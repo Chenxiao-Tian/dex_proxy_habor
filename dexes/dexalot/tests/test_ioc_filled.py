@@ -1,0 +1,62 @@
+import aiohttp
+import asyncio
+import time
+
+async def recv_osf(ws):
+    osf = await ws.receive_json()
+    print('OSF: ', osf)
+
+async def recv_trade(ws):
+    trade = await ws.receive_json()
+    print('TRADE: ', trade)
+
+async def main():
+    async with aiohttp.ClientSession() as session:
+        async with session.ws_connect('ws://localhost:8081/private/ws') as ws:
+            sub = {
+                'id': 1,
+                'jsonrpc': '2.0',
+                'method': 'subscribe',
+                'params': {'channel': 'ORDER'}
+            }
+            print('Subscription request: ', sub)
+            await ws.send_json(sub)
+            sub_reply = await ws.receive_json()
+            print('Subscription reply: ', sub_reply)
+
+            sub = {
+                'id': 2,
+                'jsonrpc': '2.0',
+                'method': 'subscribe',
+                'params': {'channel': 'TRADE'}
+            }
+            print('Subscription request: ', sub)
+            await ws.send_json(sub)
+            sub_reply = await ws.receive_json()
+            print('Subscription reply: ', sub_reply)
+
+            insert = {
+                'id': 3,
+                'jsonrpc': '2.0',
+                'method': 'insert_order',
+                'params': {
+                    'client_order_id': str(time.time_ns()),
+                    'symbol': 'ALOT/AVAX',
+                    'price': '0.1818',
+                    'qty': '2',
+                    'side': 'SELL',
+                    'type1': 1,
+                    'type2': 2,
+                    'timeout': 10}}
+            print('Insert request: ', insert)
+            await ws.send_json(insert)
+            insert_reply = await ws.receive_json()
+            print('Insert reply: ', insert_reply)
+
+            await recv_trade(ws)
+            await recv_osf(ws)
+
+            print('Test DONE')
+
+
+asyncio.run(main())

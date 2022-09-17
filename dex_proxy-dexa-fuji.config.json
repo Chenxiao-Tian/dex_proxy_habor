@@ -1,0 +1,51 @@
+{
+  "logging": {
+    "level": "debug",
+    "async": false,
+    "overrides": [
+      {
+        "logger_name": "urllib3.connectionpool",
+        "level": "info"
+      },
+      {
+        "logger_name": "web3.RequestManager",
+        "level": "info"
+      },
+      {
+        "logger_name": "web3.providers.HTTPProvider",
+        "level": "info"
+      },
+      {
+        "logger_name": "pantheon.app_health",
+        "level": "info"
+      },
+      {
+        "logger_name": "aio_pika.exchange",
+        "level": "info"
+      }
+    ]
+  },
+  "RabbitMQ": {
+    "url": "amqp://dev-sng-rmq.kdev"
+  },
+  "server": {
+    "port": 1957
+  },
+  "dex": {
+    "name": "dexa",
+    "connectors": {
+      "dexalot": {
+        "rest": {
+          "base_uri": "https://api.dexalot-test.com",
+          "api_path": "/api/trading",
+          "request_timeout": 60
+        },
+        "envs": {
+          "fuji-multi-mainnet": "https://api.avax-test.network/ext/bc/C/rpc",
+          "fuji-multi-subnet": "https://subnets.avax.network/dexalot/testnet/rpc"
+        }
+      }
+    },
+    "poll_interval_s": 1
+  }
+}
