@@ -24,8 +24,8 @@ async def main():
                 'params': {
                     'client_order_id': str(time.time_ns()),
                     'symbol': 'ALOT/AVAX',
-                    'price': '0.15',
-                    'qty': '3',
+                    'price': '0.12',
+                    'qty': '5',
                     'side': 'BUY',
                     'type1': 1,
                     'type2': 0,

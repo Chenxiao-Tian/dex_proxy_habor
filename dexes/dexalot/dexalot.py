@@ -30,70 +30,48 @@ class Dexalot:
         self.__server.register('POST', '/private/fill-up-gas-tank', self.__fill_up_gas_tank)
         self.__server.register('POST', '/private/deposit', self.__deposit)
         self.__server.register('POST', '/private/withdraw', self.__withdraw)
+        self.__server.register('POST', '/private/insert-order', self.__insert_order)
+        self.__server.register('DELETE', '/private/cancel-order', self.__cancel_order)
         self.__server.register('DELETE', '/private/cancel-all', self.__cancel_all)
 
     async def process_request(self, ws, request_id, method, params: dict):
-        if method == 'insert_order':
-            await self.__insert_order(ws, request_id, params)
-        elif method == 'cancel_orders':
-            await self.__cancel_orders(ws, request_id, params)
-        else:
-            return False
-        return True
+        return False
 
-    async def __insert_order(self, ws, request_id: int, params: dict):
-        client_oid = params['client_order_id']
-        symbol = params['symbol']
-        price = Decimal(params['price'])
-        qty = Decimal(params['qty'])
-        assert params['side'] == 'BUY' or params['side'] == 'SELL', 'Unknown order side'
-        side = Side.BUY if params['side'] == 'BUY' else Side.SELL
-        type1 = OrderType1(params['type1'])
-        type2 = OrderType2(params['type2'])
-        timeout = params['timeout']
-
-        _logger.debug(
-            f'Inserting order: client_oid={client_oid}, symbol={symbol}, price={price}, qty={qty}, side={side.name}, type1={type1.name}, type2={type2.name}, timeout={timeout}s')
-
-        reply = {'jsonrpc': '2.0', 'id': request_id}
+    async def __insert_order(self, params: dict):
         try:
+            client_oid = params['client_order_id']
+            symbol = params['symbol']
+            price = Decimal(params['price'])
+            qty = Decimal(params['qty'])
+            assert params['side'] == 'BUY' or params['side'] == 'SELL', 'Unknown order side'
+            side = Side.BUY if params['side'] == 'BUY' else Side.SELL
+            type1 = OrderType1(params['type1'])
+            type2 = OrderType2(params['type2'])
+            timeout = params.get('timeout')
+
+            _logger.debug(f'Inserting order: client_oid={client_oid}, symbol={symbol}, price={price}, qty={qty}, side={side.name}, type1={type1.name}, type2={type2.name}, timeout_s={timeout}')
             result = self.__api.insert_order(client_oid, symbol, price, qty, side, type1, type2, timeout)
             if result.error == TransactionError.NO_ERROR:
-                reply['result'] = {'client_order_id': client_oid}
+                return 200, {'result': {'client_order_id': client_oid}}
             else:
-                reply['error'] = {
-                    'code': result.error.value,
-                    'message': result.message}
+                return 400, {'error': {'code': result.error.value, 'message': result.message}}
         except Exception as e:
             _logger.exception(f'Failed to insert order: %r', e)
-            reply['error'] = {'message': repr(e)}
-        finally:
-            await self.__server.send_json(ws, reply)
+            return 400, {'error': {'message': repr(e)}}
 
-    async def __cancel_orders(self, ws, request_id: int, params: dict):
-        order_ids = params['order_ids']
-        timeout = params['timeout']
-
-        _logger.debug(f'Canceling orders: order-ids={order_ids}, timeout={timeout}')
-
-        reply = {'jsonrpc': '2.0', 'id': request_id}
+    async def __cancel_order(self, params: dict):
         try:
-            if len(order_ids) > 1:
-                result = self.__api.bulk_cancel(order_ids, timeout)
-            else:
-                result = self.__api.cancel_order(order_ids[0], timeout)
-
+            order_ids = params['order_id']
+            timeout = params.get('timeout')
+            _logger.debug(f'Canceling order: order-id={order_id}, timeout={timeout}')
+            result = self.__api.cancel_order(order_id, timeout)
             if result.error == TransactionError.NO_ERROR:
-                reply['result'] = {'order_ids': order_ids}
+                return 200, {'result': {'order_id': order_id}}
             else:
-                reply['error'] = {
-                    'code': result.error.value,
-                    'message': result.message}
+                return 400, {'error': {'code': result.error.value, 'message': result.message}}
         except Exception as e:
             _logger.exception(f'Failed to cancel orders: %r', e)
-            reply['error'] = {'message': repr(e)}
-        finally:
-            await self.__server.send_json(ws, reply)
+            return 400, {'error': {'message': repr(e)}}
 
     async def __cancel_all(self, params):
         '''
@@ -130,9 +108,9 @@ class Dexalot:
         return 400 if failed_orders else 200, {'canceled': canceled_orders, 'failed': failed_orders}
 
     async def __get_order(self, params):
-        order_id = params['order_id']
-        _logger.debug(f'Getting order: oid={order_id}')
         try:
+            order_id = params['order_id']
+            _logger.debug(f'Getting order: oid={order_id}')
             order = self.__api.subnet.get_order(order_id)
             if order is None:
                 return 404, {'error': {'message': 'Order not found'}}
@@ -143,8 +121,8 @@ class Dexalot:
             return 400, {'error': {'message': str(e)}}
 
     async def __get_open_orders(self, params):
-        symbol = params.get('symbol')
         try:
+            symbol = params.get('symbol')
             orders = await self.__api.get_open_orders(self.__api.subnet.account.address, symbol)
             return 200, [order.toDict() for order in orders]
         except Exception as e:

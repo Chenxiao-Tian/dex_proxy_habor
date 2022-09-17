@@ -4,7 +4,7 @@ import time
 
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with session.ws_connect('ws://localhost:8081/private/ws') as ws:
+        async with session.ws_connect('ws://localhost:1957/private/ws') as ws:
             sub = {
                 'id': 1,
                 'jsonrpc': '2.0',

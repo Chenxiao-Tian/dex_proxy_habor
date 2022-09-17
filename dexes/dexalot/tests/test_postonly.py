@@ -4,7 +4,7 @@ import time
 
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with session.ws_connect('ws://localhost:8081/private/ws') as ws:
+        async with session.ws_connect('ws://localhost:1957/private/ws') as ws:
             sub = {
                 'id': 1,
                 'jsonrpc': '2.0',
@@ -24,7 +24,7 @@ async def main():
                 'params': {
                     'client_order_id': str(time.time_ns()),
                     'symbol': 'ALOT/AVAX',
-                    'price': '0.15',
+                    'price': '0.19',
                     'qty': '3',
                     'side': 'BUY',
                     'type1': 1,

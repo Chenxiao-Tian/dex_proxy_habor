@@ -12,7 +12,7 @@ async def recv_trade(ws):
 
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with session.ws_connect('ws://localhost:8081/private/ws') as ws:
+        async with session.ws_connect('ws://localhost:1957/private/ws') as ws:
             sub = {
                 'id': 1,
                 'jsonrpc': '2.0',
@@ -42,9 +42,9 @@ async def main():
                 'params': {
                     'client_order_id': str(time.time_ns()),
                     'symbol': 'ALOT/AVAX',
-                    'price': '0.1818',
+                    'price': '0.1820',
                     'qty': '2',
-                    'side': 'SELL',
+                    'side': 'BUY',
                     'type1': 1,
                     'type2': 2,
                     'timeout': 10}}
