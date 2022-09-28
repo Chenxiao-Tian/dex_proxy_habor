@@ -179,7 +179,7 @@ class DexProxy:
 
 
 if __name__ == '__main__':
-    pt = Pantheon('dex-proxy')
+    pt = Pantheon('dex_proxy')
     parser = StandardArgParser('Dex Proxy')
     pt.load_args_and_config(parser)
     proxy = DexProxy(pt)

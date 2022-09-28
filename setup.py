@@ -16,7 +16,7 @@ tag = run('git', 'for-each-ref', '--format=%(refname:short)',
 rev = run('git', 'rev-parse', '--short=8', 'HEAD')
 
 setuptools.setup(
-    name='dex-proxy',
+    name='dex_proxy',
     version=f'{tag}+{rev}',
     install_requires=[
         'aiohttp==3.7.4',
