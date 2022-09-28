@@ -62,7 +62,7 @@ class Dexalot:
     async def __cancel_order(self, params: dict):
         try:
             order_id = params['order_id']
-            timeout = params.get('timeout')
+            timeout = int(params.get('timeout'))
             _logger.debug(f'Canceling order: order-id={order_id}, timeout={timeout}')
             result = self.__api.cancel_order(order_id, timeout)
             if result.error == TransactionError.NO_ERROR:

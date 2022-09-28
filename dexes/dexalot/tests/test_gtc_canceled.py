@@ -21,18 +21,7 @@ async def insert(session):
         print(f'Received text: {text}')
 
 async def cancel(session, order_id):
-    data = {
-        'client_order_id': str(time.time_ns()),
-        'symbol': 'ALOT/AVAX',
-        'price': '0.21',
-        'qty': '2',
-        'side': 'SELL',
-        'type1': 1,
-        'type2': 0,
-        'timeout': 10
-    }
-
-    async with session.delete(f'http://dev-sng-both0.kdev:1957/private/cancel-order?order_id={order_id}') as response:
+    async with session.delete(f'http://dev-sng-both0.kdev:1957/private/cancel-order?order_id={order_id}&timeout=10') as response:
         status = response.status
         print(f'Received status {status}')
         text = await response.text()
