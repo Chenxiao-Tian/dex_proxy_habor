@@ -4,7 +4,7 @@ import asyncio
 
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with session.get('http://localhost:8081/public/get-open-orders?symbol=ALOT/AVAX') as response:
+        async with session.get('http://dev-sng-both0.kdev:1957/public/get-open-orders') as response:
             status = response.status
             print(f'Received status {status}')
 

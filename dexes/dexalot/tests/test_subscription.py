@@ -4,7 +4,7 @@ import asyncio
 
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with session.ws_connect('ws://localhost:1957/private/ws') as ws:
+        async with session.ws_connect('ws://dev-sng-both0.kdev:1957/private/ws') as ws:
             sub = {
                 'id': 1,
                 'jsonrpc': '2.0',

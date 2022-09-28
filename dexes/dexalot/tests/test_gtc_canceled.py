@@ -2,9 +2,45 @@ import aiohttp
 import asyncio
 import time
 
+async def insert(session):
+    data = {
+        'client_order_id': str(time.time_ns()),
+        'symbol': 'ALOT/AVAX',
+        'price': '0.21',
+        'qty': '2',
+        'side': 'SELL',
+        'type1': 1,
+        'type2': 0,
+        'timeout': 10
+    }
+
+    async with session.post('http://dev-sng-both0.kdev:1957/private/insert-order', json=data) as response:
+        status = response.status
+        print(f'Received status {status}')
+        text = await response.text()
+        print(f'Received text: {text}')
+
+async def cancel(session, order_id):
+    data = {
+        'client_order_id': str(time.time_ns()),
+        'symbol': 'ALOT/AVAX',
+        'price': '0.21',
+        'qty': '2',
+        'side': 'SELL',
+        'type1': 1,
+        'type2': 0,
+        'timeout': 10
+    }
+
+    async with session.delete(f'http://dev-sng-both0.kdev:1957/private/cancel-order?order_id={order_id}') as response:
+        status = response.status
+        print(f'Received status {status}')
+        text = await response.text()
+        print(f'Received text: {text}')
+
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with session.ws_connect('ws://localhost:1957/private/ws') as ws:
+        async with session.ws_connect('ws://dev-sng-both0.kdev:1957/private/ws') as ws:
             sub = {
                 'id': 1,
                 'jsonrpc': '2.0',
@@ -17,40 +53,13 @@ async def main():
             sub_reply = await ws.receive_json()
             print('Subscription reply: ', sub_reply)
 
-            insert = {
-                'id': 2,
-                'jsonrpc': '2.0',
-                'method': 'insert_order',
-                'params': {
-                    'client_order_id': str(time.time_ns()),
-                    'symbol': 'ALOT/AVAX',
-                    'price': '0.12',
-                    'qty': '5',
-                    'side': 'BUY',
-                    'type1': 1,
-                    'type2': 0,
-                    'timeout': 10}}
-            print('Insert request ', insert)
-            await ws.send_json(insert)
-            insert_reply = await ws.receive_json()
-            print('Insert reply: ', insert_reply)
+            await insert(session)
 
             osf = await ws.receive_json()
             print('OSF: ', osf)
 
             order_id = osf['params']['data']['oid']
-            cancel = {
-                'id': 3,
-                'jsonrpc': '2.0',
-                'method': 'cancel_orders',
-                'params': {
-                    'order_ids': [order_id],
-                    'timeout': 10}
-            }
-            print('Cancel request: ', cancel)
-            await ws.send_json(cancel)
-            cancel_reply = await ws.receive_json()
-            print('Cancel reply: ', cancel_reply)
+            await cancel(session, order_id)
 
             osf = await ws.receive_json()
             print('OSF: ', osf)

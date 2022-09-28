@@ -4,7 +4,7 @@ import asyncio
 
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with session.get('http://localhost:8081/public/get-order?order_id=0x000000000000000000000000000000000000000000000000000000006317045a') as response:
+        async with session.get('http://dev-sng-both0.kdev:1957/public/get-order?order_id=0x0000000000000000000000000000000000000000000000000000000063178d03') as response:
             status = response.status
             print(f'Received status {status}')
 

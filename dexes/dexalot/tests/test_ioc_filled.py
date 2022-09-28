@@ -2,17 +2,27 @@ import aiohttp
 import asyncio
 import time
 
-async def recv_osf(ws):
-    osf = await ws.receive_json()
-    print('OSF: ', osf)
+async def insert(session):
+    data = {
+        'client_order_id': str(time.time_ns()),
+        'symbol': 'ALOT/AVAX',
+        'price': '0.21',
+        'qty': '2',
+        'side': 'SELL',
+        'type1': 1,
+        'type2': 2,
+        'timeout': 10
+    }
 
-async def recv_trade(ws):
-    trade = await ws.receive_json()
-    print('TRADE: ', trade)
+    async with session.post('http://dev-sng-both0.kdev:1957/private/insert-order', json=data) as response:
+        status = response.status
+        print(f'Received status {status}')
+        text = await response.text()
+        print(f'Received text: {text}')
 
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with session.ws_connect('ws://localhost:1957/private/ws') as ws:
+        async with session.ws_connect('ws://dev-sng-both0.kdev:1957/private/ws') as ws:
             sub = {
                 'id': 1,
                 'jsonrpc': '2.0',
@@ -35,26 +45,13 @@ async def main():
             sub_reply = await ws.receive_json()
             print('Subscription reply: ', sub_reply)
 
-            insert = {
-                'id': 3,
-                'jsonrpc': '2.0',
-                'method': 'insert_order',
-                'params': {
-                    'client_order_id': str(time.time_ns()),
-                    'symbol': 'ALOT/AVAX',
-                    'price': '0.1820',
-                    'qty': '2',
-                    'side': 'BUY',
-                    'type1': 1,
-                    'type2': 2,
-                    'timeout': 10}}
-            print('Insert request: ', insert)
-            await ws.send_json(insert)
-            insert_reply = await ws.receive_json()
-            print('Insert reply: ', insert_reply)
+            await insert(session)
 
-            await recv_trade(ws)
-            await recv_osf(ws)
+            trade = await ws.receive_json()
+            print('TRADE: ', trade)
+
+            osf = await ws.receive_json()
+            print('OSF: ', osf)
 
             print('Test DONE')
 
