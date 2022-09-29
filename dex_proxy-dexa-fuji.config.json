@@ -38,7 +38,10 @@
         "rest": {
           "base_uri": "https://api.dexalot-test.com",
           "api_path": "/api/trading",
-          "request_timeout": 60
+          "request_timeout": 60,
+          "rate_limits": {
+            "limits": [{ "key": "api.dexalot-test.com", "interval": 60, "limit": 6 }]
+          }
         },
         "envs": {
           "fuji-multi-mainnet": "https://api.avax-test.network/ext/bc/C/rpc",

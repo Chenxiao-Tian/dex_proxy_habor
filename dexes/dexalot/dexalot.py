@@ -109,12 +109,16 @@ class Dexalot:
 
     async def __get_order(self, params):
         try:
-            order_id = params['order_id']
-            _logger.debug(f'Getting order: oid={order_id}')
-            order = self.__api.subnet.get_order(order_id)
+            order_id = params.get('order_id')
+            client_oid = params.get('client_order_id')
+            if order_id is None and client_oid is None:
+                return 400, {'error': {'message': 'Either order id or client order id must be provided'}}
+
+            _logger.debug(f'Getting order: oid={order_id}, client_oid={client_oid}')
+            order = self.__api.subnet.get_order(order_id, client_oid)
             if order is None:
                 return 404, {'error': {'message': 'Order not found'}}
-            _logger.debug(f'Got order {order}')
+            _logger.debug(f'Got {order}')
             return 200, order.toDict()
         except Exception as e:
             _logger.exception(f'Failed to get order: %r', e)
