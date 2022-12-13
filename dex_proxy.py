@@ -11,7 +11,6 @@ from pantheon import Pantheon, StandardArgParser
 from web_server import WebServer
 from dexes import Dexalot
 
-import web3
 from eth_account import Account
 
 import boto3
