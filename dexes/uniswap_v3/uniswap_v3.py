@@ -16,9 +16,9 @@ _logger = logging.getLogger('uniswap_v3')
 
 
 class Order:
-    def __init__(self, client_oId: str, symbol: str, base_ccy_qty: Decimal, quote_ccy_qty: Decimal, side: Side, fee_rate: int, deadline_since_epoch_s: int):
-        self.oId = None
-        self.client_oId = client_oId
+    def __init__(self, client_order_id: str, symbol: str, base_ccy_qty: Decimal, quote_ccy_qty: Decimal, side: Side, fee_rate: int, deadline_since_epoch_s: int):
+        self.order_id = None
+        self.client_order_id = client_order_id
         self.symbol = symbol
         self.base_ccy_qty = base_ccy_qty
         self.quote_ccy_qty = quote_ccy_qty
@@ -32,15 +32,15 @@ class Order:
         self.revert_reason = None
 
     def __str__(self):
-        return f'Order: oid={self.oId}, client_oid={self.client_oId}, symbol={self.symbol}, ' \
+        return f'Order: order_id={self.order_id}, client_order_id={self.client_order_id}, symbol={self.symbol}, ' \
                f'base_ccy_qty={self.base_ccy_qty}, quote_ccy_qty={self.quote_ccy_qty}, side={self.side.name}, ' \
                f'fee_rate={self.fee_rate}, cancel_requested={self.cancel_requested}, finalised={self.finalised}, ' \
                f'finalised_at={self.finalised_at}, reverted={self.reverted}, revert_reason={self.revert_reason}'
 
     def toDict(self):
         return {
-            'oId': self.oId,
-            'client_oId': self.client_oId,
+            'order_id': self.order_id,
+            'client_order_id': self.client_order_id,
             'symbol': self.symbol,
             'base_ccy_qty': str(self.base_ccy_qty),
             'quote_ccy_qty': str(self.quote_ccy_qty),
@@ -89,7 +89,7 @@ class Uniswap:
 
     async def __insert_order(self, params: dict):
         try:
-            client_oId = params['client_order_id']
+            client_order_id = params['client_order_id']
             symbol = params['symbol']
             base_ccy_qty = Decimal(params['base_ccy_qty'])
             quote_ccy_qty = Decimal(params['quote_ccy_qty'])
@@ -104,9 +104,9 @@ class Uniswap:
             base_ccy_symbol = instrument.base_currency
             quote_ccy_symbol = instrument.quote_currency
 
-            order = Order(client_oId, symbol, base_ccy_qty,
+            order = Order(client_order_id, symbol, base_ccy_qty,
                           quote_ccy_qty, side, fee_rate, gas_price, timeout_s)
-            self.__orders[client_oId] = order
+            self.__orders[client_order_id] = order
 
             _logger.debug(f'Inserting : {order}')
 
@@ -117,8 +117,8 @@ class Uniswap:
                 nonce, result = self.__api.swap_exact_input_single(
                     base_ccy_symbol, quote_ccy_symbol, base_ccy_qty, quote_ccy_qty, fee_rate, timeout_s, 210000, gas_price)
             if result.error_type == ErrorType.NO_ERROR:
-                order.oId = result.tx_hash
-                self.__client_oid_to_nonce[client_oId] = nonce
+                order.order_id = result.tx_hash
+                self.__client_oid_to_nonce[client_order_id] = nonce
                 return 200, {'result': {'order_id': result.tx_hash}}
             else:
                 order.finalised = True
@@ -134,10 +134,10 @@ class Uniswap:
 
     async def __amend_order(self, params: dict):
         try:
-            client_oId = params['client_order_id']
+            client_order_id = params['client_order_id']
 
-            if (client_oId in self.__orders.keys()):
-                order = self.__orders[client_oId]
+            if (client_order_id in self.__orders.keys()):
+                order = self.__orders[client_order_id]
 
                 if (order.finalised):
                     return 400, {'error': {'message': 'order already finalised'}}
@@ -156,12 +156,12 @@ class Uniswap:
 
                 if (order.side == Side.BUY):
                     _, result = self.__api.swap_exact_output_single(
-                        quote_ccy_symbol, base_ccy_symbol, order.quote_ccy_qty, order.base_ccy_qty, order.fee_rate, timeout_s, 210000, gas_price, nonce=self.__client_oid_to_nonce[client_oId])
+                        quote_ccy_symbol, base_ccy_symbol, order.quote_ccy_qty, order.base_ccy_qty, order.fee_rate, timeout_s, 210000, gas_price, nonce=self.__client_oid_to_nonce[client_order_id])
                 else:
                     _, result = self.__api.swap_exact_input_single(
-                        base_ccy_symbol, quote_ccy_symbol, order.base_ccy_qty, order.quote_ccy_qty, order.fee_rate, timeout_s, 210000, gas_price, nonce=self.__client_oid_to_nonce[client_oId])
+                        base_ccy_symbol, quote_ccy_symbol, order.base_ccy_qty, order.quote_ccy_qty, order.fee_rate, timeout_s, 210000, gas_price, nonce=self.__client_oid_to_nonce[client_order_id])
                 if result.error_type == ErrorType.NO_ERROR:
-                    return 200, {'result': {'order_id': order.oId}}
+                    return 200, {'result': {'order_id': order.order_id}}
                 else:
                     return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
                 
@@ -174,19 +174,19 @@ class Uniswap:
 
     async def __cancel_order(self, params: dict):
         try:
-            client_oId = params['client_order_id']
+            client_order_id = params['client_order_id']
             gas_price = int(params['gas_price'])
 
-            if (client_oId in self.__orders.keys()):
-                order = self.__orders[client_oId]
+            if (client_order_id in self.__orders.keys()):
+                order = self.__orders[client_order_id]
                 if (order.finalised):
                     return 400, {'error': {'message': 'order already finalised'}}
                 _logger.debug(f'Canceling : {order}')
                 _, result = self.__api.withdraw_native(
-                    0, gas_price, nonce=self.__client_oid_to_nonce[client_oId])
+                    0, gas_price, nonce=self.__client_oid_to_nonce[client_order_id])
                 if result.error_type == ErrorType.NO_ERROR:
                     order.cancel_requested = True
-                    return 200, {'result': {'order_id': order.oId}}
+                    return 200, {'result': {'order_id': order.order_id}}
                 else:
                     return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
             else:
@@ -205,20 +205,20 @@ class Uniswap:
             if order.finalised == False and order.cancel_requested == False:
                 _logger.debug(f'Canceling : {order}')
                 _, result = self.__api.withdraw_native(
-                    0, gas_price, nonce=self.__client_oid_to_nonce[order.client_oId])
+                    0, gas_price, nonce=self.__client_oid_to_nonce[order.client_order_id])
                 if result.error_type == ErrorType.NO_ERROR:
                     order.cancel_requested = True
-                    cancel_requested.append(order.client_oId)
+                    cancel_requested.append(order.client_order_id)
                 else:
-                    failed_cancels.append(order.client_oId)
+                    failed_cancels.append(order.client_order_id)
         return 400 if failed_cancels else 200, {'cancel_requested': cancel_requested, 'failed_cancels': failed_cancels}
 
     async def __get_order(self, params):
         try:
-            client_oId = params['client_order_id']
-            _logger.debug(f'Getting order: client_oId={client_oId}')
-            if (client_oId in self.__orders.keys()):
-                return 200, self.__orders[client_oId].toDict()
+            client_order_id = params['client_order_id']
+            _logger.debug(f'Getting order: client_order_id={client_order_id}')
+            if (client_order_id in self.__orders.keys()):
+                return 200, self.__orders[client_order_id].toDict()
             else:
                 return 404, {'error': {'message': 'Order not found'}}
         except Exception as e:
@@ -273,8 +273,8 @@ class Uniswap:
         while True:
             for order in self.__orders.values():
                 if order.finalised and order.finalised_at + self.finalised_orders_cleanup_after_s < int(time.time()):
-                    self.__orders.pop(order.client_oId)
-                    self.__client_oid_to_nonce.pop(order.client_oId)
+                    self.__orders.pop(order.client_order_id)
+                    self.__client_oid_to_nonce.pop(order.client_order_id)
 
             await self.pantheon.sleep(poll_interval_s)
 
