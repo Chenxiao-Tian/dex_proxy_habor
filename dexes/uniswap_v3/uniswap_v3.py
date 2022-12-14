@@ -34,9 +34,8 @@ class Order:
     def __str__(self):
         return f'Order: oid={self.oId}, client_oid={self.client_oId}, symbol={self.symbol}, ' \
                f'base_ccy_qty={self.base_ccy_qty}, quote_ccy_qty={self.quote_ccy_qty}, side={self.side.name}, ' \
-               f'fee_rate={self.fee_rate}, deadline_since_epoch_s={self.deadline_since_epoch_s}, ' \
-               f'cancel_requested={self.cancel_requested}, finalised={self.finalised}, finalised_at={self.finalised_at}, ' \
-               f'reverted={self.reverted}, revert_reason={self.revert_reason}'
+               f'fee_rate={self.fee_rate}, cancel_requested={self.cancel_requested}, finalised={self.finalised}, ' \
+               f'finalised_at={self.finalised_at}, reverted={self.reverted}, revert_reason={self.revert_reason}'
 
     def toDict(self):
         return {
@@ -47,10 +46,9 @@ class Order:
             'quote_ccy_qty': str(self.quote_ccy_qty),
             'side': self.side.name,
             'fee_rate': self.fee_rate,
-            'deadline_since_epoch_s': self.deadline_since_epoch_s,
             'cancel_requested': self.cancel_requested,
             'finalised': self.finalised,
-            'reverted': str(self.reverted),
+            'reverted': self.reverted,
             'revert_reason': self.revert_reason
         }
 
@@ -71,6 +69,8 @@ class Uniswap:
         self.__server.register('POST', '/private/withdraw', self.__withdraw)
         self.__server.register(
             'POST', '/private/insert-order', self.__insert_order)
+        self.__server.register(
+            'POST', '/private/amend-order', self.__amend_order)
         self.__server.register(
             'DELETE', '/private/cancel-order', self.__cancel_order)
         self.__server.register(
@@ -130,6 +130,46 @@ class Uniswap:
             order.finalised = True
             order.reverted = True
             order.finalised_at = time.time()
+            return 400, {'error': {'message': repr(e)}}
+
+    async def __amend_order(self, params: dict):
+        try:
+            client_oId = params['client_order_id']
+
+            if (client_oId in self.__orders.keys()):
+                order = self.__orders[client_oId]
+
+                if (order.finalised):
+                    return 400, {'error': {'message': 'order already finalised'}}
+                elif (order.cancel_requested):
+                    return 400, {'error': {'message': 'Cannot amend. Cancel in progress'}}
+
+                gas_price = int(params['gas_price'])
+                timeout_s = int(time.time() + params.get('timeout_s'))
+
+                instrument = self.__instruments.get_instrument(
+                    InstrumentId('uni3', order.symbol))
+                base_ccy_symbol = instrument.base_currency
+                quote_ccy_symbol = instrument.quote_currency
+
+                _logger.debug(f'Amending : {order}')
+
+                if (order.side == Side.BUY):
+                    _, result = self.__api.swap_exact_output_single(
+                        quote_ccy_symbol, base_ccy_symbol, order.quote_ccy_qty, order.base_ccy_qty, order.fee_rate, timeout_s, 210000, gas_price, nonce=self.__client_oid_to_nonce[client_oId])
+                else:
+                    _, result = self.__api.swap_exact_input_single(
+                        base_ccy_symbol, quote_ccy_symbol, order.base_ccy_qty, order.quote_ccy_qty, order.fee_rate, timeout_s, 210000, gas_price, nonce=self.__client_oid_to_nonce[client_oId])
+                if result.error_type == ErrorType.NO_ERROR:
+                    return 200, {'result': {'order_id': order.oId}}
+                else:
+                    return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
+                
+            else:
+                return 404, {'error': {'message': 'order not found'}}
+            
+        except Exception as e:
+            _logger.exception(f'Failed to amend order: %r', e)
             return 400, {'error': {'message': repr(e)}}
 
     async def __cancel_order(self, params: dict):
@@ -229,13 +269,13 @@ class Uniswap:
     async def __finalised_order_cleanup(self, poll_interval_s):
         _logger.debug(
             f'Start polling for removing {self.finalised_orders_cleanup_after_s}s earlier finalised orders every {poll_interval_s}s')
-        
+
         while True:
             for order in self.__orders.values():
                 if order.finalised and order.finalised_at + self.finalised_orders_cleanup_after_s < int(time.time()):
                     self.__orders.pop(order.client_oId)
                     self.__client_oid_to_nonce.pop(order.client_oId)
-                    
+
             await self.pantheon.sleep(poll_interval_s)
 
     async def start(self, private_key, secrets):
