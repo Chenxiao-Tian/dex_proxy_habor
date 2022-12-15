@@ -164,10 +164,10 @@ class Uniswap:
                     return 200, {'result': {'order_id': order.order_id}}
                 else:
                     return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
-                
+
             else:
                 return 404, {'error': {'message': 'order not found'}}
-            
+
         except Exception as e:
             _logger.exception(f'Failed to amend order: %r', e)
             return 400, {'error': {'message': repr(e)}}
@@ -182,8 +182,8 @@ class Uniswap:
                 if (order.finalised):
                     return 400, {'error': {'message': 'order already finalised'}}
                 _logger.debug(f'Canceling : {order}')
-                _, result = self.__api.withdraw_native(
-                    0, gas_price, nonce=self.__client_oid_to_nonce[client_order_id])
+                _, result = self.cancel_transaction(
+                    gas_price, nonce=self.__client_oid_to_nonce[client_order_id])
                 if result.error_type == ErrorType.NO_ERROR:
                     order.cancel_requested = True
                     return 200, {'result': {'order_id': order.order_id}}
@@ -204,8 +204,8 @@ class Uniswap:
         for order in self.__orders.values():
             if order.finalised == False and order.cancel_requested == False:
                 _logger.debug(f'Canceling : {order}')
-                _, result = self.__api.withdraw_native(
-                    0, gas_price, nonce=self.__client_oid_to_nonce[order.client_order_id])
+                _, result = self.cancel_transaction(
+                    gas_price, nonce=self.__client_oid_to_nonce[order.client_order_id])
                 if result.error_type == ErrorType.NO_ERROR:
                     order.cancel_requested = True
                     cancel_requested.append(order.client_order_id)
@@ -265,6 +265,10 @@ class Uniswap:
                 await self.__event_sink.on_event(channel, event)
 
             await self.pantheon.sleep(poll_interval_s)
+
+    async def cancel_transaction(self, gas_price: int, nonce: int):
+        _logger.debug(f'Trying to cancel transaction with nonce={nonce}')
+        return self.__api.withdraw_native(0, gas_price, nonce)
 
     async def __finalised_order_cleanup(self, poll_interval_s):
         _logger.debug(
