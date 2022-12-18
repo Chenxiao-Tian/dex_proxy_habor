@@ -1,6 +1,7 @@
 import logging
 import time
 from decimal import Decimal
+from enum import Enum
 
 from pantheon import Pantheon
 from pantheon.market_data_types import Side
@@ -12,7 +13,15 @@ from pyutils.exchange_apis.erc20web3_api import ErrorType
 from pyutils.exchange_apis import ApiFactory
 from pyutils.exchange_connectors import ConnectorFactory, ConnectorType
 
+from web3.exceptions import TransactionNotFound
+
 _logger = logging.getLogger('uniswap_v3')
+
+
+class TransactionType(Enum):
+    SWAP = 'swap'
+    CANCEL = 'cancel'
+    TRANSFER = 'transfer'
 
 
 class Order:
@@ -29,13 +38,12 @@ class Order:
         self.finalised = False
         self.finalised_at = None
         self.reverted = False
-        self.revert_reason = None
 
     def __str__(self):
         return f'Order: order_id={self.order_id}, client_order_id={self.client_order_id}, symbol={self.symbol}, ' \
                f'base_ccy_qty={self.base_ccy_qty}, quote_ccy_qty={self.quote_ccy_qty}, side={self.side.name}, ' \
                f'fee_rate={self.fee_rate}, cancel_requested={self.cancel_requested}, finalised={self.finalised}, ' \
-               f'finalised_at={self.finalised_at}, reverted={self.reverted}, revert_reason={self.revert_reason}'
+               f'finalised_at={self.finalised_at}, reverted={self.reverted}'
 
     def toDict(self):
         return {
@@ -48,8 +56,7 @@ class Order:
             'fee_rate': self.fee_rate,
             'cancel_requested': self.cancel_requested,
             'finalised': self.finalised,
-            'reverted': self.reverted,
-            'revert_reason': self.revert_reason
+            'reverted': self.reverted
         }
 
 
@@ -78,6 +85,8 @@ class Uniswap:
 
         self.__orders = {}
         self.__client_oid_to_nonce = {}
+        self.__swap_tx_hash_to_client_oid = {}
+        self.__cancel_tx_hash_to_client_oid = {}
 
         self.__instruments = None
 
@@ -119,6 +128,7 @@ class Uniswap:
             if result.error_type == ErrorType.NO_ERROR:
                 order.order_id = result.tx_hash
                 self.__client_oid_to_nonce[client_order_id] = nonce
+                self.__swap_tx_hash_to_client_oid[result.tx_hash] = client_order_id
                 return 200, {'result': {'order_id': result.tx_hash}}
             else:
                 order.finalised = True
@@ -161,6 +171,7 @@ class Uniswap:
                     _, result = self.__api.swap_exact_input_single(
                         base_ccy_symbol, quote_ccy_symbol, order.base_ccy_qty, order.quote_ccy_qty, order.fee_rate, timeout_s, 210000, gas_price, nonce=self.__client_oid_to_nonce[client_order_id])
                 if result.error_type == ErrorType.NO_ERROR:
+                    self.__swap_tx_hash_to_client_oid[result.tx_hash] = client_order_id
                     return 200, {'result': {'order_id': order.order_id}}
                 else:
                     return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
@@ -186,6 +197,7 @@ class Uniswap:
                     gas_price, nonce=self.__client_oid_to_nonce[client_order_id])
                 if result.error_type == ErrorType.NO_ERROR:
                     order.cancel_requested = True
+                    self.__cancel_tx_hash_to_client_oid[result.tx_hash] = client_order_id
                     return 200, {'result': {'order_id': order.order_id}}
                 else:
                     return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
@@ -209,6 +221,7 @@ class Uniswap:
                 if result.error_type == ErrorType.NO_ERROR:
                     order.cancel_requested = True
                     cancel_requested.append(order.client_order_id)
+                    self.__cancel_tx_hash_to_client_oid[result.tx_hash] = order.client_order_id
                 else:
                     failed_cancels.append(order.client_order_id)
         return 400 if failed_cancels else 200, {'cancel_requested': cancel_requested, 'failed_cancels': failed_cancels}
@@ -253,16 +266,17 @@ class Uniswap:
             _logger.exception(f'Failed to withdraw: %r', e)
             return 400, {'error': {'message': str(e)}}
 
-    async def __poll_order_for_status(self, poll_interval_s):
+    async def __poll_tx_for_status(self, poll_interval_s):
         _logger.debug(
-            f'Start polling for order status every {poll_interval_s}s')
-        channel = 'ORDER'
+            f'Start polling for transaction status every {poll_interval_s}s')
         while True:
-            async for order in self.__orders.values():
-                if order.finalised == False:
-                    # TODO : poll for order status
-                    event = {}
-                await self.__event_sink.on_event(channel, event)
+            _logger.debug('Polling status for swap transactions')
+            self.__poll_tx(self.__swap_tx_hash_to_client_oid,
+                           TransactionType.SWAP)
+
+            _logger.debug('Polling status for cancel transactions')
+            self.__poll_tx(self.__cancel_tx_hash_to_client_oid,
+                           TransactionType.CANCEL)
 
             await self.pantheon.sleep(poll_interval_s)
 
@@ -282,6 +296,36 @@ class Uniswap:
 
             await self.pantheon.sleep(poll_interval_s)
 
+    async def __poll_tx(self, tx_hash_to_clientOid: dict, type: TransactionType):
+        channel = 'ORDER'
+        for tx_hash in tx_hash_to_clientOid.keys():
+            client_order_id = tx_hash_to_clientOid[tx_hash]
+            if (client_order_id not in self.__orders or self.__orders[client_order_id].finalised):
+                tx_hash_to_clientOid.pop(tx_hash)
+            else:
+                try:
+                    tx = self.__api.get_transaction_receipt(tx_hash)
+                    if (not tx is None):
+                        status = tx['status']
+                        order = self.__orders[client_order_id]
+                        order.finalised = True
+                        order.finalised_at = time.time()
+                        if ((type == TransactionType.SWAP and status == 0) or (type == TransactionType.CANCEL and status == 1)):
+                            order.reverted = True
+                        event = {
+                            'jsonrpc': '2.0',
+                            'method': 'subscription',
+                            'params': {
+                                'channel': channel,
+                                'data': order.toDict()
+                            }
+                        }
+                        await self.__event_sink.on_event(channel, event)
+                except Exception as ex:
+                    if not isinstance(ex, TransactionNotFound):
+                        _logger.error(
+                            f'Error polling tx_hash : {tx_hash} for order : {client_order_id}, transaction_type : {type.name}. ex = {ex}')
+
     async def start(self, private_key, secrets):
         self.__instruments = await self.pantheon.get_instruments_live_source(
             exchanges=['uni3'],
@@ -294,5 +338,5 @@ class Uniswap:
         await self.__api.initialize(private_key)
 
         poll_interval_s = self.__config['poll_interval_s']
-        self.pantheon.spawn(self.__poll_order_for_status(poll_interval_s))
+        self.pantheon.spawn(self.__poll_tx_for_status(poll_interval_s))
         self.pantheon.spawn(self.__finalised_order_cleanup(poll_interval_s))
