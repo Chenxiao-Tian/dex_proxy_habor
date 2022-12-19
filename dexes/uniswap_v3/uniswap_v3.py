@@ -24,8 +24,17 @@ class TransactionType(Enum):
     TRANSFER = 'transfer'
 
 
+class TransactionStatus(Enum):
+    PENDING = 'pending'
+    CANCEL_REQUESTED = 'cancel_requested'
+    CANCELED = 'canceled'
+    SUCCEEDED = 'succeeded'
+    FAILED = 'failed'
+
+
 class Order:
-    def __init__(self, client_order_id: str, symbol: str, base_ccy_qty: Decimal, quote_ccy_qty: Decimal, side: Side, fee_rate: int, deadline_since_epoch_s: int):
+    def __init__(self, client_order_id: str, symbol: str, base_ccy_qty: Decimal, quote_ccy_qty: Decimal, side: Side,
+                 fee_rate: int, deadline_since_epoch_s: int):
         self.order_id = None
         self.client_order_id = client_order_id
         self.symbol = symbol
@@ -33,19 +42,17 @@ class Order:
         self.quote_ccy_qty = quote_ccy_qty
         self.side = side
         self.fee_rate = fee_rate
-        self.deadline_since_epoch_s = deadline_since_epoch_s
-        self.cancel_requested = False
-        self.finalised = False
+        self.status = TransactionStatus.PENDING
+        self.deadline_since_epoch_s = deadline_since_epoch_s,
         self.finalised_at = None
-        self.reverted = False
 
     def __str__(self):
         return f'Order: order_id={self.order_id}, client_order_id={self.client_order_id}, symbol={self.symbol}, ' \
-               f'base_ccy_qty={self.base_ccy_qty}, quote_ccy_qty={self.quote_ccy_qty}, side={self.side.name}, ' \
-               f'fee_rate={self.fee_rate}, cancel_requested={self.cancel_requested}, finalised={self.finalised}, ' \
-               f'finalised_at={self.finalised_at}, reverted={self.reverted}'
+            f'base_ccy_qty={self.base_ccy_qty}, quote_ccy_qty={self.quote_ccy_qty}, side={self.side.name}, ' \
+            f'fee_rate={self.fee_rate}, status={self.status}, deadline_since_epoch_s={self.deadline_since_epoch_s}, ' \
+            f'finalised_at={self.finalised_at}'
 
-    def toDict(self):
+    def to_dict(self):
         return {
             'order_id': self.order_id,
             'client_order_id': self.client_order_id,
@@ -54,10 +61,13 @@ class Order:
             'quote_ccy_qty': str(self.quote_ccy_qty),
             'side': self.side.name,
             'fee_rate': self.fee_rate,
-            'cancel_requested': self.cancel_requested,
-            'finalised': self.finalised,
-            'reverted': self.reverted
+            'status': self.status.name
         }
+
+    def is_finalised(self):
+        if (self.finalised_at):
+            return True
+        return False
 
 
 class Uniswap:
@@ -114,7 +124,7 @@ class Uniswap:
             quote_ccy_symbol = instrument.quote_currency
 
             order = Order(client_order_id, symbol, base_ccy_qty,
-                          quote_ccy_qty, side, fee_rate, gas_price, timeout_s)
+                          quote_ccy_qty, side, fee_rate, timeout_s)
             self.__orders[client_order_id] = order
 
             _logger.debug(f'Inserting : {order}')
@@ -131,14 +141,12 @@ class Uniswap:
                 self.__swap_tx_hash_to_client_oid[result.tx_hash] = client_order_id
                 return 200, {'result': {'order_id': result.tx_hash}}
             else:
-                order.finalised = True
-                order.reverted = True
+                order.status = TransactionStatus.FAILED
                 order.finalised_at = time.time()
                 return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
         except Exception as e:
             _logger.exception(f'Failed to insert order: %r', e)
-            order.finalised = True
-            order.reverted = True
+            order.status = TransactionStatus.FAILED
             order.finalised_at = time.time()
             return 400, {'error': {'message': repr(e)}}
 
@@ -149,10 +157,8 @@ class Uniswap:
             if (client_order_id in self.__orders.keys()):
                 order = self.__orders[client_order_id]
 
-                if (order.finalised):
-                    return 400, {'error': {'message': 'order already finalised'}}
-                elif (order.cancel_requested):
-                    return 400, {'error': {'message': 'Cannot amend. Cancel in progress'}}
+                if (order.status != TransactionStatus.PENDING):
+                    return 400, {'error': {'message': f'Cannot amend. Order status={order.status.name}'}}
 
                 gas_price = int(params['gas_price'])
                 timeout_s = int(time.time() + params.get('timeout_s'))
@@ -162,14 +168,18 @@ class Uniswap:
                 base_ccy_symbol = instrument.base_currency
                 quote_ccy_symbol = instrument.quote_currency
 
+                order.deadline_since_epoch_s = timeout_s
+
                 _logger.debug(f'Amending : {order}')
 
                 if (order.side == Side.BUY):
                     _, result = self.__api.swap_exact_output_single(
-                        quote_ccy_symbol, base_ccy_symbol, order.quote_ccy_qty, order.base_ccy_qty, order.fee_rate, timeout_s, 210000, gas_price, nonce=self.__client_oid_to_nonce[client_order_id])
+                        quote_ccy_symbol, base_ccy_symbol, order.quote_ccy_qty, order.base_ccy_qty, order.fee_rate,
+                        timeout_s, 210000, gas_price, nonce=self.__client_oid_to_nonce[client_order_id])
                 else:
                     _, result = self.__api.swap_exact_input_single(
-                        base_ccy_symbol, quote_ccy_symbol, order.base_ccy_qty, order.quote_ccy_qty, order.fee_rate, timeout_s, 210000, gas_price, nonce=self.__client_oid_to_nonce[client_order_id])
+                        base_ccy_symbol, quote_ccy_symbol, order.base_ccy_qty, order.quote_ccy_qty, order.fee_rate,
+                        timeout_s, 210000, gas_price, nonce=self.__client_oid_to_nonce[client_order_id])
                 if result.error_type == ErrorType.NO_ERROR:
                     self.__swap_tx_hash_to_client_oid[result.tx_hash] = client_order_id
                     return 200, {'result': {'order_id': order.order_id}}
@@ -190,13 +200,17 @@ class Uniswap:
 
             if (client_order_id in self.__orders.keys()):
                 order = self.__orders[client_order_id]
-                if (order.finalised):
-                    return 400, {'error': {'message': 'order already finalised'}}
+
+                if (order.is_finalised()):
+                    return 400, {'error': {'message': f'Cannot cancel. Order status={order.status.name}'}}
+
                 _logger.debug(f'Canceling : {order}')
+
                 _, result = self.cancel_transaction(
                     gas_price, nonce=self.__client_oid_to_nonce[client_order_id])
+
                 if result.error_type == ErrorType.NO_ERROR:
-                    order.cancel_requested = True
+                    order.status = TransactionStatus.CANCEL_REQUESTED
                     self.__cancel_tx_hash_to_client_oid[result.tx_hash] = client_order_id
                     return 200, {'result': {'order_id': order.order_id}}
                 else:
@@ -214,12 +228,14 @@ class Uniswap:
         failed_cancels = []
 
         for order in self.__orders.values():
-            if order.finalised == False and order.cancel_requested == False:
+            if (order.status == TransactionStatus.PENDING or order.status == TransactionStatus.CANCEL_REQUESTED):
                 _logger.debug(f'Canceling : {order}')
+
                 _, result = self.cancel_transaction(
                     gas_price, nonce=self.__client_oid_to_nonce[order.client_order_id])
+
                 if result.error_type == ErrorType.NO_ERROR:
-                    order.cancel_requested = True
+                    order.status = TransactionStatus.CANCEL_REQUESTED
                     cancel_requested.append(order.client_order_id)
                     self.__cancel_tx_hash_to_client_oid[result.tx_hash] = order.client_order_id
                 else:
@@ -229,9 +245,11 @@ class Uniswap:
     async def __get_order(self, params):
         try:
             client_order_id = params['client_order_id']
+
             _logger.debug(f'Getting order: client_order_id={client_order_id}')
+
             if (client_order_id in self.__orders.keys()):
-                return 200, self.__orders[client_order_id].toDict()
+                return 200, self.__orders[client_order_id].to_dict()
             else:
                 return 404, {'error': {'message': 'Order not found'}}
         except Exception as e:
@@ -256,12 +274,14 @@ class Uniswap:
 
             _logger.debug(
                 f'Withdrawing: symbol={symbol}, amount={amount}')
+
             _, result = self.__api.withdraw_token(
                 symbol, amount, 210000, gas_price)
-            if result.error_type != ErrorType.NO_ERROR:
-                return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
-            else:
+
+            if result.error_type == ErrorType.NO_ERROR:
                 return 200, {'tx_hash': result.tx_hash}
+            else:
+                return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
         except Exception as e:
             _logger.exception(f'Failed to withdraw: %r', e)
             return 400, {'error': {'message': str(e)}}
@@ -269,6 +289,7 @@ class Uniswap:
     async def __poll_tx_for_status(self, poll_interval_s):
         _logger.debug(
             f'Start polling for transaction status every {poll_interval_s}s')
+
         while True:
             _logger.debug('Polling status for swap transactions')
             self.__poll_tx(self.__swap_tx_hash_to_client_oid,
@@ -280,44 +301,51 @@ class Uniswap:
 
             await self.pantheon.sleep(poll_interval_s)
 
-    async def cancel_transaction(self, gas_price: int, nonce: int):
-        _logger.debug(f'Trying to cancel transaction with nonce={nonce}')
-        return self.__api.withdraw_native(0, gas_price, nonce)
-
     async def __finalised_order_cleanup(self, poll_interval_s):
         _logger.debug(
             f'Start polling for removing {self.finalised_orders_cleanup_after_s}s earlier finalised orders every {poll_interval_s}s')
 
         while True:
             for order in self.__orders.values():
-                if order.finalised and order.finalised_at + self.finalised_orders_cleanup_after_s < int(time.time()):
+                if (order.is_finalised() and order.finalised_at + self.finalised_orders_cleanup_after_s < int(time.time())):
                     self.__orders.pop(order.client_order_id)
                     self.__client_oid_to_nonce.pop(order.client_order_id)
 
             await self.pantheon.sleep(poll_interval_s)
 
+    async def cancel_transaction(self, gas_price: int, nonce: int):
+        _logger.debug(f'Trying to cancel transaction with nonce={nonce}')
+        return self.__api.withdraw_native(0, gas_price, nonce)
+
     async def __poll_tx(self, tx_hash_to_clientOid: dict, type: TransactionType):
         channel = 'ORDER'
         for tx_hash in tx_hash_to_clientOid.keys():
             client_order_id = tx_hash_to_clientOid[tx_hash]
-            if (client_order_id not in self.__orders or self.__orders[client_order_id].finalised):
+            if (client_order_id not in self.__orders):
+                tx_hash_to_clientOid.pop(tx_hash)
+                continue
+            order = self.__orders[client_order_id]
+            if (order.is_finalised()):
                 tx_hash_to_clientOid.pop(tx_hash)
             else:
                 try:
                     tx = self.__api.get_transaction_receipt(tx_hash)
                     if (not tx is None):
                         status = tx['status']
-                        order = self.__orders[client_order_id]
-                        order.finalised = True
                         order.finalised_at = time.time()
-                        if ((type == TransactionType.SWAP and status == 0) or (type == TransactionType.CANCEL and status == 1)):
-                            order.reverted = True
+                        if (type == TransactionType.SWAP):
+                            if (status == 1):
+                                order.status = TransactionStatus.SUCCEEDED
+                            else:
+                                order.status = TransactionStatus.FAILED
+                        else:
+                            order.status = TransactionStatus.CANCELED
                         event = {
                             'jsonrpc': '2.0',
                             'method': 'subscription',
                             'params': {
                                 'channel': channel,
-                                'data': order.toDict()
+                                'data': order.to_dict()
                             }
                         }
                         await self.__event_sink.on_event(channel, event)
