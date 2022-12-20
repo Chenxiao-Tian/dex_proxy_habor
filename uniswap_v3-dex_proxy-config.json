@@ -1,8 +1,23 @@
 {
     "logging": {
         "level": "debug",
-        "async": false,
         "overrides": [
+            {
+                "logger_name": "aio_pika",
+                "level": "info"
+            },
+            {
+                "logger_name": "botocore",
+                "level": "info"
+            },
+            {
+                "logger_name": " aiormq.connection",
+                "level": "info"
+            },
+            {
+                "logger_name": "aiormq.channel",
+                "level": "critical"
+            },
             {
                 "logger_name": "urllib3.connectionpool",
                 "level": "info"
@@ -25,6 +40,9 @@
             }
         ]
     },
+    "TradingDB": {
+        "dsn": "postgres://master:fd97d13dad2e2da0f8aa62dfc28cc5d6742b9e8@trading-db.kdev/dev_trading"
+    },
     "RabbitMQ": {
         "url": "amqp://dev-sng-rmq.kdev"
     },
@@ -38,7 +56,7 @@
                 "web3": {
                     "chain": "Ethereum",
                     "router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
-                    "http": "https://goerli.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
+                    "http": "https://mainnet.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
                     "wallet_address": "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB"
                 }
             }

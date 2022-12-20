@@ -231,7 +231,8 @@ class Uniswap:
             if (order.status == TransactionStatus.PENDING or order.status == TransactionStatus.CANCEL_REQUESTED):
                 _logger.debug(f'Canceling : {order}')
 
-                _, result = self.cancel_transaction(1000000, nonce=self.__client_oid_to_nonce[order.client_order_id])
+                _, result = self.cancel_transaction(
+                    1000000, nonce=self.__client_oid_to_nonce[order.client_order_id])
 
                 if result.error_type == ErrorType.NO_ERROR:
                     order.status = TransactionStatus.CANCEL_REQUESTED
@@ -291,11 +292,11 @@ class Uniswap:
 
         while True:
             _logger.debug('Polling status for swap transactions')
-            self.__poll_tx(self.__swap_tx_hash_to_client_oid,
+            await self.__poll_tx(self.__swap_tx_hash_to_client_oid,
                            TransactionType.SWAP)
 
             _logger.debug('Polling status for cancel transactions')
-            self.__poll_tx(self.__cancel_tx_hash_to_client_oid,
+            await self.__poll_tx(self.__cancel_tx_hash_to_client_oid,
                            TransactionType.CANCEL)
 
             await self.pantheon.sleep(poll_interval_s)
@@ -360,7 +361,7 @@ class Uniswap:
             kinds=[],
             usage=InstrumentUsageExchanges.TradableOnly,
             lifecycles=[InstrumentLifecycle.ACTIVE],
-            rmq_conn_name='read')
+            rmq_conn_name='url')
 
         await self.__api.initialize(private_key)
 
