@@ -50,7 +50,7 @@
         "port": 1958
     },
     "dex": {
-        "name": "uniswap_v3",
+        "name": "chainEth-uni3",
         "connectors": {
             "uniswap_v3": {
                 "web3": {

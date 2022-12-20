@@ -293,11 +293,11 @@ class Uniswap:
         while True:
             _logger.debug('Polling status for swap transactions')
             await self.__poll_tx(self.__swap_tx_hash_to_client_oid,
-                           TransactionType.SWAP)
+                                 TransactionType.SWAP)
 
             _logger.debug('Polling status for cancel transactions')
             await self.__poll_tx(self.__cancel_tx_hash_to_client_oid,
-                           TransactionType.CANCEL)
+                                 TransactionType.CANCEL)
 
             await self.pantheon.sleep(poll_interval_s)
 
@@ -356,7 +356,7 @@ class Uniswap:
 
     async def start(self, private_key, secrets):
         self.__instruments = await self.pantheon.get_instruments_live_source(
-            exchanges=['uni3'],
+            exchanges=[self.__config['name']],
             symbols=[],
             kinds=[],
             usage=InstrumentUsageExchanges.TradableOnly,

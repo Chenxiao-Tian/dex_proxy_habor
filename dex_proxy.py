@@ -47,7 +47,7 @@ class DexProxy:
         name = dex_config['name']
         if name == 'dexa':
             self.__exchange = Dexalot(pantheon, dex_config, self.__server, self)
-        elif name == 'uniswap_v3':
+        elif name == 'chainEth-uni3':
             self.__exchange = Uniswap(pantheon, dex_config, self.__server, self)
         else:
             raise Exception(f'Exchange {name} not supported')
