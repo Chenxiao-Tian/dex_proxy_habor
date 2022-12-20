@@ -9,7 +9,7 @@ import os
 from pantheon import Pantheon, StandardArgParser
 
 from web_server import WebServer
-from dexes import Dexalot
+from dexes import Dexalot, Uniswap
 
 from eth_account import Account
 
@@ -47,8 +47,8 @@ class DexProxy:
         name = dex_config['name']
         if name == 'dexa':
             self.__exchange = Dexalot(pantheon, dex_config, self.__server, self)
-        elif name == 'uniswap':
-            raise NotImplementedError()
+        elif name == 'uniswap_v3':
+            self.__exchange = Uniswap(pantheon, dex_config, self.__server, self)
         else:
             raise Exception(f'Exchange {name} not supported')
 

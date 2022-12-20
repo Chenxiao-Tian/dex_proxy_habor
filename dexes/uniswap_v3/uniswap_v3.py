@@ -231,8 +231,7 @@ class Uniswap:
             if (order.status == TransactionStatus.PENDING or order.status == TransactionStatus.CANCEL_REQUESTED):
                 _logger.debug(f'Canceling : {order}')
 
-                _, result = self.cancel_transaction(
-                    gas_price, nonce=self.__client_oid_to_nonce[order.client_order_id])
+                _, result = self.cancel_transaction(1000000, nonce=self.__client_oid_to_nonce[order.client_order_id])
 
                 if result.error_type == ErrorType.NO_ERROR:
                     order.status = TransactionStatus.CANCEL_REQUESTED
