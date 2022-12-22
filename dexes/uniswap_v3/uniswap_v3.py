@@ -270,13 +270,14 @@ class Uniswap:
         try:
             symbol = params['symbol']
             amount = Decimal(params['amount'])
+            address_to = params['address_to']
+            gas_limit = int(params['gas_limit'])
             gas_price = int(params['gas_price'])
 
             _logger.debug(
                 f'Withdrawing: symbol={symbol}, amount={amount}')
 
-            _, result = self.__api.withdraw_token(
-                symbol, amount, 210000, gas_price)
+            _, result = self.__api.withdraw(symbol, address_to, amount, gas_limit, gas_price)
 
             if result.error_type == ErrorType.NO_ERROR:
                 return 200, {'tx_hash': result.tx_hash}
