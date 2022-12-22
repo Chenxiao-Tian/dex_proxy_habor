@@ -316,7 +316,7 @@ class Uniswap:
 
     async def cancel_transaction(self, gas_price: int, nonce: int):
         _logger.debug(f'Trying to cancel transaction with nonce={nonce}')
-        return self.__api.withdraw_native(0, gas_price, nonce)
+        return self.__api.cancel_transaction(nonce, gas_price)
 
     async def __poll_tx(self, tx_hash_to_clientOid: dict, type: TransactionType):
         channel = 'ORDER'
