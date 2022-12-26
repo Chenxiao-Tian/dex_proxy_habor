@@ -58,6 +58,9 @@
                     "router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
                     "http": "https://goerli.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
                     "wallet_address": "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB"
+                },
+                "websocket": {
+                    "base_uri": "wss://eth-goerli.g.alchemy.com/v2/5OEuevdMYT7tRf9bK4Ca9FV13qgrO8KW"
                 }
             }
         },

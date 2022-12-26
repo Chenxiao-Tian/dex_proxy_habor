@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import time
+
 from decimal import Decimal
 from enum import Enum
 
@@ -105,7 +107,7 @@ class TransferRequest(Request):
 
 class Uniswap:
     CHANNELS = ['ORDER']
-    
+
     def __init__(self, pantheon: Pantheon, config, server, event_sink):
         self.pantheon = pantheon
         self.__config = config
@@ -114,6 +116,8 @@ class Uniswap:
 
         api_factory = ApiFactory(ConnectorFactory(config.get('connectors')))
         self.__api = api_factory.create(self.pantheon, ConnectorType.UniswapV3)
+
+        self.msg_queue = asyncio.Queue(loop=self.pantheon.loop)
 
         self.__server.register(
             'POST', '/private/insert-order', self.__insert_order)
@@ -187,7 +191,7 @@ class Uniswap:
             order.request_status = RequestStatus.FAILED
             order.finalised_at = time.time()
             return 400, {'error': {'message': repr(e)}}
-        
+
     async def __withdraw(self, params):
         try:
             client_request_id = params['client_request_id']
@@ -219,7 +223,7 @@ class Uniswap:
             transfer.request_status = RequestStatus.FAILED
             transfer.finalised_at = time.time()
             return 400, {'error': {'message': str(e)}}
-        
+
     def __get_request_status(self, params):
         try:
             client_request_id = params['client_request_id']
@@ -234,7 +238,6 @@ class Uniswap:
         except Exception as e:
             _logger.exception(f'Failed to get request: %r', e)
             return 400, {'error': {'message': str(e)}}
-
 
     async def __amend_request(self, params: dict):
         try:
@@ -366,7 +369,7 @@ class Uniswap:
         _logger.debug(f'Trying to cancel transaction with nonce={nonce}')
         return self.__api.cancel_transaction(nonce, gas_price)
 
-    async def __poll_tx_for_status(self, poll_interval_s):
+    async def __poll_tx_for_status_rest(self, poll_interval_s):
         _logger.debug(
             f'Start polling for transaction status every {poll_interval_s}s')
 
@@ -381,6 +384,17 @@ class Uniswap:
             await self.__poll_tx(self.__cancel_tx_hash_to_client_rid, 'cancel')
 
             await self.pantheon.sleep(poll_interval_s)
+            
+    async def __get_tx_status_ws(self):
+        while True:
+            try:
+                _logger.info(
+                    "[WS] Subscribing to alchemy_minedTransactions")
+                reply = await self.__api.subscribe_alchemy_mined_transactions(self.msg_queue)
+                await self.__api.get_public_websocket_status().wait_until_disconnected()
+                await self.__api.get_public_websocket_status().wait_until_connected()
+            except Exception as ex:
+                _logger.error(ex)
 
     async def __finalised_requests_cleanup(self, poll_interval_s):
         _logger.debug(
@@ -444,5 +458,6 @@ class Uniswap:
         await self.__api.initialize(private_key)
 
         poll_interval_s = self.__config['poll_interval_s']
-        self.pantheon.spawn(self.__poll_tx_for_status(poll_interval_s))
+        self.pantheon.spawn(self.__get_tx_status_ws())
+        self.pantheon.spawn(self.__poll_tx_for_status_rest(poll_interval_s))
         self.pantheon.spawn(self.__finalised_requests_cleanup(poll_interval_s))
