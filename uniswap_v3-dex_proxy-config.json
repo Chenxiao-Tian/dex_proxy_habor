@@ -11,7 +11,7 @@
                 "level": "info"
             },
             {
-                "logger_name": " aiormq.connection",
+                "logger_name": "aiormq.connection",
                 "level": "info"
             },
             {
@@ -36,6 +36,10 @@
             },
             {
                 "logger_name": "aio_pika.exchange",
+                "level": "info"
+            },
+            {
+                "logger_name": "websockets",
                 "level": "info"
             }
         ]

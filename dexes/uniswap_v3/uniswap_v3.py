@@ -139,6 +139,7 @@ class Uniswap:
         self.__transfer_tx_hash_to_client_rid = {}
         self.__cancel_tx_hash_to_client_rid = {}
 
+        self.__exchange_name = config['name']
         self.__instruments = None
 
         self.finalised_requests_cleanup_after_s = int(
@@ -155,13 +156,13 @@ class Uniswap:
             quote_ccy_qty = Decimal(params['quote_ccy_qty'])
             assert params['side'] == 'BUY' or params['side'] == 'SELL', 'Unknown order side'
             side = Side.BUY if params['side'] == 'BUY' else Side.SELL
-            fee_rate = Decimal(params['fee_rate'])
+            fee_rate = int(params['fee_rate'])
             gas_price = int(params['gas_price'])
             gas_limit = 210000  # TODO: Check for the most suitable value
             timeout_s = int(time.time() + params.get('timeout_s'))
 
             instrument = self.__instruments.get_instrument(
-                InstrumentId('uni3', symbol))
+                InstrumentId(self.__exchange_name, symbol))
             base_ccy_symbol = instrument.base_currency
             quote_ccy_symbol = instrument.quote_currency
 
@@ -384,17 +385,19 @@ class Uniswap:
             await self.__poll_tx(self.__cancel_tx_hash_to_client_rid, 'cancel')
 
             await self.pantheon.sleep(poll_interval_s)
-            
+
     async def __get_tx_status_ws(self):
+        self.pantheon.spawn(self.__receive_ws_messages())
+
         while True:
             try:
                 _logger.info(
-                    "[WS] Subscribing to alchemy_minedTransactions")
-                reply = await self.__api.subscribe_alchemy_mined_transactions(self.msg_queue)
+                    "[WS] Subscribing to get WS update for all mined transaction for the wallet")
+                await self.__api.subscribe_alchemy_mined_transactions(self.msg_queue)
                 await self.__api.get_public_websocket_status().wait_until_disconnected()
                 await self.__api.get_public_websocket_status().wait_until_connected()
             except Exception as ex:
-                _logger.error(ex)
+                await self.pantheon.sleep(2)
 
     async def __finalised_requests_cleanup(self, poll_interval_s):
         _logger.debug(
@@ -420,7 +423,7 @@ class Uniswap:
             else:
                 try:
                     tx = self.__api.get_transaction_receipt(tx_hash)
-                    if (not tx is None):
+                    if (tx is not None):
                         status = tx['status']
                         request.finalised_at = time.time()
                         if (tx_type == 'swap' or tx_type == 'transfer'):
@@ -446,9 +449,34 @@ class Uniswap:
                         _logger.error(
                             f'Error polling tx_hash : {tx_hash} for request : {client_request_id}, tx_type : {tx_type}. ex = {ex}')
 
+    async def __receive_ws_messages(self):
+        while True:
+            try:
+                message = await self.msg_queue.get()
+                _logger.info("[WS] [MESSAGE] %s", message)
+
+                tx_hash = message['hash']
+                self.__update_request_status(tx_hash)
+            except Exception as ex:
+                _logger.error(f'Error occured while receiving WS message {ex}')
+
+    async def __update_request_status(self, tx_hash: str):
+        _logger.debug(tx_hash)
+        if (tx_hash in self.__swap_tx_hash_to_client_rid):
+            self.__poll_tx(
+                {tx_hash: self.__swap_tx_hash_to_client_rid[tx_hash]}, 'swap')
+        elif (tx_hash in self.__transfer_tx_hash_to_client_rid):
+            self.__poll_tx(
+                {tx_hash: self.__transfer_tx_hash_to_client_rid[tx_hash]}, 'transfer')
+        elif (tx_hash in self.__cancel_tx_hash_to_client_rid):
+            self.__poll_tx(
+                {tx_hash: self.__cancel_tx_hash_to_client_rid[tx_hash]}, 'cancel')
+        else:
+            _logger.error(f'No request found for the tx_hash={tx_hash}')
+
     async def start(self, private_key, secrets):
         self.__instruments = await self.pantheon.get_instruments_live_source(
-            exchanges=[self.__config['name']],
+            exchanges=[self.__exchange_name],
             symbols=[],
             kinds=[],
             usage=InstrumentUsageExchanges.TradableOnly,
