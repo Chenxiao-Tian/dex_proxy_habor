@@ -38,6 +38,7 @@ class Request:
         self.request_type = request_type
         self.request_status = RequestStatus.PENDING
         self.client_request_id = client_request_id
+        self.nonce = None
         self.finalised_at = None
 
     def is_finalised(self):
@@ -62,8 +63,9 @@ class OrderRequest(Request):
     def __str__(self):
         return f'Order: order_id={self.order_id}, client_request_id={self.client_request_id}, symbol={self.symbol}, ' \
             f'base_ccy_qty={self.base_ccy_qty}, quote_ccy_qty={self.quote_ccy_qty}, side={self.side.name}, ' \
-            f'fee_rate={self.fee_rate}, gas_limit={self.gas_limit}, request_status={self.request_status}, request_type={self.request_type.name}, ' \
-            f'deadline_since_epoch_s={self.deadline_since_epoch_s}, finalised_at = {self.finalised_at}'
+            f'fee_rate={self.fee_rate}, gas_limit={self.gas_limit}, request_status={self.request_status}, ' \
+            f'request_type={self.request_type.name}, deadline_since_epoch_s={self.deadline_since_epoch_s}, ' \
+            f'nonce={self.nonce}, finalised_at={self.finalised_at}'
 
     def to_dict(self):
         return {
@@ -75,6 +77,7 @@ class OrderRequest(Request):
             'side': self.side.name,
             'fee_rate': self.fee_rate,
             'gas_limit': self.gas_limit,
+            'nonce': self.nonce,
             'request_type': self.request_type.name,
             'request_status': self.request_status.name
         }
@@ -91,7 +94,7 @@ class TransferRequest(Request):
     def __str__(self):
         return f'TransferRequest: client_request_id={self.client_request_id}, symbol={self.symbol}, amount={self.amount}, ' \
             f'address_to={self.address_to}, gas_limit={self.gas_limit}, request_status={self.request_status}, ' \
-            f'request_type={self.request_type.name}, finalised_at={self.finalised_at}'
+            f'request_type={self.request_type.name}, nonce={self.nonce}, finalised_at={self.finalised_at}'
 
     def to_dict(self):
         return {
@@ -100,6 +103,7 @@ class TransferRequest(Request):
             'amount': self.amount,
             'address_to': self.address_to,
             'gas_limit': self.gas_limit,
+            'nonce': self.nonce,
             'request_type': self.request_type.name,
             'request_status': self.request_status.name
         }
@@ -134,7 +138,6 @@ class Uniswap:
             'GET', '/public/get-wallet-balance', self.__get_wallet_balance)
 
         self.__requests = {}
-        self.__client_rid_to_nonce = {}
         self.__swap_tx_hash_to_client_rid = {}
         self.__transfer_tx_hash_to_client_rid = {}
         self.__cancel_tx_hash_to_client_rid = {}
@@ -180,9 +183,9 @@ class Uniswap:
                     base_ccy_symbol, quote_ccy_symbol, base_ccy_qty, quote_ccy_qty, fee_rate, timeout_s, gas_limit, gas_price)
             if result.error_type == ErrorType.NO_ERROR:
                 order.order_id = result.tx_hash
-                self.__client_rid_to_nonce[client_request_id] = nonce
+                order.nonce = nonce
                 self.__swap_tx_hash_to_client_rid[result.tx_hash] = client_request_id
-                return 200, {'result': {'order_id': result.tx_hash}}
+                return 200, {'result': {'order_id': result.tx_hash, 'nonce': nonce}}
             else:
                 order.request_status = RequestStatus.FAILED
                 order.finalised_at = time.time()
@@ -212,7 +215,7 @@ class Uniswap:
                 symbol, address_to, amount, gas_limit, gas_price)
 
             if result.error_type == ErrorType.NO_ERROR:
-                self.__client_rid_to_nonce[client_request_id] = nonce
+                transfer.nonce = nonce
                 self.__transfer_tx_hash_to_client_rid[result.tx_hash] = client_request_id
                 return 200, {'withdraw_tx_hash': result.tx_hash}
             else:
@@ -268,15 +271,15 @@ class Uniswap:
                     if (request.side == Side.BUY):
                         _, result = await self.__api.swap_exact_output_single(
                             quote_ccy_symbol, base_ccy_symbol, request.quote_ccy_qty, request.base_ccy_qty, request.fee_rate,
-                            timeout_s, request.gas_limit, gas_price, nonce=self.__client_rid_to_nonce[client_request_id])
+                            timeout_s, request.gas_limit, gas_price, nonce=request.nonce)
                     else:
                         _, result = await self.__api.swap_exact_input_single(
                             base_ccy_symbol, quote_ccy_symbol, request.base_ccy_qty, request.quote_ccy_qty, request.fee_rate,
-                            timeout_s, request.gas_limit, gas_price, nonce=self.__client_rid_to_nonce[client_request_id])
+                            timeout_s, request.gas_limit, gas_price, nonce=request.nonce)
                 else:
                     _, result = await self.__api.withdraw(
-                        request.symbol, request.address_to, request.amount, request.gas_limit, gas_price, 
-                        nonce=self.__client_rid_to_nonce[client_request_id])
+                        request.symbol, request.address_to, request.amount, request.gas_limit, gas_price,
+                        nonce=request.nonce)
 
                 if result.error_type == ErrorType.NO_ERROR:
                     if (request.request_type == RequestType.ORDER):
@@ -309,7 +312,7 @@ class Uniswap:
                 _logger.debug(f'Canceling : {request}')
 
                 _, result = self.__cancel_transaction(
-                    gas_price, nonce=self.__client_rid_to_nonce[client_request_id])
+                    gas_price, nonce=request.nonce)
 
                 if result.error_type == ErrorType.NO_ERROR:
                     request.request_status = RequestStatus.CANCEL_REQUESTED
@@ -344,7 +347,7 @@ class Uniswap:
                 _logger.debug(f'Canceling : {request}')
 
                 _, result = self.__cancel_transaction(
-                    1000000, nonce=self.__client_rid_to_nonce[request.client_request_id])
+                    1000000, nonce=request.nonce)
 
                 if result.error_type == ErrorType.NO_ERROR:
                     request.request_status = RequestStatus.CANCEL_REQUESTED
@@ -408,7 +411,6 @@ class Uniswap:
             for request in self.__requests.values():
                 if (request.is_finalised() and request.finalised_at + self.finalised_requests_cleanup_after_s < int(time.time())):
                     self.__requests.pop(request.client_request_id)
-                    self.__client_rid_to_nonce.pop(request.client_request_id)
 
             await self.pantheon.sleep(poll_interval_s)
 
