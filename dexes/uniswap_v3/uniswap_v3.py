@@ -275,7 +275,8 @@ class Uniswap:
                             timeout_s, request.gas_limit, gas_price, nonce=self.__client_rid_to_nonce[client_request_id])
                 else:
                     _, result = await self.__api.withdraw(
-                        request.symbol, request.address_to, request.amount, request.gas_limit, gas_price)
+                        request.symbol, request.address_to, request.amount, request.gas_limit, gas_price, 
+                        nonce=self.__client_rid_to_nonce[client_request_id])
 
                 if result.error_type == ErrorType.NO_ERROR:
                     if (request.request_type == RequestType.ORDER):
