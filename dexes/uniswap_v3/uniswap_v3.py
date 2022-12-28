@@ -173,7 +173,7 @@ class Uniswap:
                                  quote_ccy_qty, side, fee_rate, gas_limit, timeout_s)
             self.__requests[client_request_id] = order
 
-            _logger.debug(f'Inserting : {order}')
+            _logger.debug(f'Inserting={order}, gas_price={gas_price}')
 
             if (side == Side.BUY):
                 nonce, result = await self.__api.swap_exact_output_single(
@@ -209,7 +209,7 @@ class Uniswap:
                 client_request_id, symbol, amount, address_to, gas_limit)
             self.__requests[client_request_id] = transfer
 
-            _logger.debug(f'Withdrawing : {transfer}')
+            _logger.debug(f'Withdrawing={transfer}, gas_price={gas_price}')
 
             nonce, result = await self.__api.withdraw(
                 symbol, address_to, amount, gas_limit, gas_price)
@@ -228,7 +228,7 @@ class Uniswap:
             transfer.finalised_at = time.time()
             return 400, {'error': {'message': str(e)}}
 
-    def __get_request_status(self, params):
+    async def __get_request_status(self, params):
         try:
             client_request_id = params['client_request_id']
 
@@ -259,13 +259,13 @@ class Uniswap:
                     timeout_s = int(time.time() + params.get('timeout_s'))
 
                     instrument = self.__instruments.get_instrument(
-                        InstrumentId('uni3', request.symbol))
+                        InstrumentId(self.__exchange_name, request.symbol))
                     base_ccy_symbol = instrument.base_currency
                     quote_ccy_symbol = instrument.quote_currency
 
                     request.deadline_since_epoch_s = timeout_s
 
-                _logger.debug(f'Amending : {request}')
+                _logger.debug(f'Amending={request}, gas_price={gas_price}')
 
                 if (request.request_type == RequestType.ORDER):
                     if (request.side == Side.BUY):
@@ -298,7 +298,7 @@ class Uniswap:
             _logger.exception(f'Failed to amend request: %r', e)
             return 400, {'error': {'message': repr(e)}}
 
-    def __cancel_request(self, params: dict):
+    async def __cancel_request(self, params: dict):
         try:
             client_request_id = params['client_request_id']
             gas_price = int(params['gas_price'])
@@ -309,7 +309,7 @@ class Uniswap:
                 if (request.is_finalised()):
                     return 400, {'error': {'message': f'Cannot cancel. Request status={request.request_status.name}'}}
 
-                _logger.debug(f'Canceling : {request}')
+                _logger.debug(f'Canceling={request}, gas_price={gas_price}')
 
                 _, result = self.__cancel_transaction(
                     gas_price, nonce=request.nonce)
@@ -330,7 +330,7 @@ class Uniswap:
             _logger.exception(f'Failed to cancel request: %r', e)
             return 400, {'error': {'message': repr(e)}}
 
-    def __cancel_all(self, params):
+    async def __cancel_all(self, params):
         try:
             _logger.debug('Canceling all orders')
 
@@ -343,11 +343,10 @@ class Uniswap:
             for request in self.__requests.values():
                 if (request.is_finalised() or request.request_type != request_type):
                     continue
+                gas_price = 100
+                _logger.debug(f'Canceling={request}, gas_price={gas_price}')
 
-                _logger.debug(f'Canceling : {request}')
-
-                _, result = self.__cancel_transaction(
-                    1000000, nonce=request.nonce)
+                _, result = self.__cancel_transaction(gas_price, nonce=request.nonce)
 
                 if result.error_type == ErrorType.NO_ERROR:
                     request.request_status = RequestStatus.CANCEL_REQUESTED
@@ -408,21 +407,21 @@ class Uniswap:
             f'Start polling for removing {self.finalised_requests_cleanup_after_s}s earlier finalised requests every {poll_interval_s}s')
 
         while True:
-            for request in self.__requests.values():
+            for request in list(self.__requests.values()):
                 if (request.is_finalised() and request.finalised_at + self.finalised_requests_cleanup_after_s < int(time.time())):
                     self.__requests.pop(request.client_request_id)
 
             await self.pantheon.sleep(poll_interval_s)
 
-    async def __poll_tx(self, tx_hash_to_clientRid: dict, tx_type: str):
-        for tx_hash in tx_hash_to_clientRid.keys():
-            client_request_id = tx_hash_to_clientRid[tx_hash]
+    async def __poll_tx(self, tx_hash_to_client_r_id: dict, tx_type: str):
+        for tx_hash in list(tx_hash_to_client_r_id.keys()):
+            client_request_id = tx_hash_to_client_r_id[tx_hash]
             if (client_request_id not in self.__requests):
-                tx_hash_to_clientRid.pop(tx_hash)
+                tx_hash_to_client_r_id.pop(tx_hash)
                 continue
             request = self.__requests[client_request_id]
             if (request.is_finalised()):
-                tx_hash_to_clientRid.pop(tx_hash)
+                tx_hash_to_client_r_id.pop(tx_hash)
             else:
                 try:
                     tx = self.__api.get_transaction_receipt(tx_hash)
@@ -450,7 +449,7 @@ class Uniswap:
                 except Exception as ex:
                     if not isinstance(ex, TransactionNotFound):
                         _logger.error(
-                            f'Error polling tx_hash : {tx_hash} for request : {client_request_id}, tx_type : {tx_type}. ex = {ex}')
+                            f'Error polling tx_hash : {tx_hash} for client_request_id={client_request_id}, tx_type={tx_type}. Error={ex}')
 
     async def __receive_ws_messages(self):
         while True:
@@ -458,21 +457,20 @@ class Uniswap:
                 message = await self.msg_queue.get()
                 _logger.info("[WS] [MESSAGE] %s", message)
 
-                tx_hash = message['hash']
-                self.__update_request_status(tx_hash)
+                tx_hash = message['params']['result']['transaction']['hash']
+                await self.__update_request_status(tx_hash)
             except Exception as ex:
-                _logger.error(f'Error occured while receiving WS message {ex}')
+                _logger.error(f'Error occured while handling WS message {ex}')
 
     async def __update_request_status(self, tx_hash: str):
-        _logger.debug(tx_hash)
         if (tx_hash in self.__swap_tx_hash_to_client_rid):
-            self.__poll_tx(
+            await self.__poll_tx(
                 {tx_hash: self.__swap_tx_hash_to_client_rid[tx_hash]}, 'swap')
         elif (tx_hash in self.__transfer_tx_hash_to_client_rid):
-            self.__poll_tx(
+            await self.__poll_tx(
                 {tx_hash: self.__transfer_tx_hash_to_client_rid[tx_hash]}, 'transfer')
         elif (tx_hash in self.__cancel_tx_hash_to_client_rid):
-            self.__poll_tx(
+            await self.__poll_tx(
                 {tx_hash: self.__cancel_tx_hash_to_client_rid[tx_hash]}, 'cancel')
         else:
             _logger.error(f'No request found for the tx_hash={tx_hash}')

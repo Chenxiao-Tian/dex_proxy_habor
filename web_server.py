@@ -27,7 +27,6 @@ class WebServer:
         self.__connections = weakref.WeakSet()
 
     def register(self, method, path, handler):
-
         def wrapper(handler):
             async def inner(request):
                 if request.method == 'POST':
@@ -35,6 +34,7 @@ class WebServer:
                 else:
                     params = request.query
                 status, data = await handler(params)
+                _logger.debug(f'status={status}, data={data}')
                 return web.json_response(data=data, status=status)
             return inner
 
