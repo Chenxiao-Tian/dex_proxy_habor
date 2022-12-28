@@ -335,7 +335,7 @@ class Uniswap:
             _logger.debug('Canceling all orders')
 
             assert params['request_type'] == 'ORDER' or params['request_type'] == 'TRANSFER', 'Unknown transaction type'
-            request_type = RequestType.ORDER if params['request_type'] == 'order' else RequestType.TRANSFER
+            request_type = RequestType.ORDER if params['request_type'] == 'ORDER' else RequestType.TRANSFER
 
             cancel_requested = []
             failed_cancels = []
