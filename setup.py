@@ -25,6 +25,6 @@ setuptools.setup(
         'eth-account>=0.4.0,<0.6.0',
         'web3==5.29.2',
         'pantheon @ git+ssh://bitbucket.org/kenetic/pytheon.git@pytheon-1.0.0',
-        'pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@19502f011a0f01e3e461b3616cf27ee04da03df1',
+        'pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@b93cb4d67d8192d4ddb6d31f04a90fa70998a017',
     ]
 )
