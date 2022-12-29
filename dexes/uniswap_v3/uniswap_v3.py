@@ -168,7 +168,7 @@ class UniswapV3:
             for request in self.__requests.values():
                 if (request.is_finalised() or request.request_type != request_type):
                     continue
-                open_requests.append(request)
+                open_requests.append(request.to_dict())
 
             return 200, open_requests
         except Exception as e:
