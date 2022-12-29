@@ -3,7 +3,6 @@ import logging
 import time
 
 from decimal import Decimal
-from enum import Enum
 
 from pantheon import Pantheon
 from pantheon.market_data_types import Side
@@ -20,96 +19,7 @@ from web3.exceptions import TransactionNotFound
 _logger = logging.getLogger('uniswap_v3')
 
 
-class RequestType(Enum):
-    ORDER = 'order'
-    TRANSFER = 'transfer'
-
-
-class RequestStatus(Enum):
-    PENDING = 'pending'
-    CANCEL_REQUESTED = 'cancel_requested'
-    CANCELED = 'canceled'
-    SUCCEEDED = 'succeeded'
-    FAILED = 'failed'
-
-
-class Request:
-    def __init__(self, request_type: RequestType, client_request_id: str):
-        self.request_type = request_type
-        self.request_status = RequestStatus.PENDING
-        self.client_request_id = client_request_id
-        self.nonce = None
-        self.finalised_at = None
-
-    def is_finalised(self):
-        if (self.finalised_at):
-            return True
-        return False
-
-
-class OrderRequest(Request):
-    def __init__(self, client_request_id: str, symbol: str, base_ccy_qty: Decimal, quote_ccy_qty: Decimal, side: Side,
-                 fee_rate: int, gas_limit: int, deadline_since_epoch_s: int):
-        super().__init__(RequestType.ORDER, client_request_id)
-        self.order_id = None
-        self.symbol = symbol
-        self.base_ccy_qty = base_ccy_qty
-        self.quote_ccy_qty = quote_ccy_qty
-        self.side = side
-        self.fee_rate = fee_rate
-        self.gas_limit = gas_limit
-        self.deadline_since_epoch_s = deadline_since_epoch_s
-
-    def __str__(self):
-        return f'Order: order_id={self.order_id}, client_request_id={self.client_request_id}, symbol={self.symbol}, ' \
-            f'base_ccy_qty={self.base_ccy_qty}, quote_ccy_qty={self.quote_ccy_qty}, side={self.side.name}, ' \
-            f'fee_rate={self.fee_rate}, gas_limit={self.gas_limit}, request_status={self.request_status}, ' \
-            f'request_type={self.request_type.name}, deadline_since_epoch_s={self.deadline_since_epoch_s}, ' \
-            f'nonce={self.nonce}, finalised_at={self.finalised_at}'
-
-    def to_dict(self):
-        return {
-            'order_id': self.order_id,
-            'client_request_id': self.client_request_id,
-            'symbol': self.symbol,
-            'base_ccy_qty': str(self.base_ccy_qty),
-            'quote_ccy_qty': str(self.quote_ccy_qty),
-            'side': self.side.name,
-            'fee_rate': self.fee_rate,
-            'gas_limit': self.gas_limit,
-            'nonce': self.nonce,
-            'request_type': self.request_type.name,
-            'request_status': self.request_status.name
-        }
-
-
-class TransferRequest(Request):
-    def __init__(self, client_request_id: str, symbol: str, amount: Decimal, address_to, gas_limit: int):
-        super().__init__(RequestType.TRANSFER, client_request_id)
-        self.symbol = symbol
-        self.amount = amount
-        self.address_to = address_to
-        self.gas_limit = gas_limit
-
-    def __str__(self):
-        return f'TransferRequest: client_request_id={self.client_request_id}, symbol={self.symbol}, amount={self.amount}, ' \
-            f'address_to={self.address_to}, gas_limit={self.gas_limit}, request_status={self.request_status}, ' \
-            f'request_type={self.request_type.name}, nonce={self.nonce}, finalised_at={self.finalised_at}'
-
-    def to_dict(self):
-        return {
-            'client_request_id': self.client_request_id,
-            'symbol': self.symbol,
-            'amount': self.amount,
-            'address_to': self.address_to,
-            'gas_limit': self.gas_limit,
-            'nonce': self.nonce,
-            'request_type': self.request_type.name,
-            'request_status': self.request_status.name
-        }
-
-
-class Uniswap:
+class UniswapV3:
     CHANNELS = ['ORDER']
 
     def __init__(self, pantheon: Pantheon, config, server, event_sink):
@@ -128,6 +38,8 @@ class Uniswap:
         self.__server.register('POST', '/private/withdraw', self.__withdraw)
         self.__server.register(
             'GET', '/public/get-request-status', self.__get_request_status)
+        self.__server.register(
+            'GET', '/public/get-all-open-requests', self.__get_all_open_requests)
         self.__server.register(
             'POST', '/private/amend-request', self.__amend_request)
         self.__server.register(
@@ -243,6 +155,26 @@ class Uniswap:
             _logger.exception(f'Failed to get request: %r', e)
             return 400, {'error': {'message': str(e)}}
 
+    async def __get_all_open_requests(self, params):
+        try:
+            assert params['request_type'] == 'ORDER' or params['request_type'] == 'TRANSFER', 'Unknown transaction type'
+            request_type = RequestType.ORDER if params['request_type'] == 'ORDER' else RequestType.TRANSFER
+
+            _logger.debug(
+                f'Getting all open requests: request_type={request_type.name}')
+
+            open_requests = []
+
+            for request in self.__requests.values():
+                if (request.is_finalised() or request.request_type != request_type):
+                    continue
+                open_requests.append(request)
+
+            return 200, open_requests
+        except Exception as e:
+            _logger.exception(f'Failed to get all open requests: %r', e)
+            return 400, {'error': {'message': str(e)}}
+
     async def __amend_request(self, params: dict):
         try:
             client_request_id = params['client_request_id']
@@ -332,10 +264,11 @@ class Uniswap:
 
     async def __cancel_all(self, params):
         try:
-            _logger.debug('Canceling all orders')
-
             assert params['request_type'] == 'ORDER' or params['request_type'] == 'TRANSFER', 'Unknown transaction type'
             request_type = RequestType.ORDER if params['request_type'] == 'ORDER' else RequestType.TRANSFER
+
+            _logger.debug(
+                f'Canceling all requests, request_type={request_type.name}')
 
             cancel_requested = []
             failed_cancels = []
@@ -346,7 +279,8 @@ class Uniswap:
                 gas_price = 100
                 _logger.debug(f'Canceling={request}, gas_price={gas_price}')
 
-                _, result = self.__cancel_transaction(gas_price, nonce=request.nonce)
+                _, result = self.__cancel_transaction(
+                    gas_price, nonce=request.nonce)
 
                 if result.error_type == ErrorType.NO_ERROR:
                     request.request_status = RequestStatus.CANCEL_REQUESTED
