@@ -66,13 +66,17 @@ class UniswapV3:
     async def __insert_order(self, params: dict):
         try:
             client_request_id = params['client_request_id']
+            
+            if (client_request_id in self.__requests.keys()):
+                return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
+            
             symbol = params['symbol']
             base_ccy_qty = Decimal(params['base_ccy_qty'])
             quote_ccy_qty = Decimal(params['quote_ccy_qty'])
             assert params['side'] == 'BUY' or params['side'] == 'SELL', 'Unknown order side'
             side = Side.BUY if params['side'] == 'BUY' else Side.SELL
             fee_rate = int(params['fee_rate'])
-            gas_price = int(params['gas_price'])
+            gas_price_wei = int(params['gas_price_wei'])
             gas_limit = 210000  # TODO: Check for the most suitable value
             timeout_s = int(time.time() + params.get('timeout_s'))
 
@@ -85,14 +89,14 @@ class UniswapV3:
                                  quote_ccy_qty, side, fee_rate, gas_limit, timeout_s)
             self.__requests[client_request_id] = order
 
-            _logger.debug(f'Inserting={order}, gas_price={gas_price}')
+            _logger.debug(f'Inserting={order}, gas_price_wei={gas_price_wei}')
 
             if (side == Side.BUY):
                 nonce, result = await self.__api.swap_exact_output_single(
-                    quote_ccy_symbol, base_ccy_symbol, quote_ccy_qty, base_ccy_qty, fee_rate, timeout_s, gas_limit, gas_price)
+                    quote_ccy_symbol, base_ccy_symbol, quote_ccy_qty, base_ccy_qty, fee_rate, timeout_s, gas_limit, gas_price_wei)
             else:
                 nonce, result = await self.__api.swap_exact_input_single(
-                    base_ccy_symbol, quote_ccy_symbol, base_ccy_qty, quote_ccy_qty, fee_rate, timeout_s, gas_limit, gas_price)
+                    base_ccy_symbol, quote_ccy_symbol, base_ccy_qty, quote_ccy_qty, fee_rate, timeout_s, gas_limit, gas_price_wei)
             if result.error_type == ErrorType.NO_ERROR:
                 order.order_id = result.tx_hash
                 order.nonce = nonce
@@ -111,20 +115,24 @@ class UniswapV3:
     async def __withdraw(self, params):
         try:
             client_request_id = params['client_request_id']
+            
+            if (client_request_id in self.__requests.keys()):
+                return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
+            
             symbol = params['symbol']
             amount = Decimal(params['amount'])
             address_to = params['address_to']
             gas_limit = int(params['gas_limit'])
-            gas_price = int(params['gas_price'])
+            gas_price_wei = int(params['gas_price_wei'])
 
             transfer = TransferRequest(
                 client_request_id, symbol, amount, address_to, gas_limit)
             self.__requests[client_request_id] = transfer
 
-            _logger.debug(f'Withdrawing={transfer}, gas_price={gas_price}')
+            _logger.debug(f'Withdrawing={transfer}, gas_price_wei={gas_price_wei}')
 
             nonce, result = await self.__api.withdraw(
-                symbol, address_to, amount, gas_limit, gas_price)
+                symbol, address_to, amount, gas_limit, gas_price_wei)
 
             if result.error_type == ErrorType.NO_ERROR:
                 transfer.nonce = nonce
@@ -185,7 +193,7 @@ class UniswapV3:
                 if (request.request_status != RequestStatus.PENDING):
                     return 400, {'error': {'message': f'Cannot amend. Request status={request.request_status.name}'}}
 
-                gas_price = int(params['gas_price'])
+                gas_price_wei = int(params['gas_price_wei'])
 
                 if (request.request_type == RequestType.ORDER):
                     timeout_s = int(time.time() + params.get('timeout_s'))
@@ -197,20 +205,20 @@ class UniswapV3:
 
                     request.deadline_since_epoch_s = timeout_s
 
-                _logger.debug(f'Amending={request}, gas_price={gas_price}')
+                _logger.debug(f'Amending={request}, gas_price_wei={gas_price_wei}')
 
                 if (request.request_type == RequestType.ORDER):
                     if (request.side == Side.BUY):
                         _, result = await self.__api.swap_exact_output_single(
                             quote_ccy_symbol, base_ccy_symbol, request.quote_ccy_qty, request.base_ccy_qty, request.fee_rate,
-                            timeout_s, request.gas_limit, gas_price, nonce=request.nonce)
+                            timeout_s, request.gas_limit, gas_price_wei, nonce=request.nonce)
                     else:
                         _, result = await self.__api.swap_exact_input_single(
                             base_ccy_symbol, quote_ccy_symbol, request.base_ccy_qty, request.quote_ccy_qty, request.fee_rate,
-                            timeout_s, request.gas_limit, gas_price, nonce=request.nonce)
+                            timeout_s, request.gas_limit, gas_price_wei, nonce=request.nonce)
                 else:
                     _, result = await self.__api.withdraw(
-                        request.symbol, request.address_to, request.amount, request.gas_limit, gas_price,
+                        request.symbol, request.address_to, request.amount, request.gas_limit, gas_price_wei,
                         nonce=request.nonce)
 
                 if result.error_type == ErrorType.NO_ERROR:
@@ -233,7 +241,7 @@ class UniswapV3:
     async def __cancel_request(self, params: dict):
         try:
             client_request_id = params['client_request_id']
-            gas_price = int(params['gas_price'])
+            gas_price_wei = int(params['gas_price_wei'])
 
             if (client_request_id in self.__requests.keys()):
                 request = self.__requests[client_request_id]
@@ -241,10 +249,10 @@ class UniswapV3:
                 if (request.is_finalised()):
                     return 400, {'error': {'message': f'Cannot cancel. Request status={request.request_status.name}'}}
 
-                _logger.debug(f'Canceling={request}, gas_price={gas_price}')
+                _logger.debug(f'Canceling={request}, gas_price_wei={gas_price_wei}')
 
                 _, result = self.__cancel_transaction(
-                    gas_price, nonce=request.nonce)
+                    gas_price_wei, nonce=request.nonce)
 
                 if result.error_type == ErrorType.NO_ERROR:
                     request.request_status = RequestStatus.CANCEL_REQUESTED
@@ -276,11 +284,11 @@ class UniswapV3:
             for request in self.__requests.values():
                 if (request.is_finalised() or request.request_type != request_type):
                     continue
-                gas_price = 100
-                _logger.debug(f'Canceling={request}, gas_price={gas_price}')
+                gas_price_wei = 100
+                _logger.debug(f'Canceling={request}, gas_price_wei={gas_price_wei}')
 
                 _, result = self.__cancel_transaction(
-                    gas_price, nonce=request.nonce)
+                    gas_price_wei, nonce=request.nonce)
 
                 if result.error_type == ErrorType.NO_ERROR:
                     request.request_status = RequestStatus.CANCEL_REQUESTED
@@ -303,9 +311,9 @@ class UniswapV3:
             _logger.exception(f'Failed to get exchange balance: %r', e)
             return 400, {'error': {'message': str(e)}}
 
-    def __cancel_transaction(self, gas_price: int, nonce: int):
+    def __cancel_transaction(self, gas_price_wei: int, nonce: int):
         _logger.debug(f'Trying to cancel transaction with nonce={nonce}')
-        return self.__api.cancel_transaction(nonce, gas_price)
+        return self.__api.cancel_transaction(nonce, gas_price_wei)
 
     async def __poll_tx_for_status_rest(self, poll_interval_s):
         _logger.debug(
