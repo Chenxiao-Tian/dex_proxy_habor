@@ -45,6 +45,10 @@
             {
                 "logger_name": "websockets",
                 "level": "info"
+            },
+            {
+                "logger_name": "gas_tracker",
+                "level": "warn"
             }
         ]
     },
@@ -71,6 +75,14 @@
                     "base_uri": "wss://eth-goerli.g.alchemy.com/v2/5OEuevdMYT7tRf9bK4Ca9FV13qgrO8KW"
                 }
             }
+        },
+        "gas_price_tracker":{
+            "http_url": "https://goerli.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
+            "ws_url": "wss://goerli.infura.io/ws/v3/d3bf8a4fe2744587bf47459446b7f170",
+            "use_fee_history": true,
+            "percentile_priority_fee_fast": 20,
+            "percentile_priority_fee_med": 10,
+            "percentile_priority_fee_slow": 5
         },
         "poll_interval_s": 15,
         "finalised_requests_cleanup_after_s": 600

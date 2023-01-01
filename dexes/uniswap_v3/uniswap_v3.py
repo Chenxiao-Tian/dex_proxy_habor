@@ -13,6 +13,7 @@ from pyutils.exchange_apis.uniswapV3_api import *
 from pyutils.exchange_apis.erc20web3_api import ErrorType
 from pyutils.exchange_apis import ApiFactory
 from pyutils.exchange_connectors import ConnectorFactory, ConnectorType
+from pyutils.gas_pricing.eth import GasPriceTracker, PriorityFee
 
 from web3.exceptions import TransactionNotFound
 
@@ -30,6 +31,9 @@ class UniswapV3:
 
         api_factory = ApiFactory(ConnectorFactory(config.get('connectors')))
         self.__api = api_factory.create(self.pantheon, ConnectorType.UniswapV3)
+
+        self.__gas_price_tracker = GasPriceTracker(
+            self.pantheon, config['gas_price_tracker'])
 
         self.msg_queue = asyncio.Queue(loop=self.pantheon.loop)
 
@@ -66,10 +70,10 @@ class UniswapV3:
     async def __insert_order(self, params: dict):
         try:
             client_request_id = params['client_request_id']
-            
+
             if (client_request_id in self.__requests.keys()):
                 return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
-            
+
             symbol = params['symbol']
             base_ccy_qty = Decimal(params['base_ccy_qty'])
             quote_ccy_qty = Decimal(params['quote_ccy_qty'])
@@ -115,10 +119,10 @@ class UniswapV3:
     async def __withdraw(self, params):
         try:
             client_request_id = params['client_request_id']
-            
+
             if (client_request_id in self.__requests.keys()):
                 return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
-            
+
             symbol = params['symbol']
             amount = Decimal(params['amount'])
             address_to = params['address_to']
@@ -129,7 +133,8 @@ class UniswapV3:
                 client_request_id, symbol, amount, address_to, gas_limit)
             self.__requests[client_request_id] = transfer
 
-            _logger.debug(f'Withdrawing={transfer}, gas_price_wei={gas_price_wei}')
+            _logger.debug(
+                f'Withdrawing={transfer}, gas_price_wei={gas_price_wei}')
 
             nonce, result = await self.__api.withdraw(
                 symbol, address_to, amount, gas_limit, gas_price_wei)
@@ -205,7 +210,8 @@ class UniswapV3:
 
                     request.deadline_since_epoch_s = timeout_s
 
-                _logger.debug(f'Amending={request}, gas_price_wei={gas_price_wei}')
+                _logger.debug(
+                    f'Amending={request}, gas_price_wei={gas_price_wei}')
 
                 if (request.request_type == RequestType.ORDER):
                     if (request.side == Side.BUY):
@@ -241,7 +247,8 @@ class UniswapV3:
     async def __cancel_request(self, params: dict):
         try:
             client_request_id = params['client_request_id']
-            gas_price_wei = int(params['gas_price_wei'])
+            gas_price_wei = int(params.get('gas_price_wei' , self.__gas_price_tracker.get_gas_price(
+                priority_fee=PriorityFee.Fast)))
 
             if (client_request_id in self.__requests.keys()):
                 request = self.__requests[client_request_id]
@@ -249,7 +256,8 @@ class UniswapV3:
                 if (request.is_finalised()):
                     return 400, {'error': {'message': f'Cannot cancel. Request status={request.request_status.name}'}}
 
-                _logger.debug(f'Canceling={request}, gas_price_wei={gas_price_wei}')
+                _logger.debug(
+                    f'Canceling={request}, gas_price_wei={gas_price_wei}')
 
                 _, result = self.__cancel_transaction(
                     gas_price_wei, nonce=request.nonce)
@@ -284,8 +292,10 @@ class UniswapV3:
             for request in self.__requests.values():
                 if (request.is_finalised() or request.request_type != request_type):
                     continue
-                gas_price_wei = 100
-                _logger.debug(f'Canceling={request}, gas_price_wei={gas_price_wei}')
+                gas_price_wei = self.__gas_price_tracker.get_gas_price(
+                    priority_fee=PriorityFee.Fast)
+                _logger.debug(
+                    f'Canceling={request}, gas_price_wei={gas_price_wei}')
 
                 _, result = self.__cancel_transaction(
                     gas_price_wei, nonce=request.nonce)
@@ -418,6 +428,8 @@ class UniswapV3:
             _logger.error(f'No request found for the tx_hash={tx_hash}')
 
     async def start(self, private_key, secrets):
+        await self.__gas_price_tracker.start()
+
         self.__instruments = await self.pantheon.get_instruments_live_source(
             exchanges=[self.__exchange_name],
             symbols=[],
@@ -432,3 +444,4 @@ class UniswapV3:
         self.pantheon.spawn(self.__get_tx_status_ws())
         self.pantheon.spawn(self.__poll_tx_for_status_rest(poll_interval_s))
         self.pantheon.spawn(self.__finalised_requests_cleanup(poll_interval_s))
+        await self.__gas_price_tracker.wait_gas_price_ready()
