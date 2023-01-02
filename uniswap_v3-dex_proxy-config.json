@@ -72,7 +72,7 @@
                     "wallet_address": "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB"
                 },
                 "websocket": {
-                    "base_uri": "wss://eth-goerli.g.alchemy.com/v2/5OEuevdMYT7tRf9bK4Ca9FV13qgrO8KW"
+                    "base_uri": "wss://eth-goerli.g.alchemy.com/v2/qYOcvHNenpMYrDCfgpS-sg75t2ouBmnY"
                 }
             }
         },
