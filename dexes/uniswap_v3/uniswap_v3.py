@@ -82,7 +82,7 @@ class UniswapV3:
             fee_rate = int(params['fee_rate'])
             gas_price_wei = int(params['gas_price_wei'])
             gas_limit = 210000  # TODO: Check for the most suitable value
-            timeout_s = int(time.time() + params.get('timeout_s'))
+            timeout_s = int(time.time() + params['timeout_s'])
 
             instrument = self.__instruments.get_instrument(
                 InstrumentId(self.__exchange_name, symbol))
@@ -105,6 +105,8 @@ class UniswapV3:
                 order.order_id = result.tx_hash
                 order.nonce = nonce
                 self.__swap_tx_hash_to_client_rid[result.tx_hash] = client_request_id
+                order.tx_hashes.append(result.tx_hash)
+                order.used_gas_prices_wei.append(gas_price_wei)
                 return 200, {'result': {'order_id': result.tx_hash, 'nonce': nonce}}
             else:
                 order.request_status = RequestStatus.FAILED
@@ -142,6 +144,8 @@ class UniswapV3:
             if result.error_type == ErrorType.NO_ERROR:
                 transfer.nonce = nonce
                 self.__transfer_tx_hash_to_client_rid[result.tx_hash] = client_request_id
+                transfer.tx_hashes.append(result.tx_hash)
+                transfer.used_gas_prices_wei.append(gas_price_wei)
                 return 200, {'withdraw_tx_hash': result.tx_hash}
             else:
                 transfer.request_status = RequestStatus.FAILED
@@ -201,7 +205,7 @@ class UniswapV3:
                 gas_price_wei = int(params['gas_price_wei'])
 
                 if (request.request_type == RequestType.ORDER):
-                    timeout_s = int(time.time() + params.get('timeout_s'))
+                    timeout_s = int(time.time() + params['timeout_s'])
 
                     instrument = self.__instruments.get_instrument(
                         InstrumentId(self.__exchange_name, request.symbol))
@@ -228,6 +232,8 @@ class UniswapV3:
                         nonce=request.nonce)
 
                 if result.error_type == ErrorType.NO_ERROR:
+                    request.tx_hashes.append(result.tx_hash)
+                    request.used_gas_prices_wei.append(gas_price_wei)
                     if (request.request_type == RequestType.ORDER):
                         self.__swap_tx_hash_to_client_rid[result.tx_hash] = client_request_id
                         return 200, {'result': {'order_id': request.order_id}}
@@ -265,6 +271,8 @@ class UniswapV3:
                 if result.error_type == ErrorType.NO_ERROR:
                     request.request_status = RequestStatus.CANCEL_REQUESTED
                     self.__cancel_tx_hash_to_client_rid[result.tx_hash] = client_request_id
+                    request.tx_hashes.append(result.tx_hash)
+                    request.used_gas_prices_wei.append(gas_price_wei)
 
                     if (request.request_type == RequestType.ORDER):
                         return 200, {'result': {'order_id': request.order_id}}
@@ -302,6 +310,8 @@ class UniswapV3:
 
                 if result.error_type == ErrorType.NO_ERROR:
                     request.request_status = RequestStatus.CANCEL_REQUESTED
+                    request.tx_hashes.append(result.tx_hash)
+                    request.used_gas_prices_wei.append(gas_price_wei)
                     cancel_requested.append(request.client_request_id)
                     self.__cancel_tx_hash_to_client_rid[result.tx_hash] = request.client_request_id
                 else:
