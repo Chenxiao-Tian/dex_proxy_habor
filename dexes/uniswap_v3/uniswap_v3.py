@@ -253,7 +253,7 @@ class UniswapV3:
     async def __cancel_request(self, params: dict):
         try:
             client_request_id = params['client_request_id']
-            gas_price_wei = int(params.get('gas_price_wei' , self.__gas_price_tracker.get_gas_price(
+            gas_price_wei = int(params.get('gas_price_wei', self.__gas_price_tracker.get_gas_price(
                 priority_fee=PriorityFee.Fast)))
 
             if (client_request_id in self.__requests.keys()):
@@ -261,6 +261,18 @@ class UniswapV3:
 
                 if (request.is_finalised()):
                     return 400, {'error': {'message': f'Cannot cancel. Request status={request.request_status.name}'}}
+
+                if ('gas_price_wei' not in params):
+
+                    if (request.request_status == RequestStatus.CANCEL_REQUESTED and
+                            request.used_gas_prices_wei[-1] >= gas_price_wei):
+                        return 400, {'error': {'message': f'Cancel with greater than or equal to the '
+                                               f'gas_price_wei={gas_price_wei} already in progress'}}
+
+                    # replacement transaction should have gas_price atleast greater than 10% of the last gas_price used otherwise
+                    # 'replacement transaction underpriced' error will occur. https://ethereum.stackexchange.com/a/44875
+                    gas_price_wei = max(gas_price_wei, int(
+                        1.1 * request.used_gas_prices_wei[-1]))
 
                 _logger.debug(
                     f'Canceling={request}, gas_price_wei={gas_price_wei}')
@@ -300,8 +312,21 @@ class UniswapV3:
             for request in self.__requests.values():
                 if (request.is_finalised() or request.request_type != request_type):
                     continue
+
                 gas_price_wei = self.__gas_price_tracker.get_gas_price(
                     priority_fee=PriorityFee.Fast)
+
+                if (request.request_status == RequestStatus.CANCEL_REQUESTED and
+                        request.used_gas_prices_wei[-1] >= gas_price_wei):
+                    _logger.info(
+                        f'Not sending cancel request for {request.client_request_id} as cancel with greater than '
+                        f'or equal to the gas_price_wei={gas_price_wei} already in progress')
+                    cancel_requested.append(request.client_request_id)
+                    continue
+
+                gas_price_wei = max(gas_price_wei, int(
+                    1.1 * request.used_gas_prices_wei[-1]))
+
                 _logger.debug(
                     f'Canceling={request}, gas_price_wei={gas_price_wei}')
 
