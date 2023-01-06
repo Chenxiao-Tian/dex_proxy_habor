@@ -1,0 +1,90 @@
+{
+    "logging": {
+        "level": "debug",
+        "overrides": [
+            {
+                "logger_name": "aio_pika",
+                "level": "info"
+            },
+            {
+                "logger_name": "botocore",
+                "level": "info"
+            },
+            {
+                "logger_name": "aiormq.connection",
+                "level": "info"
+            },
+            {
+                "logger_name": "aiormq.channel",
+                "level": "critical"
+            },
+            {
+                "logger_name": "urllib3.connectionpool",
+                "level": "info"
+            },
+            {
+                "logger_name": "web3.RequestManager",
+                "level": "info"
+            },
+            {
+                "logger_name": "web3.providers.HTTPProvider",
+                "level": "info"
+            },
+            {
+                "logger_name": "pantheon.app_health",
+                "level": "info"
+            },
+            {
+                "logger_name": "aio_pika.exchange",
+                "level": "info"
+            },
+            {
+                "logger_name": "aiohttp.access",
+                "level": "warn"
+            },
+            {
+                "logger_name": "websockets",
+                "level": "info"
+            },
+            {
+                "logger_name": "gas_tracker",
+                "level": "warn"
+            }
+        ]
+    },
+    "TradingDB": {
+        "dsn": "postgres://master:fd97d13dad2e2da0f8aa62dfc28cc5d6742b9e8@trading-db.kdev/dev_trading"
+    },
+    "RabbitMQ": {
+        "url": "amqp://dev-sng-rmq.kdev"
+    },
+    "server": {
+        "port": 1958
+    },
+    "dex": {
+        "name": "chainEth-uni3",
+        "connectors": {
+            "uniswap_v3": {
+                "web3": {
+                    "chain": "Goerli Testnet",
+                    "router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+                    "http": "https://goerli.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
+                    "wallet_address": "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB"
+                },
+                "websocket": {
+                    "base_uri": "wss://eth-goerli.g.alchemy.com/v2/qYOcvHNenpMYrDCfgpS-sg75t2ouBmnY"
+                }
+            }
+        },
+        "gas_price_tracker":{
+            "http_url": "https://goerli.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
+            "ws_url": "wss://goerli.infura.io/ws/v3/d3bf8a4fe2744587bf47459446b7f170",
+            "use_fee_history": true,
+            "percentile_priority_fee_fast": 20,
+            "percentile_priority_fee_med": 10,
+            "percentile_priority_fee_slow": 5
+        },
+        "poll_interval_s": 15,
+        "finalised_requests_cleanup_after_s": 600
+    }
+}
