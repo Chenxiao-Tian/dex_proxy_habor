@@ -1,0 +1,21 @@
+image:
+  name: docker:dind
+
+clone:
+  depth: 1
+
+definitions:
+  services:
+    docker:
+      memory: 3000
+
+pipelines:
+  default:
+    - step:
+        name: Verify commit signatures
+        services:
+          - docker
+        image: alpine:3
+        script:
+          - apk add --no-cache aws-cli git gpg dirmngr gpg-agent bash
+          - ./AuthenticateSignedCommits.sh
