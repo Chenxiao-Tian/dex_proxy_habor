@@ -43,6 +43,7 @@ class UniswapV3:
         self.__server.register(
             'POST', '/private/insert-order', self.__insert_order)
         self.__server.register('POST', '/private/withdraw', self.__withdraw)
+        self.__server.register('POST', '/private/approve-token', self.__approve_token)
         self.__server.register(
             'GET', '/public/get-request-status', self.__get_request_status)
         self.__server.register(
@@ -57,9 +58,7 @@ class UniswapV3:
             'GET', '/public/get-wallet-balance', self.__get_wallet_balance)
 
         self.__requests = {}
-        self.__swap_tx_hash_to_client_rid = {}
-        self.__transfer_tx_hash_to_client_rid = {}
-        self.__cancel_tx_hash_to_client_rid = {}
+        self.__tx_hash_to_client_rid_and_request_type = {}
 
         self.__instruments = None
 
@@ -109,14 +108,17 @@ class UniswapV3:
 
             if (side == Side.BUY):
                 nonce, result = await self.__api.swap_exact_output_single(
-                    quote_ccy_symbol, base_ccy_symbol, quote_ccy_qty, base_ccy_qty, fee_rate, timeout_s, gas_limit, gas_price_wei)
+                    quote_ccy_symbol, base_ccy_symbol, quote_ccy_qty, base_ccy_qty, fee_rate, timeout_s,
+                    gas_limit, gas_price_wei)
             else:
                 nonce, result = await self.__api.swap_exact_input_single(
-                    base_ccy_symbol, quote_ccy_symbol, base_ccy_qty, quote_ccy_qty, fee_rate, timeout_s, gas_limit, gas_price_wei)
+                    base_ccy_symbol, quote_ccy_symbol, base_ccy_qty, quote_ccy_qty, fee_rate, timeout_s,
+                    gas_limit, gas_price_wei)
             if result.error_type == ErrorType.NO_ERROR:
                 order.order_id = result.tx_hash
                 order.nonce = nonce
-                self.__swap_tx_hash_to_client_rid[result.tx_hash] = client_request_id
+                self.__tx_hash_to_client_rid_and_request_type[result.tx_hash] = (
+                    client_request_id, RequestType.ORDER)
                 order.tx_hashes.append(result.tx_hash)
                 order.used_gas_prices_wei.append(gas_price_wei)
                 return 200, {'result': {'order_id': result.tx_hash, 'nonce': nonce}}
@@ -172,7 +174,8 @@ class UniswapV3:
 
             if result.error_type == ErrorType.NO_ERROR:
                 transfer.nonce = nonce
-                self.__transfer_tx_hash_to_client_rid[result.tx_hash] = client_request_id
+                self.__tx_hash_to_client_rid_and_request_type[result.tx_hash] = (
+                    client_request_id, RequestType.TRANSFER)
                 transfer.tx_hashes.append(result.tx_hash)
                 transfer.used_gas_prices_wei.append(gas_price_wei)
                 return 200, {'withdraw_tx_hash': result.tx_hash}
@@ -182,6 +185,49 @@ class UniswapV3:
         except Exception as e:
             _logger.exception(f'Failed to withdraw: %r', e)
             transfer.finalise_request(RequestStatus.FAILED)
+            return 400, {'error': {'message': str(e)}}
+
+    async def __approve_token(self, params):
+        try:
+            received_at_ms = int(time.time() * 1000)
+            client_request_id = params['client_request_id']
+
+            if (client_request_id in self.__requests.keys()):
+                return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
+
+            symbol = params['symbol']
+            amount = Decimal(params['amount'])
+            gas_price_wei = int(params['gas_price_wei'])
+
+            gas_limit = 100000  # TODO: Check for the most suitable value
+
+            approve = ApproveRequest(
+                client_request_id, symbol, amount, gas_limit, received_at_ms)
+            self.__requests[client_request_id] = approve
+            
+            if (gas_price_wei > self.__max_allowed_gas_price_wei):
+                approve.finalise_request(RequestStatus.FAILED)
+                return 400, {'error': {'message': f'gas_price_wei={gas_price_wei} is greater than '
+                                       f'max_allowed_gas_price_wei={self.__max_allowed_gas_price_wei}'}}
+
+            _logger.debug(
+                f'Approving={approve}, gas_price_wei={gas_price_wei}')
+
+            nonce, result = await self.__api.approve(symbol, amount, gas_limit, gas_price_wei)
+
+            if result.error_type == ErrorType.NO_ERROR:
+                approve.nonce = nonce
+                self.__tx_hash_to_client_rid_and_request_type[result.tx_hash] = (
+                    client_request_id, RequestType.APPROVE)
+                approve.tx_hashes.append(result.tx_hash)
+                approve.used_gas_prices_wei.append(gas_price_wei)
+                return 200, {'approve_tx_hash': result.tx_hash}
+            else:
+                approve.finalise_request(RequestStatus.FAILED)
+                return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
+        except Exception as e:
+            _logger.exception(f'Failed to approve: %r', e)
+            approve.finalise_request(RequestStatus.FAILED)
             return 400, {'error': {'message': str(e)}}
 
     async def __get_request_status(self, params):
@@ -201,8 +247,9 @@ class UniswapV3:
 
     async def __get_all_open_requests(self, params):
         try:
-            assert params['request_type'] == 'ORDER' or params['request_type'] == 'TRANSFER', 'Unknown transaction type'
-            request_type = RequestType.ORDER if params['request_type'] == 'ORDER' else RequestType.TRANSFER
+            assert params['request_type'] == 'ORDER' or params['request_type'] == 'TRANSFER' or \
+                params['request_type'] == 'APPROVE', 'Unknown transaction type'
+            request_type = RequestType[params['request_type']]
 
             _logger.debug(
                 f'Getting all open requests: request_type={request_type.name}')
@@ -257,20 +304,25 @@ class UniswapV3:
                         _, result = await self.__api.swap_exact_input_single(
                             base_ccy_symbol, quote_ccy_symbol, request.base_ccy_qty, request.quote_ccy_qty, request.fee_rate,
                             timeout_s, request.gas_limit, gas_price_wei, nonce=request.nonce)
-                else:
+                elif (request.request_type == RequestType.TRANSFER):
                     _, result = await self.__api.withdraw(
                         request.symbol, request.address_to, request.amount, request.gas_limit, gas_price_wei,
                         nonce=request.nonce)
+                else:
+                    _, result = await self.__api.approve(request.symbol, request.amount, request.gas_limit, gas_price_wei,
+                                                         nonce=request.nonce)
 
                 if result.error_type == ErrorType.NO_ERROR:
                     request.tx_hashes.append(result.tx_hash)
                     request.used_gas_prices_wei.append(gas_price_wei)
+                    self.__tx_hash_to_client_rid_and_request_type[result.tx_hash] = (
+                        client_request_id, request.request_type)
                     if (request.request_type == RequestType.ORDER):
-                        self.__swap_tx_hash_to_client_rid[result.tx_hash] = client_request_id
                         return 200, {'result': {'order_id': request.order_id}}
-                    else:
-                        self.__transfer_tx_hash_to_client_rid[result.tx_hash] = client_request_id
+                    elif (request.request_type == RequestType.TRANSFER):
                         return 200, {'result': {'withdraw_amend_tx_hash': result.tx_hash}}
+                    else:
+                        return 200, {'result': {'approve_amend_tx_hash': result.tx_hash}}
                 else:
                     return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
 
@@ -317,14 +369,17 @@ class UniswapV3:
 
                 if result.error_type == ErrorType.NO_ERROR:
                     request.request_status = RequestStatus.CANCEL_REQUESTED
-                    self.__cancel_tx_hash_to_client_rid[result.tx_hash] = client_request_id
+                    self.__tx_hash_to_client_rid_and_request_type[result.tx_hash] = (
+                        client_request_id, RequestType.CANCEL)
                     request.tx_hashes.append(result.tx_hash)
                     request.used_gas_prices_wei.append(gas_price_wei)
 
                     if (request.request_type == RequestType.ORDER):
                         return 200, {'result': {'order_id': request.order_id}}
-                    else:
+                    elif (request.request_type == RequestType.TRANSFER):
                         return 200, {'result': {'withdraw_cancel_tx_hash': result.tx_hash}}
+                    else:
+                        return 200, {'result': {'approve_cancel_tx_hash': result.tx_hash}}
                 else:
                     return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
             else:
@@ -335,8 +390,9 @@ class UniswapV3:
 
     async def __cancel_all(self, params):
         try:
-            assert params['request_type'] == 'ORDER' or params['request_type'] == 'TRANSFER', 'Unknown transaction type'
-            request_type = RequestType.ORDER if params['request_type'] == 'ORDER' else RequestType.TRANSFER
+            assert params['request_type'] == 'ORDER' or params['request_type'] == 'TRANSFER' \
+                or params['request_type'] == 'APPROVE', 'Unknown transaction type'
+            request_type = RequestType[params['request_type']]
 
             _logger.debug(
                 f'Canceling all requests, request_type={request_type.name}')
@@ -380,7 +436,8 @@ class UniswapV3:
                     request.tx_hashes.append(result.tx_hash)
                     request.used_gas_prices_wei.append(gas_price_wei)
                     cancel_requested.append(request.client_request_id)
-                    self.__cancel_tx_hash_to_client_rid[result.tx_hash] = request.client_request_id
+                    self.__tx_hash_to_client_rid_and_request_type[result.tx_hash] = (
+                        request.client_request_id, RequestType.CANCEL)
                 else:
                     failed_cancels.append(request.client_request_id)
             return 400 if failed_cancels else 200, {'cancel_requested': cancel_requested, 'failed_cancels': failed_cancels}
@@ -407,15 +464,8 @@ class UniswapV3:
             f'Start polling for transaction status every {poll_interval_s}s')
 
         while True:
-            _logger.debug('Polling status for swap transactions')
-            await self.__poll_tx(self.__swap_tx_hash_to_client_rid, 'swap')
-
-            _logger.debug('Polling status for transfer transactions')
-            await self.__poll_tx(self.__transfer_tx_hash_to_client_rid, 'transfer')
-
-            _logger.debug('Polling status for cancel transactions')
-            await self.__poll_tx(self.__cancel_tx_hash_to_client_rid, 'cancel')
-
+            _logger.debug('Polling status for transactions')
+            await self.__poll_tx(self.__tx_hash_to_client_rid_and_request_type)
             await self.pantheon.sleep(poll_interval_s)
 
     async def __get_tx_status_ws(self):
@@ -429,6 +479,8 @@ class UniswapV3:
                 await self.__api.get_public_websocket_status().wait_until_disconnected()
                 await self.__api.get_public_websocket_status().wait_until_connected()
             except Exception as ex:
+                _logger.exception(
+                    f'Error occured in alchemy_mined_transactions ws subscription: %r', ex)
                 await self.pantheon.sleep(2)
 
     async def __finalised_requests_cleanup(self, poll_interval_s):
@@ -444,27 +496,27 @@ class UniswapV3:
 
             await self.pantheon.sleep(poll_interval_s)
 
-    async def __poll_tx(self, tx_hash_to_client_r_id: dict, tx_type: str):
-        for tx_hash in list(tx_hash_to_client_r_id.keys()):
-            client_request_id = tx_hash_to_client_r_id[tx_hash]
+    async def __poll_tx(self, tx_hash_to_client_r_id_and_request_type: dict):
+        for tx_hash in list(tx_hash_to_client_r_id_and_request_type.keys()):
+            client_request_id, request_type = tx_hash_to_client_r_id_and_request_type[tx_hash]
             if (client_request_id not in self.__requests):
-                tx_hash_to_client_r_id.pop(tx_hash)
+                tx_hash_to_client_r_id_and_request_type.pop(tx_hash)
                 continue
             request = self.__requests[client_request_id]
             if (request.is_finalised()):
-                tx_hash_to_client_r_id.pop(tx_hash)
+                tx_hash_to_client_r_id_and_request_type.pop(tx_hash)
             else:
                 try:
                     tx = self.__api.get_transaction_receipt(tx_hash)
                     if (tx is not None):
                         status = tx['status']
-                        if (tx_type == 'swap' or tx_type == 'transfer'):
+                        if (request_type == RequestType.CANCEL):
+                            request_status = RequestStatus.CANCELED
+                        else:
                             if (status == 1):
                                 request_status = RequestStatus.SUCCEEDED
                             else:
                                 request_status = RequestStatus.FAILED
-                        else:
-                            request_status = RequestStatus.CANCELED
 
                         request.finalise_request(request_status)
 
@@ -480,8 +532,9 @@ class UniswapV3:
                             await self.__event_sink.on_event('ORDER', event)
                 except Exception as ex:
                     if not isinstance(ex, TransactionNotFound):
-                        _logger.error(
-                            f'Error polling tx_hash : {tx_hash} for client_request_id={client_request_id}, tx_type={tx_type}. Error={ex}')
+                        _logger.exception(
+                            f'Error polling tx_hash: {tx_hash} for client_request_id={client_request_id}, '
+                            f'request_type={request_type}: %r', ex)
 
     async def __receive_ws_messages(self):
         while True:
@@ -492,18 +545,11 @@ class UniswapV3:
                 tx_hash = message['params']['result']['transaction']['hash']
                 await self.__update_request_status(tx_hash)
             except Exception as ex:
-                _logger.error(f'Error occured while handling WS message {ex}')
+                _logger.exception(f'Error occured while handling WS message: %r', ex)
 
     async def __update_request_status(self, tx_hash: str):
-        if (tx_hash in self.__swap_tx_hash_to_client_rid):
-            await self.__poll_tx(
-                {tx_hash: self.__swap_tx_hash_to_client_rid[tx_hash]}, 'swap')
-        elif (tx_hash in self.__transfer_tx_hash_to_client_rid):
-            await self.__poll_tx(
-                {tx_hash: self.__transfer_tx_hash_to_client_rid[tx_hash]}, 'transfer')
-        elif (tx_hash in self.__cancel_tx_hash_to_client_rid):
-            await self.__poll_tx(
-                {tx_hash: self.__cancel_tx_hash_to_client_rid[tx_hash]}, 'cancel')
+        if (tx_hash in self.__tx_hash_to_client_rid_and_request_type):
+            await self.__poll_tx({tx_hash: self.__tx_hash_to_client_rid_and_request_type[tx_hash]})
         else:
             _logger.error(f'No request found for the tx_hash={tx_hash}')
 

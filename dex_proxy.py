@@ -116,6 +116,7 @@ class DexProxy:
         await self.__server.send_json(ws, reply)
 
     async def on_event(self, channel, event):
+        _logger.debug(f'channel={channel}, event={event}')
         for sub in self.__subscriptions[channel]:
             ws = sub.ws_ref()
             if ws is not None:
