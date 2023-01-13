@@ -1,0 +1,54 @@
+{
+    "Ethereum Goerli Testnet": {
+        "tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB"
+                ]
+            },
+            {
+                "symbol": "DAI",
+                "address": "0x11fE4B6AE13d2a6055C8D9cF65c55bac32B5d844",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+                ]
+            },
+            {
+                "symbol": "WETH",
+                "address": "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6",
+                "valid_withdrawal_addresses": [
+                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+                ]
+            },
+            {
+                "symbol": "USDT",
+                "address": "0xC2C527C0CACF457746Bd31B2a698Fe89de2b6d49",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+                ]
+            },
+            {
+                "symbol": "WBTC",
+                "address": "0xC04B0d3107736C32e19F1c62b2aF67BE61d63a05",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "address": "0xD87Ba7A50B2E7E660f678A895E4B72E7CB4CCd9C",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+                ]
+            }
+        ],
+        "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
+        "uniswap_router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+        "withdraw_tokens_to_wallet_address": "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+    }
+}

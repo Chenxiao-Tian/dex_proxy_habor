@@ -1,6 +1,5 @@
 import asyncio
 import concurrent
-import json
 import logging
 import weakref
 from typing import Callable, Awaitable

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import time
 
@@ -37,6 +38,8 @@ class UniswapV3:
 
         self.msg_queue = asyncio.Queue(loop=self.pantheon.loop)
 
+        self.__tokens_to_valid_withdrawal_addresses = {}
+
         self.__server.register(
             'POST', '/private/insert-order', self.__insert_order)
         self.__server.register('POST', '/private/withdraw', self.__withdraw)
@@ -58,10 +61,13 @@ class UniswapV3:
         self.__transfer_tx_hash_to_client_rid = {}
         self.__cancel_tx_hash_to_client_rid = {}
 
-        self.__exchange_name = config['name']
         self.__instruments = None
 
-        self.finalised_requests_cleanup_after_s = int(
+        self.__exchange_name = config['name']
+        self.__chain_name = config['chain_name']
+        self.__native_token = config['native_token']
+        self.__max_allowed_gas_price_wei = config['max_allowed_gas_price_gwei'] * 10 ** 9
+        self.__finalised_requests_cleanup_after_s = int(
             config['finalised_requests_cleanup_after_s'])
 
     async def process_request(self, ws, request_id, method, params: dict):
@@ -69,6 +75,7 @@ class UniswapV3:
 
     async def __insert_order(self, params: dict):
         try:
+            received_at_ms = int(time.time() * 1000)
             client_request_id = params['client_request_id']
 
             if (client_request_id in self.__requests.keys()):
@@ -90,8 +97,13 @@ class UniswapV3:
             quote_ccy_symbol = instrument.quote_currency
 
             order = OrderRequest(client_request_id, symbol, base_ccy_qty,
-                                 quote_ccy_qty, side, fee_rate, gas_limit, timeout_s)
+                                 quote_ccy_qty, side, fee_rate, gas_limit, timeout_s, received_at_ms)
             self.__requests[client_request_id] = order
+            
+            if (gas_price_wei > self.__max_allowed_gas_price_wei):
+                order.finalise_request(RequestStatus.FAILED)
+                return 400, {'error': {'message': f'gas_price_wei={gas_price_wei} is greater than '
+                                       f'max_allowed_gas_price_wei={self.__max_allowed_gas_price_wei}'}}
 
             _logger.debug(f'Inserting={order}, gas_price_wei={gas_price_wei}')
 
@@ -109,17 +121,16 @@ class UniswapV3:
                 order.used_gas_prices_wei.append(gas_price_wei)
                 return 200, {'result': {'order_id': result.tx_hash, 'nonce': nonce}}
             else:
-                order.request_status = RequestStatus.FAILED
-                order.finalised_at = time.time()
+                order.finalise_request(RequestStatus.FAILED)
                 return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
         except Exception as e:
             _logger.exception(f'Failed to insert order: %r', e)
-            order.request_status = RequestStatus.FAILED
-            order.finalised_at = time.time()
+            order.finalise_request(RequestStatus.FAILED)
             return 400, {'error': {'message': repr(e)}}
 
     async def __withdraw(self, params):
         try:
+            received_at_ms = int(time.time() * 1000)
             client_request_id = params['client_request_id']
 
             if (client_request_id in self.__requests.keys()):
@@ -127,13 +138,31 @@ class UniswapV3:
 
             symbol = params['symbol']
             amount = Decimal(params['amount'])
-            address_to = params['address_to']
             gas_limit = int(params['gas_limit'])
             gas_price_wei = int(params['gas_price_wei'])
+            address_to = params['address_to']
 
             transfer = TransferRequest(
-                client_request_id, symbol, amount, address_to, gas_limit)
+                client_request_id, symbol, amount, address_to, gas_limit, received_at_ms)
             self.__requests[client_request_id] = transfer
+            
+            if (gas_price_wei > self.__max_allowed_gas_price_wei):
+                transfer.finalise_request(RequestStatus.FAILED)
+                return 400, {'error': {'message': f'gas_price_wei={gas_price_wei} is greater than '
+                                       f'max_allowed_gas_price_wei={self.__max_allowed_gas_price_wei}'}}
+
+            if (symbol not in self.__tokens_to_valid_withdrawal_addresses):
+                transfer.finalise_request(RequestStatus.FAILED)
+                _logger.error(
+                    f'HIGH ALERT: client_request_id={client_request_id} tried to withdraw unknown symbol={symbol}')
+                return 400, {'error': {'message': f'Unknown symbol={symbol}'}}
+
+            if (address_to not in self.__tokens_to_valid_withdrawal_addresses[symbol]):
+                transfer.finalise_request(RequestStatus.FAILED)
+                _logger.error(
+                    f'HIGH ALERT: client_request_id={client_request_id} tried to withdraw symbol={symbol} '
+                    f'to unknown address={address_to}')
+                return 400, {'error': {'message': f'Unknown withdrawal_address={address_to} for symbol={symbol}'}}
 
             _logger.debug(
                 f'Withdrawing={transfer}, gas_price_wei={gas_price_wei}')
@@ -148,13 +177,11 @@ class UniswapV3:
                 transfer.used_gas_prices_wei.append(gas_price_wei)
                 return 200, {'withdraw_tx_hash': result.tx_hash}
             else:
-                transfer.request_status = RequestStatus.FAILED
-                transfer.finalised_at = time.time()
+                transfer.finalise_request(RequestStatus.FAILED)
                 return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
         except Exception as e:
             _logger.exception(f'Failed to withdraw: %r', e)
-            transfer.request_status = RequestStatus.FAILED
-            transfer.finalised_at = time.time()
+            transfer.finalise_request(RequestStatus.FAILED)
             return 400, {'error': {'message': str(e)}}
 
     async def __get_request_status(self, params):
@@ -203,6 +230,10 @@ class UniswapV3:
                     return 400, {'error': {'message': f'Cannot amend. Request status={request.request_status.name}'}}
 
                 gas_price_wei = int(params['gas_price_wei'])
+
+                if (gas_price_wei > self.__max_allowed_gas_price_wei):
+                    return 400, {'error': {'message': f'gas_price_wei={gas_price_wei} is greater than '
+                                           f'max_allowed_gas_price_wei={self.__max_allowed_gas_price_wei}'}}
 
                 if (request.request_type == RequestType.ORDER):
                     timeout_s = int(time.time() + params['timeout_s'])
@@ -274,6 +305,10 @@ class UniswapV3:
                     gas_price_wei = max(gas_price_wei, int(
                         1.1 * request.used_gas_prices_wei[-1]))
 
+                if (gas_price_wei > self.__max_allowed_gas_price_wei):
+                    return 400, {'error': {'message': f'gas_price_wei={gas_price_wei} is greater than '
+                                           f'max_allowed_gas_price_wei={self.__max_allowed_gas_price_wei}'}}
+
                 _logger.debug(
                     f'Canceling={request}, gas_price_wei={gas_price_wei}')
 
@@ -319,13 +354,20 @@ class UniswapV3:
                 if (request.request_status == RequestStatus.CANCEL_REQUESTED and
                         request.used_gas_prices_wei[-1] >= gas_price_wei):
                     _logger.info(
-                        f'Not sending cancel request for {request.client_request_id} as cancel with greater than '
-                        f'or equal to the gas_price_wei={gas_price_wei} already in progress')
+                        f'Not sending cancel request for client_request_id={request.client_request_id} as cancel with '
+                        f'greater than or equal to the gas_price_wei={gas_price_wei} already in progress')
                     cancel_requested.append(request.client_request_id)
                     continue
 
                 gas_price_wei = max(gas_price_wei, int(
                     1.1 * request.used_gas_prices_wei[-1]))
+
+                if (gas_price_wei > self.__max_allowed_gas_price_wei):
+                    _logger.error(
+                        f'Not sending cancel request for client_request_id={request.client_request_id} as gas_price_wei='
+                        f'{gas_price_wei} is greater than max_allowed_gas_price_wei={self.__max_allowed_gas_price_wei}')
+                    failed_cancels.append(request.client_request_id)
+                    continue
 
                 _logger.debug(
                     f'Canceling={request}, gas_price_wei={gas_price_wei}')
@@ -391,11 +433,13 @@ class UniswapV3:
 
     async def __finalised_requests_cleanup(self, poll_interval_s):
         _logger.debug(
-            f'Start polling for removing {self.finalised_requests_cleanup_after_s}s earlier finalised requests every {poll_interval_s}s')
+            f'Start polling for removing {self.__finalised_requests_cleanup_after_s}s '
+            f'earlier finalised requests every {poll_interval_s}s')
 
         while True:
             for request in list(self.__requests.values()):
-                if (request.is_finalised() and request.finalised_at + self.finalised_requests_cleanup_after_s < int(time.time())):
+                if (request.is_finalised() and
+                        request.finalised_at_ms + self.__finalised_requests_cleanup_after_s * 1000 < int(time.time() * 1000)):
                     self.__requests.pop(request.client_request_id)
 
             await self.pantheon.sleep(poll_interval_s)
@@ -414,14 +458,15 @@ class UniswapV3:
                     tx = self.__api.get_transaction_receipt(tx_hash)
                     if (tx is not None):
                         status = tx['status']
-                        request.finalised_at = time.time()
                         if (tx_type == 'swap' or tx_type == 'transfer'):
                             if (status == 1):
-                                request.request_status = RequestStatus.SUCCEEDED
+                                request_status = RequestStatus.SUCCEEDED
                             else:
-                                request.request_status = RequestStatus.FAILED
+                                request_status = RequestStatus.FAILED
                         else:
-                            request.request_status = RequestStatus.CANCELED
+                            request_status = RequestStatus.CANCELED
+
+                        request.finalise_request(request_status)
 
                         if (request.request_type == RequestType.ORDER):
                             event = {
@@ -462,7 +507,7 @@ class UniswapV3:
         else:
             _logger.error(f'No request found for the tx_hash={tx_hash}')
 
-    async def start(self, private_key, secrets):
+    async def start(self, private_key):
         await self.__gas_price_tracker.start()
 
         self.__instruments = await self.pantheon.get_instruments_live_source(
@@ -473,7 +518,26 @@ class UniswapV3:
             lifecycles=[InstrumentLifecycle.ACTIVE],
             rmq_conn_name='url')
 
-        await self.__api.initialize(private_key)
+        with open('./resources/contracts_address.json', 'r') as contracts_address_file:
+            contracts_address_json = json.load(contracts_address_file)[
+                self.__chain_name]
+
+            tokens_list_json = contracts_address_json["tokens"]
+            tokens_list = []
+            for token_json in tokens_list_json:
+                symbol = token_json["symbol"]
+                if (symbol in self.__tokens_to_valid_withdrawal_addresses):
+                    raise RuntimeError(
+                        f'Duplicate token : {symbol} in contracts_address file')
+                self.__tokens_to_valid_withdrawal_addresses[symbol] = token_json["valid_withdrawal_addresses"]
+
+                if (symbol != self.__native_token):
+                    tokens_list.append(ERC20Token(
+                        token_json["symbol"], Web3.toChecksumAddress(token_json["address"])))
+
+            uniswap_router_address = contracts_address_json["uniswap_router_address"]
+
+        await self.__api.initialize(private_key, uniswap_router_address, tokens_list)
 
         poll_interval_s = self.__config['poll_interval_s']
         self.pantheon.spawn(self.__get_tx_status_ws())

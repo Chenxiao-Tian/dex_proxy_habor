@@ -251,7 +251,7 @@ class Dexalot:
 
             await self.pantheon.sleep(poll_interval)
 
-    async def start(self, private_key, secrets):
+    async def start(self, private_key):
         await self.__api.initialize(private_key)
 
         poll_interval_s = self.__config['poll_interval_s']

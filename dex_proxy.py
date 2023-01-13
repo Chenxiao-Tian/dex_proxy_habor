@@ -14,7 +14,6 @@ from dexes import Dexalot, UniswapV3
 from eth_account import Account
 
 import boto3
-import ujson
 import base64
 
 _logger = logging.getLogger('DexProxy')
@@ -58,24 +57,6 @@ class DexProxy:
             encrypted_key = keyfile.read()
             private_key = Account.decrypt(encrypted_key, '')
             return private_key.hex()
-
-    def __get_secrets(self):
-        region_name = os.getenv('AWS_REGION')
-        if region_name is None:
-            region_name = 'ap-southeast-1'
-        secret_id = os.getenv('SECRET_ID')
-        if secret_id is None:
-            _logger.warning('Environment variable SECRET_ID not found')
-            return None
-
-        secrets_client = boto3.client(service_name='secretsmanager', region_name=region_name)
-        secret_value = secrets_client.get_secret_value(SecretId=secret_id)
-        if 'SecretString' in secret_value:
-            payload = ujson.loads(secret_value['SecretString'])
-        else:
-            decoded_binary_secret = base64.b64decode(secret_value['SecretBinary'])
-            payload = ujson.loads(decoded_binary_secret)
-        return payload
 
     async def __on_message(self, ws, msg: dict):
         try:
@@ -152,8 +133,7 @@ class DexProxy:
         app_health = await self.pantheon.get_app_health(app_type='service')
 
         private_key = self.__get_private_key()
-        secrets = self.__get_secrets()
-        await self.__exchange.start(private_key, secrets)
+        await self.__exchange.start(private_key)
 
         await self.__server.start()
 
