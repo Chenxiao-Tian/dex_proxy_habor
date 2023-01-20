@@ -49,10 +49,9 @@ class Dexalot:
             type1 = OrderType1(params['type1'])
             type2 = OrderType2(params['type2'])
             timeout = params.get('timeout')
-            timeout_s = int(timeout) if timeout else 0
 
-            _logger.debug(f'Inserting order: client_oid={client_oid}, symbol={symbol}, price={price}, qty={qty}, side={side.name}, type1={type1.name}, type2={type2.name}, timeout_s={timeout_s}')
-            result = self.__api.subnet.insert_order(client_oid, symbol, price, qty, side, type1, type2, timeout_s)
+            _logger.debug(f'Inserting order: client_oid={client_oid}, symbol={symbol}, price={price}, qty={qty}, side={side.name}, type1={type1.name}, type2={type2.name}, timeout={timeout}')
+            result = await self.__api.subnet.insert_order(client_oid, symbol, price, qty, side, type1, type2, timeout=timeout)
             if result.error_type == ErrorType.NO_ERROR:
                 return 200, {'result': {'client_order_id': client_oid}}
             else:
@@ -65,10 +64,11 @@ class Dexalot:
         try:
             order_id = params['order_id']
             timeout = params.get('timeout')
-            timeout_s = int(timeout) if timeout else 0
+            if timeout:
+                timeout = float(timeout)
 
-            _logger.debug(f'Canceling order: oid={order_id}, timeout_s={timeout_s}')
-            result = self.__api.subnet.cancel_order(order_id, timeout_s)
+            _logger.debug(f'Canceling order: oid={order_id}, timeout={timeout}')
+            result = await self.__api.subnet.cancel_order(order_id, timeout=timeout)
             if result.error_type == ErrorType.NO_ERROR:
                 return 200, {'result': {'order_id': order_id}}
             else:
@@ -103,7 +103,7 @@ class Dexalot:
         for batch in batches:
             # same timeout used as es
             _logger.debug(f'Bulk canceling orders {batch}')
-            result = self.__api.subnet.bulk_cancel(batch, 60)
+            result = await self.__api.subnet.bulk_cancel(batch, 60)
             if result.error_type != ErrorType.NO_ERROR:
                 _logger.error(f'Can not cancel orders {batch}: {result.error_message}')
                 failed_orders.extend(batch)
@@ -120,7 +120,7 @@ class Dexalot:
                 return 400, {'error': {'message': 'Either order id or client order id must be provided'}}
 
             _logger.debug(f'Getting order: oid={order_id}, client_oid={client_oid}')
-            order = self.__api.subnet.get_order(order_id, client_oid)
+            order = await self.__api.subnet.get_order(order_id, client_oid)
             if order is None:
                 return 404, {'error': {'message': 'Order not found'}}
             _logger.debug(f'Got {order}')
@@ -142,10 +142,9 @@ class Dexalot:
         try:
             amount = Decimal(params['amount'])
             timeout = params.get('timeout')
-            timeout_s = int(timeout) if timeout else 0
 
-            _logger.debug(f'Removing gas from tank: amount={amount}, timeout_s={timeout_s}')
-            result = self.__api.subnet.remove_gas_from_tank(amount, timeout_s)
+            _logger.debug(f'Removing gas from tank: amount={amount}, timeout={timeout}')
+            result = await self.__api.subnet.remove_gas_from_tank(amount, timeout=timeout)
             if result.error_type != ErrorType.NO_ERROR:
                 return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
             else:
@@ -158,10 +157,9 @@ class Dexalot:
         try:
             amount = Decimal(params['amount'])
             timeout = params.get('timeout')
-            timeout_s = int(timeout) if timeout else 0
 
-            _logger.debug(f'Filling up gas tank: amount={amount}, timeout_s={timeout_s}')
-            result = self.__api.subnet.fill_up_gas_tank(amount, timeout_s)
+            _logger.debug(f'Filling up gas tank: amount={amount}, timeout={timeout}')
+            result = await self.__api.subnet.fill_up_gas_tank(amount, timeout)
             if result.error_type != ErrorType.NO_ERROR:
                 return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
             else:
@@ -174,7 +172,7 @@ class Dexalot:
         try:
             symbol = params['symbol']
             _logger.debug(f'Getting exchange balance: symbol={symbol}')
-            balance = self.__api.subnet.get_exchange_balance(symbol)
+            balance = await self.__api.subnet.get_exchange_balance(symbol)
             return 200, {'result': {symbol: balance}}
         except Exception as e:
             _logger.exception(f'Failed to get exchange balance: %r', e)
@@ -185,10 +183,9 @@ class Dexalot:
             symbol = params['symbol']
             amount = Decimal(params['amount'])
             timeout = params.get('timeout')
-            timeout_s = int(timeout) if timeout else 0
 
-            _logger.debug(f'Depositing: symbol={symbol}, amount={amount}, timeout_s={timeout_s}')
-            result = self.__api.mainnet.deposit(symbol, amount, timeout_s)
+            _logger.debug(f'Depositing: symbol={symbol}, amount={amount}, timeout={timeout}')
+            result = await self.__api.mainnet.deposit(symbol, amount, timeout=timeout)
             if result.error_type != ErrorType.NO_ERROR:
                 return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
             else:
@@ -202,10 +199,9 @@ class Dexalot:
             symbol = params['symbol']
             amount = Decimal(params['amount'])
             timeout = params.get('timeout')
-            timeout_s = int(timeout) if timeout else 0
 
-            _logger.debug(f'Withdrawing: symbol={symbol}, amount={amount}, timeout_s={timeout_s}')
-            result = self.__api.subnet.withdraw(symbol, amount, timeout_s)
+            _logger.debug(f'Withdrawing: symbol={symbol}, amount={amount}, timeout={timeout}')
+            result = await self.__api.subnet.withdraw(symbol, amount, timeout=timeout)
             if result.error_type != ErrorType.NO_ERROR:
                 return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
             else:
