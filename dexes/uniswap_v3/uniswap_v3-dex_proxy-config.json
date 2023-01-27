@@ -58,6 +58,10 @@
     "RabbitMQ": {
         "url": "amqp://dev-sng-rmq.kdev"
     },
+    "Redis": {
+        "host": "localhost",
+        "port": 6379
+    },
     "server": {
         "port": 1958
     },
@@ -75,7 +79,7 @@
                 }
             }
         },
-        "gas_price_tracker":{
+        "gas_price_tracker": {
             "http_url": "https://goerli.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
             "ws_url": "wss://goerli.infura.io/ws/v3/d3bf8a4fe2744587bf47459446b7f170",
             "use_fee_history": true,
@@ -84,7 +88,11 @@
             "percentile_priority_fee_slow": 5
         },
         "max_allowed_gas_price_gwei": 500,
-        "poll_interval_s": 15,
-        "finalised_requests_cleanup_after_s": 600
+        "request_cache": {
+            "finalised_requests_cleanup_after_s": 600
+        },
+        "transactions_status_poller": {
+            "poll_interval_s": 15
+        }
     }
 }

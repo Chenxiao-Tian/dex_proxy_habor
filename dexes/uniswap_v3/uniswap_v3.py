@@ -16,7 +16,8 @@ from pyutils.exchange_apis import ApiFactory
 from pyutils.exchange_connectors import ConnectorFactory, ConnectorType
 from pyutils.gas_pricing.eth import GasPriceTracker, PriorityFee
 
-from web3.exceptions import TransactionNotFound
+from .requests_cache import RequestsCache
+from .transactions_status_poller import TransactionsStatusPoller
 
 _logger = logging.getLogger('uniswap_v3')
 
@@ -26,7 +27,6 @@ class UniswapV3:
 
     def __init__(self, pantheon: Pantheon, config, server, event_sink):
         self.pantheon = pantheon
-        self.__config = config
         self.__server = server
         self.__event_sink = event_sink
 
@@ -43,7 +43,8 @@ class UniswapV3:
         self.__server.register(
             'POST', '/private/insert-order', self.__insert_order)
         self.__server.register('POST', '/private/withdraw', self.__withdraw)
-        self.__server.register('POST', '/private/approve-token', self.__approve_token)
+        self.__server.register(
+            'POST', '/private/approve-token', self.__approve_token)
         self.__server.register(
             'GET', '/public/get-request-status', self.__get_request_status)
         self.__server.register(
@@ -57,8 +58,9 @@ class UniswapV3:
         self.__server.register(
             'GET', '/public/get-wallet-balance', self.__get_wallet_balance)
 
-        self.__requests = {}
-        self.__tx_hash_to_client_rid_and_request_type = {}
+        self.__request_cache = RequestsCache(pantheon, config['request_cache'])
+        self.__transactions_status_poller = TransactionsStatusPoller(
+            pantheon, self.__api, self.__request_cache, self.__on_request_status_update, config['transactions_status_poller'])
 
         self.__instruments = None
 
@@ -66,8 +68,6 @@ class UniswapV3:
         self.__chain_name = config['chain_name']
         self.__native_token = config['native_token']
         self.__max_allowed_gas_price_wei = config['max_allowed_gas_price_gwei'] * 10 ** 9
-        self.__finalised_requests_cleanup_after_s = int(
-            config['finalised_requests_cleanup_after_s'])
 
     async def process_request(self, ws, request_id, method, params: dict):
         return False
@@ -77,7 +77,7 @@ class UniswapV3:
             received_at_ms = int(time.time() * 1000)
             client_request_id = params['client_request_id']
 
-            if (client_request_id in self.__requests.keys()):
+            if (self.__request_cache.does_exist(client_request_id)):
                 return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
 
             symbol = params['symbol']
@@ -97,10 +97,11 @@ class UniswapV3:
 
             order = OrderRequest(client_request_id, symbol, base_ccy_qty,
                                  quote_ccy_qty, side, fee_rate, gas_limit, timeout_s, received_at_ms)
-            self.__requests[client_request_id] = order
-            
+            self.__request_cache.add(order)
+
             if (gas_price_wei > self.__max_allowed_gas_price_wei):
-                order.finalise_request(RequestStatus.FAILED)
+                self.__request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'message': f'gas_price_wei={gas_price_wei} is greater than '
                                        f'max_allowed_gas_price_wei={self.__max_allowed_gas_price_wei}'}}
 
@@ -117,17 +118,20 @@ class UniswapV3:
             if result.error_type == ErrorType.NO_ERROR:
                 order.order_id = result.tx_hash
                 order.nonce = nonce
-                self.__tx_hash_to_client_rid_and_request_type[result.tx_hash] = (
-                    client_request_id, RequestType.ORDER)
-                order.tx_hashes.append(result.tx_hash)
+                self.__transactions_status_poller.add_for_polling(result.tx_hash, client_request_id, RequestType.ORDER)
+                order.tx_hashes.append((result.tx_hash, RequestType.ORDER.name))
                 order.used_gas_prices_wei.append(gas_price_wei)
+                self.__request_cache.add_or_update_request_in_redis(
+                    client_request_id)
                 return 200, {'result': {'order_id': result.tx_hash, 'nonce': nonce}}
             else:
-                order.finalise_request(RequestStatus.FAILED)
+                self.__request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
         except Exception as e:
             _logger.exception(f'Failed to insert order: %r', e)
-            order.finalise_request(RequestStatus.FAILED)
+            self.__request_cache.finalise_request(
+                client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': repr(e)}}
 
     async def __withdraw(self, params):
@@ -135,7 +139,7 @@ class UniswapV3:
             received_at_ms = int(time.time() * 1000)
             client_request_id = params['client_request_id']
 
-            if (client_request_id in self.__requests.keys()):
+            if (self.__request_cache.does_exist(client_request_id)):
                 return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
 
             symbol = params['symbol']
@@ -146,21 +150,24 @@ class UniswapV3:
 
             transfer = TransferRequest(
                 client_request_id, symbol, amount, address_to, gas_limit, received_at_ms)
-            self.__requests[client_request_id] = transfer
-            
+            self.__request_cache.add(transfer)
+
             if (gas_price_wei > self.__max_allowed_gas_price_wei):
-                transfer.finalise_request(RequestStatus.FAILED)
+                self.__request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'message': f'gas_price_wei={gas_price_wei} is greater than '
                                        f'max_allowed_gas_price_wei={self.__max_allowed_gas_price_wei}'}}
 
             if (symbol not in self.__tokens_to_valid_withdrawal_addresses):
-                transfer.finalise_request(RequestStatus.FAILED)
+                self.__request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
                 _logger.error(
                     f'HIGH ALERT: client_request_id={client_request_id} tried to withdraw unknown symbol={symbol}')
                 return 400, {'error': {'message': f'Unknown symbol={symbol}'}}
 
             if (address_to not in self.__tokens_to_valid_withdrawal_addresses[symbol]):
-                transfer.finalise_request(RequestStatus.FAILED)
+                self.__request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
                 _logger.error(
                     f'HIGH ALERT: client_request_id={client_request_id} tried to withdraw symbol={symbol} '
                     f'to unknown address={address_to}')
@@ -174,17 +181,21 @@ class UniswapV3:
 
             if result.error_type == ErrorType.NO_ERROR:
                 transfer.nonce = nonce
-                self.__tx_hash_to_client_rid_and_request_type[result.tx_hash] = (
-                    client_request_id, RequestType.TRANSFER)
-                transfer.tx_hashes.append(result.tx_hash)
+                self.__transactions_status_poller.add_for_polling(
+                    result.tx_hash, client_request_id, RequestType.TRANSFER)
+                transfer.tx_hashes.append((result.tx_hash, RequestType.TRANSFER.name))
                 transfer.used_gas_prices_wei.append(gas_price_wei)
+                self.__request_cache.add_or_update_request_in_redis(
+                    client_request_id)
                 return 200, {'withdraw_tx_hash': result.tx_hash}
             else:
-                transfer.finalise_request(RequestStatus.FAILED)
+                self.__request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
         except Exception as e:
             _logger.exception(f'Failed to withdraw: %r', e)
-            transfer.finalise_request(RequestStatus.FAILED)
+            self.__request_cache.finalise_request(
+                client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': str(e)}}
 
     async def __approve_token(self, params):
@@ -192,7 +203,7 @@ class UniswapV3:
             received_at_ms = int(time.time() * 1000)
             client_request_id = params['client_request_id']
 
-            if (client_request_id in self.__requests.keys()):
+            if (self.__request_cache.does_exist(client_request_id)):
                 return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
 
             symbol = params['symbol']
@@ -203,10 +214,11 @@ class UniswapV3:
 
             approve = ApproveRequest(
                 client_request_id, symbol, amount, gas_limit, received_at_ms)
-            self.__requests[client_request_id] = approve
-            
+            self.__request_cache.add(approve)
+
             if (gas_price_wei > self.__max_allowed_gas_price_wei):
-                approve.finalise_request(RequestStatus.FAILED)
+                self.__request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'message': f'gas_price_wei={gas_price_wei} is greater than '
                                        f'max_allowed_gas_price_wei={self.__max_allowed_gas_price_wei}'}}
 
@@ -217,17 +229,21 @@ class UniswapV3:
 
             if result.error_type == ErrorType.NO_ERROR:
                 approve.nonce = nonce
-                self.__tx_hash_to_client_rid_and_request_type[result.tx_hash] = (
-                    client_request_id, RequestType.APPROVE)
-                approve.tx_hashes.append(result.tx_hash)
+                self.__transactions_status_poller.add_for_polling(
+                    result.tx_hash, client_request_id, RequestType.APPROVE)
+                approve.tx_hashes.append((result.tx_hash, RequestType.APPROVE.name))
                 approve.used_gas_prices_wei.append(gas_price_wei)
+                self.__request_cache.add_or_update_request_in_redis(
+                    client_request_id)
                 return 200, {'approve_tx_hash': result.tx_hash}
             else:
-                approve.finalise_request(RequestStatus.FAILED)
+                self.__request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'code': result.error_type.value, 'message': self.__api.get_error_description(result)}}
         except Exception as e:
             _logger.exception(f'Failed to approve: %r', e)
-            approve.finalise_request(RequestStatus.FAILED)
+            self.__request_cache.finalise_request(
+                client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': str(e)}}
 
     async def __get_request_status(self, params):
@@ -237,8 +253,9 @@ class UniswapV3:
             _logger.debug(
                 f'Getting request: client_request_id={client_request_id}')
 
-            if (client_request_id in self.__requests.keys()):
-                return 200, self.__requests[client_request_id].to_dict()
+            request = self.__request_cache.get(client_request_id)
+            if (request):
+                return 200, request.to_dict()
             else:
                 return 404, {'error': {'message': 'Request not found'}}
         except Exception as e:
@@ -256,8 +273,8 @@ class UniswapV3:
 
             open_requests = []
 
-            for request in self.__requests.values():
-                if (request.is_finalised() or request.request_type != request_type):
+            for request in self.__request_cache.get_all(request_type):
+                if (request.is_finalised()):
                     continue
                 open_requests.append(request.to_dict())
 
@@ -269,10 +286,9 @@ class UniswapV3:
     async def __amend_request(self, params: dict):
         try:
             client_request_id = params['client_request_id']
+            request = self.__request_cache.get(client_request_id)
 
-            if (client_request_id in self.__requests.keys()):
-                request = self.__requests[client_request_id]
-
+            if (request):
                 if (request.request_status != RequestStatus.PENDING):
                     return 400, {'error': {'message': f'Cannot amend. Request status={request.request_status.name}'}}
 
@@ -313,10 +329,12 @@ class UniswapV3:
                                                          nonce=request.nonce)
 
                 if result.error_type == ErrorType.NO_ERROR:
-                    request.tx_hashes.append(result.tx_hash)
+                    request.tx_hashes.append((result.tx_hash, request.request_type.name))
                     request.used_gas_prices_wei.append(gas_price_wei)
-                    self.__tx_hash_to_client_rid_and_request_type[result.tx_hash] = (
-                        client_request_id, request.request_type)
+                    self.__transactions_status_poller.add_for_polling(
+                        result.tx_hash, client_request_id, request.request_type)
+                    self.__request_cache.add_or_update_request_in_redis(
+                        client_request_id)
                     if (request.request_type == RequestType.ORDER):
                         return 200, {'result': {'order_id': request.order_id}}
                     elif (request.request_type == RequestType.TRANSFER):
@@ -338,10 +356,9 @@ class UniswapV3:
             client_request_id = params['client_request_id']
             gas_price_wei = int(params.get('gas_price_wei', self.__gas_price_tracker.get_gas_price(
                 priority_fee=PriorityFee.Fast)))
+            request = self.__request_cache.get(client_request_id)
 
-            if (client_request_id in self.__requests.keys()):
-                request = self.__requests[client_request_id]
-
+            if (request):
                 if (request.is_finalised()):
                     return 400, {'error': {'message': f'Cannot cancel. Request status={request.request_status.name}'}}
 
@@ -369,10 +386,12 @@ class UniswapV3:
 
                 if result.error_type == ErrorType.NO_ERROR:
                     request.request_status = RequestStatus.CANCEL_REQUESTED
-                    self.__tx_hash_to_client_rid_and_request_type[result.tx_hash] = (
-                        client_request_id, RequestType.CANCEL)
-                    request.tx_hashes.append(result.tx_hash)
+                    self.__transactions_status_poller.add_for_polling(
+                        result.tx_hash, client_request_id, RequestType.CANCEL)
+                    request.tx_hashes.append((result.tx_hash, RequestType.CANCEL.name))
                     request.used_gas_prices_wei.append(gas_price_wei)
+                    self.__request_cache.add_or_update_request_in_redis(
+                        client_request_id)
 
                     if (request.request_type == RequestType.ORDER):
                         return 200, {'result': {'order_id': request.order_id}}
@@ -400,8 +419,8 @@ class UniswapV3:
             cancel_requested = []
             failed_cancels = []
 
-            for request in self.__requests.values():
-                if (request.is_finalised() or request.request_type != request_type):
+            for request in self.__request_cache.get_all(request_type):
+                if (request.is_finalised()):
                     continue
 
                 gas_price_wei = self.__gas_price_tracker.get_gas_price(
@@ -433,11 +452,13 @@ class UniswapV3:
 
                 if result.error_type == ErrorType.NO_ERROR:
                     request.request_status = RequestStatus.CANCEL_REQUESTED
-                    request.tx_hashes.append(result.tx_hash)
+                    request.tx_hashes.append((result.tx_hash, RequestType.CANCEL.name))
                     request.used_gas_prices_wei.append(gas_price_wei)
                     cancel_requested.append(request.client_request_id)
-                    self.__tx_hash_to_client_rid_and_request_type[result.tx_hash] = (
-                        request.client_request_id, RequestType.CANCEL)
+                    self.__transactions_status_poller.add_for_polling(
+                        result.tx_hash, request.client_request_id, RequestType.CANCEL)
+                    self.__request_cache.add_or_update_request_in_redis(
+                        request.client_request_id)
                 else:
                     failed_cancels.append(request.client_request_id)
             return 400 if failed_cancels else 200, {'cancel_requested': cancel_requested, 'failed_cancels': failed_cancels}
@@ -459,15 +480,6 @@ class UniswapV3:
         _logger.debug(f'Trying to cancel transaction with nonce={nonce}')
         return self.__api.cancel_transaction(nonce, gas_price_wei)
 
-    async def __poll_tx_for_status_rest(self, poll_interval_s):
-        _logger.debug(
-            f'Start polling for transaction status every {poll_interval_s}s')
-
-        while True:
-            _logger.debug('Polling status for transactions')
-            await self.__poll_tx(self.__tx_hash_to_client_rid_and_request_type)
-            await self.pantheon.sleep(poll_interval_s)
-
     async def __get_tx_status_ws(self):
         self.pantheon.spawn(self.__receive_ws_messages())
 
@@ -483,59 +495,6 @@ class UniswapV3:
                     f'Error occured in alchemy_mined_transactions ws subscription: %r', ex)
                 await self.pantheon.sleep(2)
 
-    async def __finalised_requests_cleanup(self, poll_interval_s):
-        _logger.debug(
-            f'Start polling for removing {self.__finalised_requests_cleanup_after_s}s '
-            f'earlier finalised requests every {poll_interval_s}s')
-
-        while True:
-            for request in list(self.__requests.values()):
-                if (request.is_finalised() and
-                        request.finalised_at_ms + self.__finalised_requests_cleanup_after_s * 1000 < int(time.time() * 1000)):
-                    self.__requests.pop(request.client_request_id)
-
-            await self.pantheon.sleep(poll_interval_s)
-
-    async def __poll_tx(self, tx_hash_to_client_r_id_and_request_type: dict):
-        for tx_hash in list(tx_hash_to_client_r_id_and_request_type.keys()):
-            client_request_id, request_type = tx_hash_to_client_r_id_and_request_type[tx_hash]
-            if (client_request_id not in self.__requests):
-                tx_hash_to_client_r_id_and_request_type.pop(tx_hash)
-                continue
-            request = self.__requests[client_request_id]
-            if (request.is_finalised()):
-                tx_hash_to_client_r_id_and_request_type.pop(tx_hash)
-            else:
-                try:
-                    tx = self.__api.get_transaction_receipt(tx_hash)
-                    if (tx is not None):
-                        status = tx['status']
-                        if (request_type == RequestType.CANCEL):
-                            request_status = RequestStatus.CANCELED
-                        else:
-                            if (status == 1):
-                                request_status = RequestStatus.SUCCEEDED
-                            else:
-                                request_status = RequestStatus.FAILED
-
-                        request.finalise_request(request_status)
-
-                        if (request.request_type == RequestType.ORDER):
-                            event = {
-                                'jsonrpc': '2.0',
-                                'method': 'subscription',
-                                'params': {
-                                    'channel': 'ORDER',
-                                    'data': request.to_dict()
-                                }
-                            }
-                            await self.__event_sink.on_event('ORDER', event)
-                except Exception as ex:
-                    if not isinstance(ex, TransactionNotFound):
-                        _logger.exception(
-                            f'Error polling tx_hash: {tx_hash} for client_request_id={client_request_id}, '
-                            f'request_type={request_type}: %r', ex)
-
     async def __receive_ws_messages(self):
         while True:
             try:
@@ -543,15 +502,24 @@ class UniswapV3:
                 _logger.info("[WS] [MESSAGE] %s", message)
 
                 tx_hash = message['params']['result']['transaction']['hash']
-                await self.__update_request_status(tx_hash)
+                await self.__transactions_status_poller.poll_for_status(tx_hash)
             except Exception as ex:
-                _logger.exception(f'Error occured while handling WS message: %r', ex)
+                _logger.exception(
+                    f'Error occured while handling WS message: %r', ex)
 
-    async def __update_request_status(self, tx_hash: str):
-        if (tx_hash in self.__tx_hash_to_client_rid_and_request_type):
-            await self.__poll_tx({tx_hash: self.__tx_hash_to_client_rid_and_request_type[tx_hash]})
-        else:
-            _logger.error(f'No request found for the tx_hash={tx_hash}')
+    async def __on_request_status_update(self, client_request_id):
+        request = self.__request_cache.get(client_request_id)
+
+        if (request and request.request_type == RequestType.ORDER):
+            event = {
+                'jsonrpc': '2.0',
+                'method': 'subscription',
+                'params': {
+                    'channel': 'ORDER',
+                    'data': request.to_dict()
+                }
+            }
+            await self.__event_sink.on_event('ORDER', event)
 
     async def start(self, private_key):
         await self.__gas_price_tracker.start()
@@ -585,8 +553,7 @@ class UniswapV3:
 
         await self.__api.initialize(private_key, uniswap_router_address, tokens_list)
 
-        poll_interval_s = self.__config['poll_interval_s']
         self.pantheon.spawn(self.__get_tx_status_ws())
-        self.pantheon.spawn(self.__poll_tx_for_status_rest(poll_interval_s))
-        self.pantheon.spawn(self.__finalised_requests_cleanup(poll_interval_s))
+        await self.__transactions_status_poller.start()
+        await self.__request_cache.start(self.__transactions_status_poller)
         await self.__gas_price_tracker.wait_gas_price_ready()
