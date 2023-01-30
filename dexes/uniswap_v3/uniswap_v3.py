@@ -58,7 +58,7 @@ class UniswapV3:
         self.__server.register(
             'GET', '/public/get-wallet-balance', self.__get_wallet_balance)
 
-        self.__request_cache = RequestsCache(pantheon, config['request_cache'])
+        self.__request_cache = RequestsCache(pantheon, self.__api, config['request_cache'])
         self.__transactions_status_poller = TransactionsStatusPoller(
             pantheon, self.__api, self.__request_cache, self.__on_request_status_update, config['transactions_status_poller'])
 
