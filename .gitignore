@@ -48,3 +48,6 @@ Thumbs.db
 *.mov
 *.wmv
 
+
+gpgout.log
+gitout.log

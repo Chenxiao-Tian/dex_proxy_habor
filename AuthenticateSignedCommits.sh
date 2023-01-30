@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 #
 # Author: greg.markey@auros.global
+# Version: 20220109-1
+# * Explicitly print that commit is untrusted.
 # Version: 20220106-1
 # * Print the name of the accepted signer.
 # Version: 20220103-1
@@ -47,6 +49,10 @@ done
 git status &> gitout.log
 RC=$?
 if [[ $RC > 0 ]]; then
+  if [[ $RC == 1 && "$(cat gitout.log)" == "" ]]; then
+    err "Most recent commit is not signed by a trusted signer"
+    exit $RC
+  fi
   err "Error reading from repository"
   err "Git output follows:"
   cat gitout.log
