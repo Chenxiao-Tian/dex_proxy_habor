@@ -52,8 +52,8 @@ class DexProxy:
             raise Exception(f'Exchange {name} not supported')
 
     def __get_private_key(self):
-        key_store_file = os.getenv('KEY_STORE_FILE')
-        with open(key_store_file) as keyfile:
+        key_store_file_path = self.pantheon.config['key_store_file_path']
+        with open(key_store_file_path) as keyfile:
             encrypted_key = keyfile.read()
             private_key = Account.decrypt(encrypted_key, '')
             return private_key.hex()

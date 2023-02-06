@@ -65,6 +65,8 @@
     "server": {
         "port": 1958
     },
+    "_comment_0": "change following to ./dexes/uniswap_v3/test/wallet.json to run dex-proxy locally",
+    "key_store_file_path": "/app/auros/secret/wallet.json",
     "dex": {
         "name": "chainEth-uni3",
         "chain_name": "Ethereum Goerli Testnet",
