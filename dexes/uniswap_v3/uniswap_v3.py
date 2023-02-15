@@ -36,7 +36,7 @@ class UniswapV3:
         self.__gas_price_tracker = GasPriceTracker(
             self.pantheon, config['gas_price_tracker'])
 
-        self.msg_queue = asyncio.Queue(loop=self.pantheon.loop)
+        self.msg_queue = asyncio.Queue()
 
         self.__tokens_to_valid_withdrawal_addresses = {}
 
@@ -547,7 +547,7 @@ class UniswapV3:
 
                 if (symbol != self.__native_token):
                     tokens_list.append(ERC20Token(
-                        token_json["symbol"], Web3.toChecksumAddress(token_json["address"])))
+                        token_json["symbol"], Web3.to_checksum_address(token_json["address"])))
 
             uniswap_router_address = contracts_address_json["uniswap_router_address"]
 

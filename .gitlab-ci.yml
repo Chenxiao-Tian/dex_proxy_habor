@@ -1,0 +1,45 @@
+stages:
+  - build
+
+
+variables:
+  ENCLAVE_BUILD_IMAGE: registry.gitlab.com/auros/enclave-builder@sha256:fb0f6d62f42796c9ee872bef9233a841ebcd3fcbfe88c76cdff8c754e622b7dd
+  DOCKER_HOST: tcp://docker:2375
+
+
+default:
+  image:
+    name: $ENCLAVE_BUILD_IMAGE
+    entrypoint: [""]
+  services:
+    - docker:20-dind
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+  retry: 2
+
+
+.default_dev_build_script: &default_dev_build_script
+  - export CONTAINER_NAME=${PROCESS_NAME}
+  - echo ${SSH_PRIVATE_KEY_BASE64} | base64 -d -w 0 > ~/.ssh/id_rsa
+  - chmod 600 ~/.ssh/id_rsa
+  - ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
+  - git clone git@bitbucket.org:kenetic/config-dev.git config
+  - cd config
+  - git checkout ${CONFIG_DEV_REF}
+  - cd -
+  - "[[ -f config/${PROCESS_NAME}.json ]] || { echo \"No config found for ${PROCESS_NAME}\"; }"
+  - export CONTEXT_ID=$(jq -r '.enclave.cid | select(. != null)' config/${PROCESS_NAME}.json)
+  - export ADDITIONAL_BUILD_ARGS="--build-arg PYAPP_MODULE_NAME=dex_proxy"
+  - ./ImageBuilder.sh --enclave
+
+
+build dex_proxy-uni3-goerli-4:
+  stage: build
+  rules:
+    - if: '$TARGET == "dex_proxy-uni3-goerli-4" || $TARGET == "default"'
+  script:
+    - export PROCESS_NAME=dex_proxy-uni3-goerli-4
+    - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_UNI3_GOERLI_4}
+    - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_UNI3_GOERLI_4}
+    - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_UNI3_GOERLI_4}
+    - *default_dev_build_script
