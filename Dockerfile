@@ -24,7 +24,7 @@ RUN apt-get update \
   && rm -rf .git
 
 
-FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:157de0b239c2096fe718a0c03f382137f78074ef7f72666ddcd0259ba4bd7a3f
+FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:615f2d3b5ef00841effc8647c60893bfdb509e66e9b5b1fff0406378a1c3c17f
 
 # Valet/authentication/enclave configuration
 # Context ID is unique to this enclave.

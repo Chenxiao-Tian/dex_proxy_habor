@@ -3,7 +3,7 @@ stages:
 
 
 variables:
-  ENCLAVE_BUILD_IMAGE: registry.gitlab.com/auros/enclave-builder@sha256:fb0f6d62f42796c9ee872bef9233a841ebcd3fcbfe88c76cdff8c754e622b7dd
+  ENCLAVE_BUILD_IMAGE: registry.gitlab.com/auros/enclave-builder@sha256:ea8814e4157bed0889ba268c40af1fa2ebdce52d6944433d8e9c0ac093f8aca1
   DOCKER_HOST: tcp://docker:2375
 
 
@@ -23,7 +23,7 @@ default:
   - echo ${SSH_PRIVATE_KEY_BASE64} | base64 -d -w 0 > ~/.ssh/id_rsa
   - chmod 600 ~/.ssh/id_rsa
   - ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
-  - git clone git@bitbucket.org:kenetic/config-dev.git config
+  - git clone --depth 50 git@bitbucket.org:kenetic/config-dev.git config
   - cd config
   - git checkout ${CONFIG_DEV_REF}
   - cd -
@@ -31,6 +31,45 @@ default:
   - export CONTEXT_ID=$(jq -r '.enclave.cid | select(. != null)' config/${PROCESS_NAME}.json)
   - export ADDITIONAL_BUILD_ARGS="--build-arg PYAPP_MODULE_NAME=dex_proxy"
   - ./ImageBuilder.sh --enclave
+
+
+.default_prod_build_script: &default_prod_build_script
+  - export CONTAINER_NAME=${PROCESS_NAME}
+  - echo ${SSH_PRIVATE_KEY_BASE64} | base64 -d -w 0 > ~/.ssh/id_rsa
+  - chmod 600 ~/.ssh/id_rsa
+  - ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
+  - git clone --depth 50 git@bitbucket.org:kenetic/config-prod.git config
+  - cd config
+  - git checkout ${CONFIG_PROD_REF}
+  - cd -
+  - "[[ -f config/${PROCESS_NAME}.json ]] || { echo \"No config found for ${PROCESS_NAME}\"; }"
+  - export CONTEXT_ID=$(jq -r '.enclave.cid | select(. != null)' config/${PROCESS_NAME}.json)
+  - export ADDITIONAL_BUILD_ARGS="--build-arg PYAPP_MODULE_NAME=dex_proxy"
+  - ./ImageBuilder.sh --enclave
+
+
+build dex_proxy-dexa-main:
+  stage: build
+  rules:
+    - if: '$TARGET == "dex_proxy-dexa-main" || $TARGET == "default"'
+  script:
+    - export PROCESS_NAME=dex_proxy-dexa-main
+    - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_DEXA_MAIN}
+    - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_DEXA_MAIN}
+    - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_DEXA_MAIN}
+    - *default_prod_build_script
+
+
+build dex_proxy-dexa-fuji:
+  stage: build
+  rules:
+    - if: '$TARGET == "dex_proxy-dexa-fuji" || $TARGET == "default"'
+  script:
+    - export PROCESS_NAME=dex_proxy-dexa-fuji
+    - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_DEXA_FUJI}
+    - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_DEXA_FUJI}
+    - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_DEXA_FUJI}
+    - *default_dev_build_script
 
 
 build dex_proxy-uni3-goerli-4:

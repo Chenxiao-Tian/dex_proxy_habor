@@ -13,14 +13,10 @@ from dexes import Dexalot, UniswapV3
 
 from eth_account import Account
 
-import boto3
-import base64
-
 _logger = logging.getLogger('DexProxy')
 
 
 class DexProxy:
-
     class Subscription:
 
         def __init__(self, ws):
@@ -40,7 +36,7 @@ class DexProxy:
         # channel -> set of Subscription
         self.__subscriptions = defaultdict(set)
 
-        self.__server = WebServer(self.pantheon.config['server'], self.__on_message)
+        self.__server = WebServer(self.pantheon.config['server'], self)
 
         dex_config = self.pantheon.config['dex']
         name = dex_config['name']
@@ -58,7 +54,10 @@ class DexProxy:
             private_key = Account.decrypt(encrypted_key, '')
             return private_key.hex()
 
-    async def __on_message(self, ws, msg: dict):
+    async def on_new_connection(self, ws):
+        await self.__exchange.on_new_connection(ws)
+
+    async def on_message(self, ws, msg: dict):
         try:
             request_id = msg['id']
             method = msg['method']

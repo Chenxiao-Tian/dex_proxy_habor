@@ -1,6 +1,8 @@
 #!/bin/bash
 #
 # Author: greg.markey@auros.global
+# Version: 20220216-1
+# * Support binary encoded shars.
 # Version: 20220111-1
 # * Initial release.
 
@@ -44,7 +46,7 @@ command -v nitro-cli    || fatal "Missing nitro-cli binary"
 
 ENCLAVE=$(basename $0)-enclave.eif
 ENCLAVE_PATH=app/${ENCLAVE}
-BASE64_SOURCE_BINARY=$(jq -r .app.s3_app_name ${CONFIG_FILE}).base64
+SOURCE_BINARY=$(jq -r .app.s3_app_name ${CONFIG_FILE})
 
 ENCLAVE_CID=$(jq -r '.enclave.cid // empty' ${CONFIG_FILE})
 CPU_COUNT=$(jq -r '.enclave.cpus // empty' ${CONFIG_FILE})
@@ -71,12 +73,14 @@ trap halt_enclave SIGINT
 
 if [ -f "${ENCLAVE_PATH}" ]; then
   info "Binary already exists, skip decoding"
-else
-  # decode the bundled binary.
-  base64 -d ${BASE64_SOURCE_BINARY} > "${ENCLAVE_PATH}" || fatal "Unable to base64 decode binary"
+elif [ -f "${SOURCE_BINARY}.eif" ]; then
+  mv "${SOURCE_BINARY}.eif" "${ENCLAVE_PATH}" || fatal "Cannot move EIF file into place for au"
+  rm -f "${SOURCE_BINARY}.eif" &>/dev/null
+elif [ -f "${SOURCE_BINARY}.base64" ]; then
+  # backwards compat for base64 encoded builds.
+  base64 -d "${SOURCE_BINARY}.base64" > "${ENCLAVE_PATH}" || fatal "Unable to base64 decode binary"
+  rm -f "${SOURCE_BINARY}.base64" &>/dev/null
 fi
-
-rm -f ${BASE64_SOURCE_BINARY} &>/dev/null
 
 # decode the custom config (if there is one)
 #for file in ${CUSTOM_CONFIG_FILES[@]}; do

@@ -1,21 +1,32 @@
 import aiohttp
 import asyncio
+import time
 
-async def withdraw(session, symbol, amount):
-    data = {'symbol': symbol, 'amount': str(amount), 'timeout': 10}
-    async with session.post('http://localhost:1957/private/withdraw', json=data) as response:
+host = 'dev-sng-build1.kdev'
+
+
+async def withdraw_to_mainnet(session, symbol, amount):
+    data = {
+        'client_request_id': str(int(time.time() * 1e9)),
+        'symbol': symbol,
+        'amount': str(amount),
+        'gas_limit': 5e5,
+        'gas_price_wei': 5e9
+    }
+    async with session.post(f'http://{host}:1957/private/withdraw-from-subnet', json=data) as response:
         status = response.status
         print(f'Received status {status}')
         text = await response.text()
         print(f'Received text: {text}')
 
+
 async def main():
     async with aiohttp.ClientSession() as session:
-        print('Withdrawing token AVAX...')
-        await withdraw(session, 'AVAX', 1)
+        print('Withdrawing 100 USDC...')
+        await withdraw_to_mainnet(session, 'USDC', 100)
 
-        #print('Withdrawing native ALOT...')
-        #await withdraw(session, 'ALOT', 1)
+        print('Withdrawing 5 ALOT...')
+        await withdraw_to_mainnet(session, 'ALOT', 5)
 
         print('Test DONE')
 

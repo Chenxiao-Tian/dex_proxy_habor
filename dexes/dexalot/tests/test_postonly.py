@@ -2,27 +2,32 @@ import aiohttp
 import asyncio
 import time
 
+host = 'dev-sng-build1.kdev'
+
+
 async def insert(session):
     data = {
-        'client_order_id': str(time.time_ns()),
-        'symbol': 'ALOT/AVAX',
-        'price': '0.21',
-        'qty': '2',
-        'side': 'SELL',
+        'client_order_id': str(int(time.time()*1e9)),
+        'symbol': 'ALOT/USDC',
+        'price': '3',
+        'qty': '20',
+        'side': 'BUY',
         'type1': 1,
         'type2': 3,
+        'gas_price_wei': 5e9,
         'timeout': 10
     }
 
-    async with session.post('http://dev-sng-both0.kdev:1957/private/insert-order', json=data) as response:
+    async with session.post(f'http://{host}:1957/private/insert-order', json=data) as response:
         status = response.status
         print(f'Received status {status}')
         text = await response.text()
         print(f'Received text: {text}')
 
+
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with session.ws_connect('ws://dev-sng-both0.kdev:1957/private/ws') as ws:
+        async with session.ws_connect(f'ws://{host}:1957/private/ws') as ws:
             sub = {
                 'id': 1,
                 'jsonrpc': '2.0',
@@ -35,7 +40,8 @@ async def main():
             sub_reply = await ws.receive_json()
             print('Subscription reply: ', sub_reply)
 
-            await insert(session)
+            for i in range(10):
+                await insert(session)
 
             print('Test DONE')
 

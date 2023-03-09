@@ -2,6 +2,7 @@ import asyncio
 import concurrent
 import logging
 import weakref
+import time
 from typing import Callable, Awaitable
 
 import aiohttp
@@ -13,9 +14,9 @@ _logger = logging.getLogger('WebServer')
 
 class WebServer:
 
-    def __init__(self, config, message_handler):
+    def __init__(self, config, proxy: 'DexProxy'):
         self.__config = config
-        self.__message_handler = message_handler
+        self.__proxy = proxy
 
         self.__app = web.Application()
         self.__app.on_shutdown.append(self.__on_shutdown)
@@ -26,15 +27,18 @@ class WebServer:
         self.__connections = weakref.WeakSet()
 
     def register(self, method, path, handler):
-        def wrapper(handler):
+        def wrapper(wrapped_handler):
             async def inner(request):
+                received_at_ms = int(time.time() * 1000)
+
                 if request.method == 'POST':
                     params = await request.json()
                 else:
                     params = request.query
-                status, data = await handler(params)
+                status, data = await wrapped_handler(request.path, params, received_at_ms)
                 _logger.debug(f'status={status}, data={data}')
                 return web.json_response(data=data, status=status)
+
             return inner
 
         self.__app.add_routes([web.route(method, path, wrapper(handler))])
@@ -53,9 +57,17 @@ class WebServer:
         _logger.info('Stopped')
 
     async def send_json(self, ws, msg):
-        if ws not in self.__connections:
-            return
+        # if ws is None, broadcast the msg to all clients
+        if ws is None:
+            connections = self.__connections.copy()
+            for ws in connections:
+                await self.__send(ws, msg)
+        else:
+            if ws not in self.__connections:
+                return
+            await self.__send(ws, msg)
 
+    async def __send(self, ws, msg):
         try:
             _logger.debug(f'Sending {msg}')
             await ws.send_json(msg)
@@ -76,12 +88,14 @@ class WebServer:
 
         self.__connections.add(ws)
 
+        await self.__proxy.on_new_connection(ws)
+
         while True:
             try:
                 msg = await receive_json(ws)
                 _logger.debug(f'Received {msg}')
 
-                await self.__message_handler(ws, msg)
+                await self.__proxy.on_message(ws, msg)
             except concurrent.futures.CancelledError:
                 pass  # quietly
             except Exception as e:

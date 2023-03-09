@@ -1,0 +1,102 @@
+{
+    "production-multi-mainnet": {
+        "exchange_contracts": [
+            {
+                "deployment_type": "Portfolio",
+                "address": "0x1FD108cf42A59c635bD4703b8DbC8a741ff834Be"
+            }
+        ],
+        "tokens": [
+            {
+                "symbol": "AVAX",
+                "valid_withdrawal_addresses": [
+                    "0x345d8e3a1f62ee6b1d483890976fd66168e390f2",
+                    "0x5bc16aa07420d06da9adec1e60d37486f17d4a6a"
+                ]
+            },
+            {
+                "symbol": "ALOT",
+                "address": "0x093783055F9047C2BfF99c4e414501F8A147bC69",
+                "valid_withdrawal_addresses": [
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "address": "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
+                "valid_withdrawal_addresses": [
+                    "0x345d8e3a1f62ee6b1d483890976fd66168e390f2",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
+                ]
+            },
+            {
+                "symbol": "USDt",
+                "address": "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7",
+                "valid_withdrawal_addresses": [
+                    "0x345d8e3a1f62ee6b1d483890976fd66168e390f2",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
+                ]
+            }
+        ]
+    },
+    "production-multi-subnet": {
+        "exchange_contracts": [
+            {
+                "deployment_type": "Portfolio",
+                "address": "0xa5C079C1986E2335d83fA2d7282e162958e515D5"
+            },
+            {
+                "deployment_type": "TradePairs",
+                "address": "0x09383137C1eEe3E1A8bc781228E4199f6b4A9bbf"
+            }
+        ]
+    },
+    "fuji-multi-mainnet": {
+        "exchange_contracts": [
+            {
+                "deployment_type": "Portfolio",
+                "address": "0x6F5051526005987A21EF245668361342C6F1F7fa"
+            }
+        ],
+        "tokens": [
+            {
+                "symbol": "AVAX",
+                "valid_withdrawal_addresses": [
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            },
+            {
+                "symbol": "ALOT",
+                "address": "0x9983F755Bbd60d1886CbfE103c98C272AA0F03d6",
+                "valid_withdrawal_addresses": [
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            },
+            {
+                "symbol": "LOST",
+                "address": "0x1CCfdD961F5C3A83D4c8566106082B90e1A87009",
+                "valid_withdrawal_addresses": [
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "address": "0x68B773B8C10F2ACE8aC51980A1548B6B48a2eC54",
+                "valid_withdrawal_addresses": [
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            }
+        ]
+    },
+    "fuji-multi-subnet": {
+        "exchange_contracts": [
+            {
+                "deployment_type": "Portfolio",
+                "address": "0xb54859290619630212D4BBAba47066BEE9654076"
+            },
+            {
+                "deployment_type": "TradePairs",
+                "address": "0xaa3891FEa80967b57AAA4E962d1b07BCEe0b5394"
+            }
+        ]
+    }
+}

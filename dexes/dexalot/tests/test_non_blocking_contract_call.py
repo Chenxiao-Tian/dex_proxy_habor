@@ -4,16 +4,16 @@ import time
 
 host = 'dev-sng-build1.kdev'
 
-async def insert(session):
+async def insert(session, client_order_id, gas_price_wei):
     data = {
-        'client_order_id': str(int(time.time()*1e9)),
+        'client_order_id': str(client_order_id),
         'symbol': 'ALOT/USDC',
         'price': '20',
         'qty': '2',
         'side': 'SELL',
         'type1': 1,
-        'type2': 0,
-        'gas_price_wei': 5e9,
+        'type2': 2,
+        'gas_price_wei': gas_price_wei,
         'timeout': 10
     }
 
@@ -22,13 +22,7 @@ async def insert(session):
         print(f'Received status {status}')
         text = await response.text()
         print(f'Received text: {text}')
-
-async def cancel(session, order_id):
-    async with session.delete(f'http://{host}:1957/private/cancel-order?order_id={order_id}&timeout=10') as response:
-        status = response.status
-        print(f'Received status {status}')
-        text = await response.text()
-        print(f'Received text: {text}')
+        return text
 
 async def main():
     async with aiohttp.ClientSession() as session:
@@ -37,26 +31,21 @@ async def main():
                 'id': 1,
                 'jsonrpc': '2.0',
                 'method': 'subscribe',
-                'params': {
-                    'channel': 'ORDER'}
+                'params': {'channel': 'ORDER'}
             }
             print('Subscription request: ', sub)
             await ws.send_json(sub)
+
             sub_reply = await ws.receive_json()
             print('Subscription reply: ', sub_reply)
 
-            await insert(session)
-
-            osf = await ws.receive_json()
-            print('OSF: ', osf)
-
-            order_id = osf['params']['data']['oid']
-            await cancel(session, order_id)
-
-            osf = await ws.receive_json()
-            print('OSF: ', osf)
+            client_order_id = int(time.time()*1e9)
+            done, pending = await asyncio.wait([insert(session, client_order_id, 5e9),
+                                                insert(session, client_order_id+1, 5e3)])
+            results = [task.result() for task in done]
+            print(results)
 
             print('Test DONE')
 
 
-asyncio.get_event_loop().run_until_complete(main())
+asyncio.run(main())

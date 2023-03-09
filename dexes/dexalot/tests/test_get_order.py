@@ -2,18 +2,20 @@ import aiohttp
 import asyncio
 import time
 
-host = 'localhost'
+host = 'dev-sng-build1.kdev'
+
 
 async def insert(session):
-    client_oid = str(time.time_ns())
+    client_oid = str(int(time.time() * 1e9))
     data = {
         'client_order_id': client_oid,
-        'symbol': 'ALOT/AVAX',
-        'price': '0.21',
-        'qty': '2',
+        'symbol': 'ALOT/USDC',
+        'price': '10',
+        'qty': '4',
         'side': 'SELL',
         'type1': 1,
         'type2': 0,
+        'gas_price_wei': 5e9,
         'timeout': 10
     }
 
@@ -24,6 +26,7 @@ async def insert(session):
         print(f'Received text: {text}')
 
     return client_oid
+
 
 async def query(session, order_id, client_oid):
     if order_id:
@@ -37,12 +40,14 @@ async def query(session, order_id, client_oid):
         text = await response.text()
         print(f'Received text: {text}')
 
+
 async def cancel(session, order_id):
     async with session.delete(f'http://{host}:1957/private/cancel-order?order_id={order_id}&timeout=10') as response:
         status = response.status
         print(f'Received status {status}')
         text = await response.text()
         print(f'Received text: {text}')
+
 
 async def main():
     async with aiohttp.ClientSession() as session:

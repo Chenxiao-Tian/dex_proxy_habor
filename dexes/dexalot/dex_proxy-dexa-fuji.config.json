@@ -22,26 +22,54 @@
       {
         "logger_name": "aio_pika.exchange",
         "level": "info"
+      },
+      {
+        "logger_name": "websockets",
+        "level": "info"
+      },
+      {
+        "logger_name": "gas_tracker",
+        "level": "warn"
       }
     ]
   },
   "RabbitMQ": {
     "url": "amqp://dev-sng-rmq.kdev"
   },
+  "Redis": {
+    "host": "localhost",
+    "port": 6379
+  },
   "server": {
     "port": 1957
   },
+  "key_store_file_path": "./dexes/dexalot/tests/dexalot-keyfile",
   "dex": {
     "name": "dexa",
     "connectors": {
       "dexalot": {
+        "credentials": {
+          "api_key": "0040a7e4-a983-4e4b-a608-4bcd77cf7338",
+          "aws_region": "ap-southeast-1"
+        },
         "rest": {
           "base_uri": "https://api.dexalot-test.com",
-          "api_path": "/api/trading",
+          "api_path": "/privapi",
           "request_timeout": 60,
           "rate_limits": {
-            "limits": [{ "key": "api.dexalot-test.com", "interval": 60, "limit": 6 }]
+            "limits": [
+              {
+                "key": "api.dexalot-test.com",
+                "interval": 60,
+                "limit": 6
+              }
+            ]
           }
+        },
+        "websocket": {
+          "base_uri": "wss://subnets.avax.network/dexalot/testnet/ws",
+          "api_path": "",
+          "ws_ping_interval": 60
         },
         "envs": {
           "fuji-multi-mainnet": "https://api.avax-test.network/ext/bc/C/rpc",
@@ -49,6 +77,33 @@
         }
       }
     },
-    "poll_interval_s": 1
+    "request_cache": {
+      "finalised_requests_cleanup_after_s": 600
+    },
+    "transactions_status_poller": {
+      "poll_interval_s": 2
+    },
+    "estimate_gas_limit": true,
+    "default_insert_gas_limit": 1000000,
+    "default_cancel_gas_limit": 500000,
+    "gas_price_trackers": {
+      "fuji-multi-mainnet": {
+        "http_url": "https://api.avax-test.network/ext/bc/C/rpc",
+        "ws_url": "wss://api.avax-test.network/ext/bc/C/ws",
+        "use_fee_history": true,
+        "percentile_priority_fee_fast": 20,
+        "percentile_priority_fee_med": 10,
+        "percentile_priority_fee_slow": 5
+      },
+      "fuji-multi-subnet": {
+        "http_url": "https://subnets.avax.network/dexalot/testnet/rpc",
+        "ws_url": "wss://subnets.avax.network/dexalot/testnet/ws",
+        "use_fee_history": true,
+        "percentile_priority_fee_fast": 20,
+        "percentile_priority_fee_med": 10,
+        "percentile_priority_fee_slow": 5
+      }
+    },
+    "poll_interval_s": 10
   }
 }

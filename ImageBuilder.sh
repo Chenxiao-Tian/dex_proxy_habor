@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 #
 # Author: greg.markey@auros.global
+# Version: 20220216-2
+# * Fix static lockdir.
+# Version: 20220216-1
+# * Switch to compressed, binary shars.
 # Version: 20220206-1
 # * Require CONTEXT_ID.
 # Version: 20220203-1
@@ -221,9 +225,14 @@ build_enclave() {
     exit $RC
   fi
 
-  base64 ${CONTAINER_NAME}.eif > ${CONTAINER_NAME}.base64
+  #base64 ${CONTAINER_NAME}.eif > ${CONTAINER_NAME}.base64
   # Fix incorrect shell usage, remove explicit exit on execute.
-  shar ${CONTAINER_NAME}.base64 | sed -e 's/^#\!\/bin\/sh/#!\/bin\/bash/' -e '/^exit/d' -e 's/^lock_dir=.*/lock_dir=$(basename $0)-$(date +%s)/' > ${CONTAINER_NAME}
+  shar -C bzip2 -g 5 -B -x ${CONTAINER_NAME}.eif | sed \
+    -e 's/^#\!\/bin\/sh/#!\/bin\/bash/' \
+    -e '/^exit/d' \
+    -e 's/^lock_dir=.*/lock_dir=$(basename $0)-$(date +%s)/' \
+    -e '/^begin 600.*/d' \
+    -e 's/| uudecode &&/| cat <(echo "begin 600 ${lock_dir}\/bzi") - | uudecode \&\&/' > ${CONTAINER_NAME}
   cat ${ROOTDIR}/AuStartEnclave.sh >> ${CONTAINER_NAME}
 }
 

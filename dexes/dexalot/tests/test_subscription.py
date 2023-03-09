@@ -2,9 +2,11 @@ import aiohttp
 import asyncio
 
 
+host = 'dev-sng-build1.kdev'
+
 async def main():
     async with aiohttp.ClientSession() as session:
-        async with session.ws_connect('ws://dev-sng-both0.kdev:1957/private/ws') as ws:
+        async with session.ws_connect(f'ws://{host}:1957/private/ws') as ws:
             sub = {
                 'id': 1,
                 'jsonrpc': '2.0',

@@ -20,13 +20,13 @@ setuptools.setup(
     version=f'{tag}+{rev}',
     py_modules=[],
     install_requires=[
-        'aiohttp==3.7.4.post0',
+        'aiohttp==3.8.4',
         'aio-pika==6.8.0',
         'boto3==1.26.55',
         'eth-account==0.8.0',
-        'ujson==4.2.0',
-        'pantheon @ git+ssh://bitbucket.org/kenetic/pytheon.git@f051f908f550e934b6a6ce5881d5d8b8e32b3fda',
-        'pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@bd39118c46635110a3b7bbdf767c7e59fe31924c',
+        'ujson==5.7.0',
+        'pantheon @ git+ssh://bitbucket.org/kenetic/pytheon.git@pytheon-1.1.11-py10-1.0.1',
+        'pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@d8f2c5f',
         # refs/tags/v6.0.0-beta.8
         # require w3 beta 6 to fix dependency conflict with solana/websockets.
         'Web3 @ git+https://github.com/ethereum/web3.py.git@de95191dea8eb56e5176693946fb1e50957b8a5c',

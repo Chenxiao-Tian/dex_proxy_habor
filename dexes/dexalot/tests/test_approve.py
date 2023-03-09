@@ -5,15 +5,14 @@ import time
 host = 'dev-sng-build1.kdev'
 
 
-async def deposit(session, symbol, amount):
+async def approve(session, symbol, amount):
     data = {
         'client_request_id': str(int(time.time() * 1e9)),
         'symbol': symbol,
         'amount': str(amount),
-        'gas_limit': 5e5,
         'gas_price_wei': 25e9
     }
-    async with session.post(f'http://{host}:1957/private/deposit-into-subnet', json=data) as response:
+    async with session.post(f'http://{host}:1957/private/approve-token', json=data) as response:
         status = response.status
         print(f'Received status {status}')
         text = await response.text()
@@ -22,8 +21,8 @@ async def deposit(session, symbol, amount):
 
 async def main():
     async with aiohttp.ClientSession() as session:
-        print('Depositing 1000 ALOT...')
-        await deposit(session, 'ALOT', 1000)
+        print('Approving 1000 ALOT...')
+        await approve(session, 'ALOT', 1000)
 
         print('Test DONE')
 
