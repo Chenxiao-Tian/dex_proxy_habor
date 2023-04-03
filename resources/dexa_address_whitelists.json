@@ -35,6 +35,12 @@
                     "0x345d8e3a1f62ee6b1d483890976fd66168e390f2",
                     "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
                 ]
+            },
+            {
+                "symbol": "LOST",
+                "address": "0x449674B82F05d498E126Dd6615a1057A9c088f2C",
+                "valid_withdrawal_addresses": [
+                ]
             }
         ]
     },
