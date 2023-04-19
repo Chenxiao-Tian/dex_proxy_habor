@@ -1,3 +1,4 @@
+# SHASUM pin of registry.gitlab.com/auros/baseimg/ubuntu:22.04
 FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:dd015accda9632ca934006586fbc285e8a0e9f6159aab9c27db4c866676d9120 as builder
 
 ARG SSH_PRIVATE_KEY_BASE64
@@ -24,7 +25,8 @@ RUN apt-get update \
   && rm -rf .git
 
 
-FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:615f2d3b5ef00841effc8647c60893bfdb509e66e9b5b1fff0406378a1c3c17f
+# SHASUM pin of registry.gitlab.com/auros/baseimg/ubuntu:22.04-enclave
+FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:facf217f654bfe17beeefba9b5605e8f476e21afcdcbcb8ba6e71c14a40bbaf0
 
 # Valet/authentication/enclave configuration
 # Context ID is unique to this enclave.
