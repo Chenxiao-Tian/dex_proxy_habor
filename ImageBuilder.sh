@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 #
 # Author: greg.markey@auros.global
+# Version: 20220420-1
+# * Implicit lowercase of container URI; fixes mixed case PROCESS_NAME.
 # Version: 20220216-2
 # * Fix static lockdir.
 # Version: 20220216-1
@@ -154,6 +156,8 @@ else
 fi
 
 CONTAINER_URI=${REGISTRY}/${REGISTRY_PATH}
+# Must be lowercase
+CONTAINER_URI=${CONTAINER_URI,,}
 
 [[ "${COMMIT_SHASUM}" ]]  || COMMIT_SHASUM=unknown-sha
 [[ "${COMMIT_BRANCH}" ]]  || COMMIT_BRANCH=unknown-branch
