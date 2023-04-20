@@ -26,7 +26,7 @@ RUN apt-get update \
 
 
 # SHASUM pin of registry.gitlab.com/auros/baseimg/ubuntu:22.04-enclave
-FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:facf217f654bfe17beeefba9b5605e8f476e21afcdcbcb8ba6e71c14a40bbaf0
+FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:20b73aae5ecfef45a838313f0b385f3bc82e7c653a532c38088b5d356a2ee1b4
 
 # Valet/authentication/enclave configuration
 # Context ID is unique to this enclave.
@@ -49,7 +49,6 @@ ENV WALLET_FORMAT=eth
 ENV APPLICATION_LISTEN_PORT=8000
 
 COPY --from=builder /app/auros/ /app/auros/
-COPY container/02-hosts-application /etc/02-hosts-application
 COPY container/run /app/auros/run
 COPY config/${PROCESS_NAME}.json /app/auros/${PROCESS_NAME}.json
 
