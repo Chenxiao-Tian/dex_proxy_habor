@@ -19,6 +19,7 @@ from pyutils.exchange_apis.dex_common import (
 
 from .transactions_status_poller import TransactionsStatusPoller
 
+
 class RequestsCache:
     def __init__(self, pantheon: Pantheon, config):
         self.__logger = logging.getLogger('requests_cache')
@@ -61,7 +62,7 @@ class RequestsCache:
             requests = filter(request_filter, self.__requests.values())
         else:
             requests = self.__requests.values()
-        return max([request.nonce for request in requests], default=-1)
+        return max([request.nonce if request.nonce else -1 for request in requests], default=-1)
 
     def finalise_request(self, client_request_id: str, request_status: RequestStatus):
         request = self.get(client_request_id)

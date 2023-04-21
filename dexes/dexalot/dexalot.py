@@ -64,6 +64,21 @@ class Dexalot(DexCommon):
     async def on_request_status_update(self, client_request_id, request_status):
         await super().on_request_status_update(client_request_id, request_status)
 
+        request = self.get_request(client_request_id)
+        if request and request.request_type == RequestType.ORDER:
+            status = OrderStatus.KILLED if request.request_status == RequestStatus.FAILED else OrderStatus.NEW
+            order = Order("", request.client_request_id, request.symbol, request.quote_ccy_qty, request.base_ccy_qty,
+                          request.side, OrderType1.LIMIT, OrderType2.PO, status, "0", "0", "0", "", request.tx_hashes[0][0])
+            event = {
+                'jsonrpc': '2.0',
+                'method': 'subscription',
+                'params': {
+                    'channel': 'ORDER',
+                    'data': order.to_dict()
+                }
+            }
+            await self._event_sink.on_event('ORDER', event)
+
     async def _amend_transaction(self, request, params, gas_price_wei):
         if request.request_type == RequestType.TRANSFER:
             return await self._transfer(request.request_path, request.symbol, request.address_to, request.amount,
@@ -167,8 +182,8 @@ class Dexalot(DexCommon):
             type2 = OrderType2(params['type2'])
             gas_price_wei = params['gas_price_wei']
             if gas_price_wei is None:
-                gas_price_wei = self.__gas_price_trackers[self._api.subnet.name].get_gas_price(priority_fee=PriorityFee.Fast)
-            timeout = params.get('timeout')
+                gas_price_wei = self.__gas_price_trackers[self._api.subnet.name].get_gas_price(priority_fee=PriorityFee.Med)
+            timeout = int(params.get('timeout', 0))
 
             gas_limit = None if self.__estimate_gas_limit else self.__default_insert_gas_limit
 
@@ -176,8 +191,25 @@ class Dexalot(DexCommon):
                 f'Inserting order: client_order_id={client_order_id}, symbol={symbol}, price={price}, qty={qty}, side={side.name},'
                 f' type1={type1.name}, type2={type2.name}, gas_limit={gas_limit}, gas_price_wei={gas_price_wei}, '
                 f'timeout={timeout}s')
+
             result = await self._api.subnet.insert_order(client_order_id, symbol, price, qty, side, type1, type2, gas_limit,
                                                          int(gas_price_wei), timeout=timeout)
+
+            poll_transaction = False
+            # if timeout is not set or default to 0, the transaction will be sent without waiting for the receipt,
+            # so it will also be polled
+            if result.error_type == ErrorType.TRANSACTION_TIMED_OUT or (result.error_type == ErrorType.NO_ERROR and timeout <= 0):
+                poll_transaction = True
+
+            if poll_transaction:
+                self._transactions_status_poller.add_for_polling(result.tx_hash, client_order_id, RequestType.ORDER)
+
+                order_request = OrderRequest(client_order_id, symbol, qty, price, side, 0, gas_limit, timeout, received_at_ms)
+                order_request.nonce = result.nonce
+                order_request.tx_hashes.append((result.tx_hash, RequestType.ORDER.name))
+                order_request.used_gas_prices_wei.append(gas_price_wei)
+                self._request_cache.add(order_request)
+
             if result.error_type == ErrorType.NO_ERROR:
                 return 200, {'result': {'client_order_id': client_order_id, 'tx_hash': result.tx_hash}}
             else:
@@ -194,16 +226,18 @@ class Dexalot(DexCommon):
             if gas_price_wei is None:
                 gas_price_wei = self.__gas_price_trackers[self._api.subnet.name].get_gas_price(priority_fee=PriorityFee.Fast)
 
-            timeout = params.get('timeout', 10)
+            # timeout is part of the query string, converts it to integer
+            timeout = int(params.get('timeout', 0))
 
             gas_limit = None if self.__estimate_gas_limit else self.__default_cancel_gas_limit
 
             self._logger.debug(f'Canceling order: order_id={order_id}, gas_limit={gas_limit}, gas_price_wei={gas_price_wei}, '
                                f'timeout={timeout}s')
-            result = await self._api.subnet.cancel_order(order_id, gas_limit, int(gas_price_wei), timeout=int(timeout))
+            result = await self._api.subnet.cancel_order(order_id, gas_limit, int(gas_price_wei), timeout=timeout)
             if result.error_type == ErrorType.NO_ERROR:
                 return 200, {'result': {'order_id': order_id}}
             else:
+                self._logger.error(f'Can not cancel order {order_id}: {result.error_message}')
                 return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
 
         except Exception as e:
@@ -241,7 +275,7 @@ class Dexalot(DexCommon):
 
             gas_price_wei = self.__gas_price_trackers[self._api.subnet.name].get_gas_price(priority_fee=PriorityFee.Fast)
 
-            timeout = params.get('timeout', 10)
+            timeout = int(params.get('timeout', 0))
 
             self._logger.debug(f'Canceling {len(order_ids)} open orders: {order_ids}')
 
@@ -255,7 +289,7 @@ class Dexalot(DexCommon):
             for batch in batches:
                 self._logger.debug(f'Bulk canceling orders {batch}, gas_limit={gas_limit}, gas_price_wei={gas_price_wei}, '
                                    f'timeout={timeout}s')
-                result = await self._api.subnet.bulk_cancel(batch, gas_limit, gas_price_wei, timeout=int(timeout))
+                result = await self._api.subnet.bulk_cancel(batch, gas_limit, gas_price_wei, timeout=timeout)
                 if result.error_type != ErrorType.NO_ERROR:
                     self._logger.error(f'Can not cancel orders {batch}: {result.error_message}')
                     failed_orders.extend(batch)
@@ -355,7 +389,7 @@ class Dexalot(DexCommon):
 
     @staticmethod
     def __is_mainnet_request(request):
-        if request.request_type != RequestType.APPROVE and request.request_type != RequestType.TRANSFER:
+        if request.request_type == RequestType.ORDER:
             return False
 
         if request.request_type == RequestType.APPROVE:
@@ -366,8 +400,8 @@ class Dexalot(DexCommon):
 
     @staticmethod
     def __is_subnet_request(request):
-        if request.request_type != RequestType.APPROVE and request.request_type != RequestType.TRANSFER:
-            return False
+        if request.request_type == RequestType.ORDER:
+            return True
 
         if request.request_type == RequestType.APPROVE:
             return False

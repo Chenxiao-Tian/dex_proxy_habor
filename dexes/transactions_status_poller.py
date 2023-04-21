@@ -47,6 +47,8 @@ class TransactionsStatusPoller:
                 try:
                     receipt = await self.__dex.get_transaction_receipt(request, tx_hash)
                     if receipt is not None:
+                        self.__logger.debug(f'Polled receipt of tx_hash {tx_hash}: {receipt}')
+
                         status = receipt['status']
                         # Why a receipt of a CANCEL type request means the original transaction is canceled, without checking if
                         # the receipt is a FAIL?
