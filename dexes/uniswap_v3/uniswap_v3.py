@@ -208,7 +208,7 @@ class UniswapV3(DexCommon):
             rmq_conn_name='url')
 
         file_prefix = os.path.dirname(os.path.realpath(__file__))
-        addresses_whitelists_file_path = f'{file_prefix}/../../resources/contracts_address.json'
+        addresses_whitelists_file_path = f'{file_prefix}/../../resources/uni3_contracts_address.json'
         self._logger.debug(f'Loading addresses whitelists from {addresses_whitelists_file_path}')
         with open(addresses_whitelists_file_path, 'r') as contracts_address_file:
             contracts_address_json = json.load(contracts_address_file)[self.__chain_name]

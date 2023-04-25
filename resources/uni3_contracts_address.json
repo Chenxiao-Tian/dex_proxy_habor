@@ -1,4 +1,9 @@
 {
+    "Ethereum Mainnet": {
+        "tokens": [],
+        "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
+        "uniswap_router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564"
+    },
     "Ethereum Goerli Testnet": {
         "tokens": [
             {
@@ -48,7 +53,6 @@
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
-        "uniswap_router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
-        "withdraw_tokens_to_wallet_address": "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+        "uniswap_router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564"
     }
 }
