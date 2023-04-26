@@ -41,6 +41,13 @@
                 "address": "0x449674B82F05d498E126Dd6615a1057A9c088f2C",
                 "valid_withdrawal_addresses": [
                 ]
+            },
+            {
+                "symbol": "STL",
+                "address": "0x66B071A55b7c258c2086527e35EE355771aA05B8",
+                "valid_withdrawal_addresses": [
+                    "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974"
+                ]
             }
         ]
     },
