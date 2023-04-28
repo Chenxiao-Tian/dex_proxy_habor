@@ -33,7 +33,11 @@
                 "address": "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7",
                 "valid_withdrawal_addresses": [
                     "0x345d8e3a1f62ee6b1d483890976fd66168e390f2",
-                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x11bc3397975ba857009124a1cfec98cc8ecf4cfd",
+                    "0xC4c945CBC846A3cC43C1F2eAc555EE9d86A7fcd3",
+                    "0x714b5fe769fd80c20f1582b3a3988ced857e0ff6",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD"
                 ]
             },
             {
