@@ -1,10 +1,9 @@
 import logging
 
 from pantheon import Pantheon
+from pyutils.exchange_apis.dex_common import RequestType, RequestStatus
 
 from web3.exceptions import TransactionNotFound
-
-from pyutils.exchange_apis.dex_common import RequestType, RequestStatus
 
 
 class TransactionsStatusPoller:
@@ -20,7 +19,8 @@ class TransactionsStatusPoller:
         self.pantheon.spawn(self.__poll_tx_for_status())
 
     def add_for_polling(self, tx_hash: str, client_request_id: str, request_type: RequestType):
-        self.__tx_hash_to_client_rid_and_request_type[tx_hash] = (client_request_id, request_type)
+        self.__tx_hash_to_client_rid_and_request_type[tx_hash] = (
+            client_request_id, request_type)
 
     async def poll_for_status(self, tx_hash: str):
         if tx_hash in self.__tx_hash_to_client_rid_and_request_type:
@@ -29,7 +29,8 @@ class TransactionsStatusPoller:
             self.__logger.error(f'No request found for the tx_hash={tx_hash}')
 
     async def __poll_tx_for_status(self):
-        self.__logger.debug(f'Start polling for transaction status every {self.__poll_interval_s}s')
+        self.__logger.debug(
+            f'Start polling for transaction status every {self.__poll_interval_s}s')
 
         while True:
             self.__logger.debug('Polling status for transactions')
@@ -48,13 +49,15 @@ class TransactionsStatusPoller:
                     receipt = await self.__dex.get_transaction_receipt(request, tx_hash)
                     if receipt is not None:
                         self.__logger.debug(f'Polled receipt of tx_hash {tx_hash}: {receipt}')
-
-                        status = receipt['status']
-                        # Why a receipt of a CANCEL type request means the original transaction is canceled, without checking if
-                        # the receipt is a FAIL?
+                        
+                        # No need to check receipt['status'] in case of RequestType.CANCEL because
+                        # it doesn't matter whether the transaction which was used to cancel the original
+                        # ORDER/TRANSFER/APPROVE request has succeeded or not, even if it has failed
+                        # the nonce is used up and hence the original request by the client is cancelled now
                         if request_type == RequestType.CANCEL:
                             request_status = RequestStatus.CANCELED
                         else:
+                            status = receipt['status']
                             if status == 1:
                                 request_status = RequestStatus.SUCCEEDED
                             else:
