@@ -41,9 +41,11 @@ class DexProxy:
         dex_config = self.pantheon.config['dex']
         name = dex_config['name']
         if name == 'dexa':
-            self.__exchange = Dexalot(pantheon, dex_config, self.__server, self)
-        elif name == 'chainEth-uni3':
-            self.__exchange = UniswapV3(pantheon, dex_config, self.__server, self)
+            self.__exchange = Dexalot(
+                pantheon, dex_config, self.__server, self)
+        elif name == 'chainEth-uni3' or name == 'chainGoerli-uni3':
+            self.__exchange = UniswapV3(
+                pantheon, dex_config, self.__server, self)
         else:
             raise Exception(f'Exchange {name} not supported')
 
@@ -89,9 +91,11 @@ class DexProxy:
             sub = self.Subscription(ws)
             if sub not in self.__subscriptions[channel]:
                 self.__subscriptions[channel].add(sub)
-                _logger.debug(f'Subscribed client(connection_id={id(ws)}) to {channel}')
+                _logger.debug(
+                    f'Subscribed client(connection_id={id(ws)}) to {channel}')
             else:
-                _logger.debug(f'Client(connection_id={id(ws)}) already subscribed to {channel}')
+                _logger.debug(
+                    f'Client(connection_id={id(ws)}) already subscribed to {channel}')
             reply['result'] = [channel]
 
         await self.__server.send_json(ws, reply)
@@ -106,10 +110,12 @@ class DexProxy:
             sub = self.Subscription(ws)
             if sub in self.__subscriptions[channel]:
                 self.__subscriptions[channel].remove(sub)
-                _logger.debug(f'Unsubscribed client(connection_id={id(ws)}) from {channel}')
+                _logger.debug(
+                    f'Unsubscribed client(connection_id={id(ws)}) from {channel}')
                 reply['result'] = [channel]
             else:
-                _logger.debug(f'Client(connection_id={id(ws)}) not subscribed to {channel}')
+                _logger.debug(
+                    f'Client(connection_id={id(ws)}) not subscribed to {channel}')
                 reply['result'] = []
 
         await self.__server.send_json(ws, reply)

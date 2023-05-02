@@ -20,7 +20,8 @@ class WebServer:
 
         self.__app = web.Application()
         self.__app.on_shutdown.append(self.__on_shutdown)
-        self.__app.add_routes([web.get('/private/ws', self.__websocket_handler)])
+        self.__app.add_routes(
+            [web.get('/private/ws', self.__websocket_handler)])
 
         self.__runner = web.AppRunner(self.__app)
 
@@ -35,6 +36,8 @@ class WebServer:
                     params = await request.json()
                 else:
                     params = request.query
+                _logger.debug(
+                    f'received_at_ms={received_at_ms}, method={request.method}, path={request.path}, params={params}')
                 status, data = await wrapped_handler(request.path, params, received_at_ms)
                 _logger.debug(f'status={status}, data={data}')
                 return web.json_response(data=data, status=status)
@@ -82,7 +85,8 @@ class WebServer:
     async def __websocket_handler(self, request):
 
         ws = web.WebSocketResponse()
-        _logger.debug(f'New client(connection_id={id(ws)}) from {request.remote}')
+        _logger.debug(
+            f'New client(connection_id={id(ws)}) from {request.remote}')
 
         await ws.prepare(request)
 

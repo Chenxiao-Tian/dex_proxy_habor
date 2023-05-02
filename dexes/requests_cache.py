@@ -3,7 +3,7 @@ import logging
 import time
 from datetime import timedelta
 from collections import deque
-from typing import Optional, List
+from typing import Dict, List, Optional
 
 from pantheon import Pantheon
 
@@ -15,6 +15,7 @@ from pyutils.exchange_apis.dex_common import (
     RequestStatus,
     OrderRequest,
     TransferRequest,
+    ApproveRequest
 )
 
 from .transactions_status_poller import TransactionsStatusPoller
@@ -24,12 +25,13 @@ class RequestsCache:
     def __init__(self, pantheon: Pantheon, config):
         self.__logger = logging.getLogger('requests_cache')
         self.pantheon = pantheon
-        self.__requests = {}
+        self.__requests: Dict[str, Request] = {}
         self.__redis = None
         self.__redis_batch_executor = None
         self.__redis_request_key = pantheon.process_name + '.requests'
-        self.__finalised_requests_cleanup_after_s = int(config['finalised_requests_cleanup_after_s'])
-        self.__add_in_redis_failed_requests_queue = deque()
+        self.__finalised_requests_cleanup_after_s = int(
+            config['finalised_requests_cleanup_after_s'])
+        self.__pending_add_in_redis = deque()
 
     async def start(self, transactions_status_poller: TransactionsStatusPoller):
         self.__redis = self.pantheon.get_aioredis_connection()
@@ -43,7 +45,8 @@ class RequestsCache:
 
     def add(self, request: Request):
         if request.client_request_id in self.__requests:
-            raise RuntimeError(f'{request.client_request_id} already exists in request cache')
+            raise RuntimeError(
+                f'{request.client_request_id} already exists in request cache')
         self.__requests[request.client_request_id] = request
         self.add_or_update_request_in_redis(request.client_request_id)
 
@@ -57,7 +60,7 @@ class RequestsCache:
                 requests_list.append(request)
         return requests_list
 
-    def get_max_nonce(self, request_filter=None):
+    def get_max_nonce(self, request_filter=None) -> int:
         if request_filter is not None:
             requests = filter(request_filter, self.__requests.values())
         else:
@@ -82,8 +85,7 @@ class RequestsCache:
             except Exception as ex:
                 self.__logger.exception(
                     f'Failed to add client_request_id={client_request_id} in redis: %r. Will retry.', ex)
-                self.__add_in_redis_failed_requests_queue.append(
-                    client_request_id)
+                self.__pending_add_in_redis.append(client_request_id)
         else:
             self.__logger.error(
                 f'Not adding in redis as client_request_id={client_request_id} not found')
@@ -98,7 +100,8 @@ class RequestsCache:
                 f'Failed to delete client_request_id={client_request_id} from cache: %r', ex)
 
     async def __load_requests(self, transactions_status_poller: TransactionsStatusPoller):
-        self.__logger.info(f'Loading requests from redis: {self.__redis_request_key}')
+        self.__logger.info(
+            f'Loading requests from redis: {self.__redis_request_key}')
 
         start = time.time()
         requests_dict = {}
@@ -132,9 +135,11 @@ class RequestsCache:
                                                                RequestType[request_type])
 
             except Exception as e:
-                self.__logger.error("Error loading request from redis, err: %r, skipping:'%s'", e, request_str)
+                self.__logger.error(
+                    "Error loading request from redis, err: %r, skipping:'%s'", e, request_str)
 
-        self.__logger.info("Loaded %d requests from redis in %dms", len(self.__requests), round((time.time() - start) * 1000))
+        self.__logger.info("Loaded %d requests from redis in %dms", len(
+            self.__requests), round((time.time() - start) * 1000))
 
     async def __finalised_requests_cleanup(self):
         self.__logger.debug(
@@ -149,12 +154,13 @@ class RequestsCache:
             await self.pantheon.sleep(25)
 
     async def __retry_failed_add_in_redis(self):
-        self.__logger.debug(f'Starting poller to retry failed add in redis requests')
+        self.__logger.debug(
+            f'Starting poller to retry adding requests in redis')
 
         while True:
-            self.__logger.debug('Polling to retry failed add in redis requests')
-            temp = self.__add_in_redis_failed_requests_queue
-            self.__add_in_redis_failed_requests_queue = deque()
+            self.__logger.debug('Polling to retry adding requests in redis')
+            temp = self.__pending_add_in_redis
+            self.__pending_add_in_redis = deque()
             while len(temp) > 0:
                 client_request_id = temp.pop()
                 request = self.get(client_request_id)
