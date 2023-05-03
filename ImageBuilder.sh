@@ -50,7 +50,7 @@ usage() {
   echo "                           shasum. The contents of CONTAINER_ADDITIONAL_TAG will be appended to the image tag"
   echo "                           in the format \"\${GIT_SHASUM}-\${CONTAINER_ADDITIONAL_TAG}\". Optional"
   echo "  REGISTRY_PATH            Subpath for the image; \"\${REGISTRY}/\${REGISTRY_PATH}\". Default: project name."
-  echo "  SSH_PRIVATE_KEY_BASE64   Auros applications generally need to be able to fetch dependencies from our CVS."
+  echo "  SSH_PRIVATE_KEY_BASE64   Auros applications generally need to be able to fetch dependencies from our CVS. Required."
   echo "                           In order to achieve this, a read-only SSH private key in base64 format needs to be"
   echo "                           passed during the container build process. Optional (requirement depends on"
   echo "                           container)."
@@ -65,6 +65,7 @@ usage() {
   echo "  VAULT_SECRET_ID   Name of the AWS SecretsManager secret that contains the second stage"
   echo "                    authentication. Required."
   echo "  VAULT_WALLET_NAME Key in Vault containing the wallet mnemonic. Required."
+  echo "  CONFIG_REPO_URI   Git URI to the repository containing app configs. Required."
   echo
   exit 1
 }
@@ -163,7 +164,8 @@ CONTAINER_URI=${CONTAINER_URI,,}
 [[ "${COMMIT_BRANCH}" ]]  || COMMIT_BRANCH=unknown-branch
 
 # Setup build args
-[[ "${SSH_PRIVATE_KEY_BASE64}" ]] && ADDITIONAL_BUILD_ARGS="${ADDITIONAL_BUILD_ARGS} --build-arg SSH_PRIVATE_KEY_BASE64=${SSH_PRIVATE_KEY_BASE64}"
+[[ "${SSH_PRIVATE_KEY_BASE64}" ]] || { echo "Missing env SSH_PRIVATE_KEY_BASE64"; exit 1; }
+ADDITIONAL_BUILD_ARGS="${ADDITIONAL_BUILD_ARGS} --build-arg SSH_PRIVATE_KEY_BASE64=${SSH_PRIVATE_KEY_BASE64}"
 
 if [[ "${WITH_ENCLAVE}" ]]; then
   # Enclaved applications must have their PROCESS_NAME embedded.
@@ -173,6 +175,7 @@ if [[ "${WITH_ENCLAVE}" ]]; then
   [[ "${VAULT_WALLET_NAME}" ]] || { echo "Missing env VAULT_WALLET_NAME (set in CI pipeline)"; exit 1; }
   [[ "${VAULT_SECRET_ID}" ]]   || { echo "Missing env VAULT_SECRET_ID (set in CI pipeline)"; exit 1; }
   [[ "${VAULT_APPROLE_ID}" ]]  || { echo "Missing env VAULT_APPROLE_ID (set in CI pipeline)"; exit 1; }
+  [[ "${CONFIG_REPO_URI}" ]]   || { echo "Missing env CONFIG_REPO_URI (set in CI pipeline)"; exit 1; }
 
   # Additional build arguments required for enclave builds.
   [[ "${CONTEXT_ID}" ]] && ADDITIONAL_BUILD_ARGS="${ADDITIONAL_BUILD_ARGS} --build-arg CONTEXT_ID=${CONTEXT_ID}"
@@ -180,6 +183,7 @@ if [[ "${WITH_ENCLAVE}" ]]; then
   ADDITIONAL_BUILD_ARGS="${ADDITIONAL_BUILD_ARGS} --build-arg VAULT_APPROLE_ID=${VAULT_APPROLE_ID}"
   ADDITIONAL_BUILD_ARGS="${ADDITIONAL_BUILD_ARGS} --build-arg VAULT_SECRET_ID=${VAULT_SECRET_ID}"
   ADDITIONAL_BUILD_ARGS="${ADDITIONAL_BUILD_ARGS} --build-arg VAULT_WALLET_NAME=${VAULT_WALLET_NAME}"
+  ADDITIONAL_BUILD_ARGS="${ADDITIONAL_BUILD_ARGS} --build-arg CONFIG_REPO_URI=${CONFIG_REPO_URI}"
 fi
 
 registry_login() {
