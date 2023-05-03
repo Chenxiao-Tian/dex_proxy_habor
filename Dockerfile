@@ -26,7 +26,7 @@ RUN apt-get update \
 
 
 # SHASUM pin of registry.gitlab.com/auros/baseimg/ubuntu:22.04-enclave
-FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:20b73aae5ecfef45a838313f0b385f3bc82e7c653a532c38088b5d356a2ee1b4
+FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:3318676cb28f6d00a6ec43690d7d9abbe639b145399f6a88e4fab09f71c00915
 
 # Valet/authentication/enclave configuration
 # Context ID is unique to this enclave.
@@ -36,11 +36,17 @@ ARG VAULT_APPROLE_ID
 ARG VAULT_SECRET_ID
 ARG VAULT_WALLET_NAME
 ARG CONFIG_PATH
+ARG SSH_PRIVATE_KEY_BASE64
+ARG CONFIG_REPO_URI
+
 ENV CONTEXT_ID=${CONTEXT_ID}
 ENV PROCESS_NAME=${PROCESS_NAME}
 ENV VAULT_APPROLE_ID=${VAULT_APPROLE_ID}
 ENV VAULT_SECRET_ID=${VAULT_SECRET_ID}
 ENV VAULT_WALLET_NAME=${VAULT_WALLET_NAME}
+ENV CONFIG_REPO_URI=${CONFIG_REPO_URI}
+# Private key is required to pull down CONFIG_REPO_URI at enclave boot.
+ENV SSH_PRIVATE_KEY_BASE64=${SSH_PRIVATE_KEY_BASE64}
 
 # Set some defaults
 ENV WALLET_FORMAT=eth
@@ -50,6 +56,5 @@ ENV APPLICATION_LISTEN_PORT=8000
 
 COPY --from=builder /app/auros/ /app/auros/
 COPY container/run /app/auros/run
-COPY config/${PROCESS_NAME}.json /app/auros/${PROCESS_NAME}.json
 
 ENTRYPOINT [ "/init" ]

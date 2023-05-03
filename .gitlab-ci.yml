@@ -18,33 +18,15 @@ default:
   retry: 2
 
 
-.default_dev_build_script: &default_dev_build_script
+.default_build_script: &default_build_script
   - export CONTAINER_NAME=${PROCESS_NAME}
   - echo ${SSH_PRIVATE_KEY_BASE64} | base64 -d -w 0 > ~/.ssh/id_rsa
   - chmod 600 ~/.ssh/id_rsa
   - ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
-  - git clone --depth 50 git@bitbucket.org:kenetic/config-dev.git config
-  - cd config
-  - git checkout ${CONFIG_DEV_REF}
-  - cd -
+  - git clone --depth 1 ${CONFIG_REPO_URI} config
   - "[[ -f config/${PROCESS_NAME}.json ]] || { echo \"No config found for ${PROCESS_NAME}\"; }"
   - export CONTEXT_ID=$(jq -r '.enclave.cid | select(. != null)' config/${PROCESS_NAME}.json)
-  - export ADDITIONAL_BUILD_ARGS="--build-arg PYAPP_MODULE_NAME=dex_proxy"
-  - ./ImageBuilder.sh --enclave
-
-
-.default_prod_build_script: &default_prod_build_script
-  - export CONTAINER_NAME=${PROCESS_NAME}
-  - echo ${SSH_PRIVATE_KEY_BASE64} | base64 -d -w 0 > ~/.ssh/id_rsa
-  - chmod 600 ~/.ssh/id_rsa
-  - ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
-  - git clone --depth 50 git@bitbucket.org:kenetic/config-prod.git config
-  - cd config
-  - git checkout ${CONFIG_PROD_REF}
-  - cd -
-  - "[[ -f config/${PROCESS_NAME}.json ]] || { echo \"No config found for ${PROCESS_NAME}\"; }"
-  - export CONTEXT_ID=$(jq -r '.enclave.cid | select(. != null)' config/${PROCESS_NAME}.json)
-  - export ADDITIONAL_BUILD_ARGS="--build-arg PYAPP_MODULE_NAME=dex_proxy"
+  - rm -rf config
   - ./ImageBuilder.sh --enclave
 
 
@@ -57,7 +39,8 @@ build dex_proxy-dexa-main:
     - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_DEXA_MAIN}
     - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_DEXA_MAIN}
     - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_DEXA_MAIN}
-    - *default_prod_build_script
+    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-prod.git
+    - *default_build_script
 
 
 build dex_proxy-dexa-fuji:
@@ -69,7 +52,8 @@ build dex_proxy-dexa-fuji:
     - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_DEXA_FUJI}
     - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_DEXA_FUJI}
     - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_DEXA_FUJI}
-    - *default_dev_build_script
+    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-dev.git
+    - *default_build_script
 
 
 build dex_proxy-uni3-goerli-4:
@@ -81,7 +65,9 @@ build dex_proxy-uni3-goerli-4:
     - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_UNI3_GOERLI_4}
     - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_UNI3_GOERLI_4}
     - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_UNI3_GOERLI_4}
-    - *default_dev_build_script
+    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-dev.git
+    - *default_build_script
+
 
 build dex_proxy-chainEth-uni3-main-1:
   stage: build
@@ -92,5 +78,5 @@ build dex_proxy-chainEth-uni3-main-1:
     - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_CHAINETH_UNI3_MAIN_1}
     - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_CHAINETH_UNI3_MAIN_1}
     - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_CHAINETH_UNI3_MAIN_1}
-    - *default_prod_build_script
-
+    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-prod.git
+    - *default_build_script

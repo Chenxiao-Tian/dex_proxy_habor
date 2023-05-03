@@ -21,6 +21,7 @@ log_error() {
 
 . /app/auros/bin/activate
 
-python3 -u -m dex_proxy --process-name ${PROCESS_NAME} -c /app/auros/${PROCESS_NAME}.json -s
+# /app/auros/config will be cloned by an enclave init process.
+python3 -u -m dex_proxy --process-name ${PROCESS_NAME} -c /app/auros/config/${PROCESS_NAME}.json -s
 
 exit $?
