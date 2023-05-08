@@ -103,7 +103,6 @@
         "percentile_priority_fee_med": 10,
         "percentile_priority_fee_slow": 5
       }
-    },
-    "poll_interval_s": 10
+    }
   }
 }
