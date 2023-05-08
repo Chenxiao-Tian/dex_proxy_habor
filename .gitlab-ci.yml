@@ -32,8 +32,6 @@ default:
 
 build dex_proxy-dexa-main:
   stage: build
-  rules:
-    - if: '$TARGET == "dex_proxy-dexa-main" || $TARGET == "default"'
   script:
     - export PROCESS_NAME=dex_proxy-dexa-main
     - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_DEXA_MAIN}
@@ -45,8 +43,6 @@ build dex_proxy-dexa-main:
 
 build dex_proxy-dexa-fuji:
   stage: build
-  rules:
-    - if: '$TARGET == "dex_proxy-dexa-fuji" || $TARGET == "default"'
   script:
     - export PROCESS_NAME=dex_proxy-dexa-fuji
     - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_DEXA_FUJI}
@@ -58,8 +54,6 @@ build dex_proxy-dexa-fuji:
 
 build dex_proxy-uni3-goerli-4:
   stage: build
-  rules:
-    - if: '$TARGET == "dex_proxy-uni3-goerli-4" || $TARGET == "default"'
   script:
     - export PROCESS_NAME=dex_proxy-uni3-goerli-4
     - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_UNI3_GOERLI_4}
@@ -71,8 +65,6 @@ build dex_proxy-uni3-goerli-4:
 
 build dex_proxy-chainEth-uni3-main-1:
   stage: build
-  rules:
-    - if: '$TARGET == "dex_proxy-chainEth-uni3-main-1" || $TARGET == "default"'
   script:
     - export PROCESS_NAME=dex_proxy-chainEth-uni3-main-1
     - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_CHAINETH_UNI3_MAIN_1}
