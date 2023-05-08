@@ -21,7 +21,6 @@ class Dexalot(DexCommon):
     def __init__(self, pantheon: Pantheon, config, server, event_sink):
         super().__init__(pantheon, ConnectorType.Dexalot, config, server, event_sink)
 
-        self.__poll_interval_s = config.get('poll_interval_s', None)
         self.__order_queue = asyncio.Queue()
         self.__trade_queue = asyncio.Queue()
 
@@ -63,21 +62,6 @@ class Dexalot(DexCommon):
 
     async def on_request_status_update(self, client_request_id, request_status):
         await super().on_request_status_update(client_request_id, request_status)
-
-        request = self.get_request(client_request_id)
-        if request and request.request_type == RequestType.ORDER:
-            status = OrderStatus.KILLED if request.request_status == RequestStatus.FAILED else OrderStatus.NEW
-            order = Order("", request.client_request_id, request.symbol, request.quote_ccy_qty, request.base_ccy_qty,
-                          request.side, OrderType1.LIMIT, OrderType2.PO, status, "0", "0", "0", "", request.tx_hashes[0][0])
-            event = {
-                'jsonrpc': '2.0',
-                'method': 'subscription',
-                'params': {
-                    'channel': 'ORDER',
-                    'data': order.to_dict()
-                }
-            }
-            await self._event_sink.on_event('ORDER', event)
 
     async def _amend_transaction(self, request, params, gas_price_wei):
         if request.request_type == RequestType.TRANSFER:
@@ -194,24 +178,9 @@ class Dexalot(DexCommon):
 
             result = await self._api.subnet.insert_order(client_order_id, symbol, price, qty, side, type1, type2, gas_limit,
                                                          int(gas_price_wei), timeout=timeout)
-
-            poll_transaction = False
-            # if timeout is not set or default to 0, the transaction will be sent without waiting for the receipt,
-            # so it will also be polled
-            if result.error_type == ErrorType.TRANSACTION_TIMED_OUT or (result.error_type == ErrorType.NO_ERROR and timeout <= 0):
-                poll_transaction = True
-
-            if poll_transaction:
-                self._transactions_status_poller.add_for_polling(result.tx_hash, client_order_id, RequestType.ORDER)
-
-                order_request = OrderRequest(client_order_id, symbol, qty, price, side, 0, gas_limit, timeout, received_at_ms)
-                order_request.nonce = result.nonce
-                order_request.tx_hashes.append((result.tx_hash, RequestType.ORDER.name))
-                order_request.used_gas_prices_wei.append(gas_price_wei)
-                self._request_cache.add(order_request)
-
             if result.error_type == ErrorType.NO_ERROR:
-                return 200, {'result': {'client_order_id': client_order_id, 'tx_hash': result.tx_hash}}
+                return 200, {'result': {'orders': [order.to_dict() for order in result.orders],
+                                        'trades': [trade.to_dict() for trade in result.trades]}}
             else:
                 return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
 
@@ -235,7 +204,8 @@ class Dexalot(DexCommon):
                                f'timeout={timeout}s')
             result = await self._api.subnet.cancel_order(order_id, gas_limit, int(gas_price_wei), timeout=timeout)
             if result.error_type == ErrorType.NO_ERROR:
-                return 200, {'result': {'order_id': order_id}}
+                return 200, {'result': {'orders': [order.to_dict() for order in result.orders],
+                                        'trades': [trade.to_dict() for trade in result.trades]}}
             else:
                 self._logger.error(f'Can not cancel order {order_id}: {result.error_message}')
                 return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
@@ -269,7 +239,7 @@ class Dexalot(DexCommon):
             orders = await self._api.get_open_orders(f'{address}:{signature}')
             if not orders:
                 self._logger.debug('No open orders to cancel')
-                return 200, {'result': {'canceled': [], 'failed': []}}
+                return 200, {'result': {'canceled_orders': [], 'failed_order_ids': []}}
 
             order_ids = [order.order_id for order in orders]
 
@@ -284,20 +254,21 @@ class Dexalot(DexCommon):
             gas_limit = None if self.__estimate_gas_limit else self.__default_cancel_gas_limit * batch_size
 
             batches = [order_ids[i:i + batch_size] for i in range(0, len(order_ids), batch_size)]
+            failed_order_ids = []
             canceled_orders = []
-            failed_orders = []
             for batch in batches:
                 self._logger.debug(f'Bulk canceling orders {batch}, gas_limit={gas_limit}, gas_price_wei={gas_price_wei}, '
                                    f'timeout={timeout}s')
                 result = await self._api.subnet.bulk_cancel(batch, gas_limit, gas_price_wei, timeout=timeout)
                 if result.error_type != ErrorType.NO_ERROR:
                     self._logger.error(f'Can not cancel orders {batch}: {result.error_message}')
-                    failed_orders.extend(batch)
+                    failed_order_ids.extend(batch)
                 else:
-                    self._logger.error(f'Canceled orders {batch}')
-                    canceled_orders.extend(batch)
+                    self._logger.debug(f'Canceled orders {batch}')
+                    canceled_orders.extend([order.to_dict() for order in result.orders])
 
-            return 400 if failed_orders else 200, {'result': {'canceled': canceled_orders, 'failed': failed_orders}}
+            return 200, {'result': {'canceled_orders': canceled_orders, 'failed_order_ids': failed_order_ids}}
+
         except Exception as e:
             self._logger.exception(f'Failed to cancel all orders: %r', e)
             return 400, {'error': {'message': repr(e)}}
@@ -333,59 +304,6 @@ class Dexalot(DexCommon):
         except Exception as e:
             self._logger.exception(f'Failed to get order: %r', e)
             return 400, {'error': {'message': str(e)}}
-
-    async def __poll_order_events(self, poll_interval):
-        self._logger.debug(f'Start polling order event every {poll_interval}s')
-        filter_id = self._api.subnet.create_event_filter(EventType.ORDER_STATUS_CHANGED,
-                                                         self._api.subnet.account.address)
-        while True:
-            try:
-                async for order in self._api.subnet.poll_order_events(filter_id):
-                    self._logger.debug(f'Received {order}')
-                    event = {
-                        'jsonrpc': '2.0',
-                        'method': 'subscription',
-                        'params': {
-                            'channel': 'ORDER',
-                            'data': order.to_dict()
-                        }
-                    }
-
-                    await self._event_sink.on_event('ORDER', event)
-            except ValueError as e:
-                self._logger.warning(f'Failed to poll order events: {str(e)}, recreating filter')
-                self._api.subnet.delete_event_filter(filter_id)
-                filter_id = self._api.subnet.create_event_filter(EventType.ORDER_STATUS_CHANGED,
-                                                                 self._api.subnet.account.address)
-
-            await self.pantheon.sleep(poll_interval)
-
-    async def __poll_trade_events(self, poll_interval):
-        self._logger.debug(f'Start polling trade event every {poll_interval}s')
-        filter_id = self._api.subnet.create_event_filter(EventType.EXECUTED,
-                                                         self._api.subnet.account.address)
-        while True:
-            try:
-                async for trade in self._api.subnet.poll_trade_events(filter_id,
-                                                                      self._api.subnet.account.address):
-                    self._logger.debug(f'Received {trade}')
-                    event = {
-                        'jsonrpc': '2.0',
-                        'method': 'subscription',
-                        'params': {
-                            'channel': 'TRADE',
-                            'data': trade.to_dict()
-                        }
-                    }
-
-                    await self._event_sink.on_event('TRADE', event)
-            except ValueError as e:
-                self._logger.warning(f'Failed to poll trade events: {str(e)}, recreating filter')
-                self._api.subnet.delete_event_filter(filter_id)
-                filter_id = self._api.subnet.create_event_filter(EventType.EXECUTED,
-                                                                 self._api.subnet.account.address)
-
-            await self.pantheon.sleep(poll_interval)
 
     @staticmethod
     def __is_mainnet_request(request):
@@ -460,10 +378,6 @@ class Dexalot(DexCommon):
                 self._api.subnet.whitelist_exchange_contract(deployment_type, address)
 
         self.pantheon.spawn(self.__connect_to_exchange())
-
-        if self.__poll_interval_s is not None:
-            self.pantheon.spawn(self.__poll_order_events(self.__poll_interval_s))
-            self.pantheon.spawn(self.__poll_trade_events(self.__poll_interval_s))
 
     async def __connect_to_exchange(self):
         self._logger.debug('Connecting to exchange')
