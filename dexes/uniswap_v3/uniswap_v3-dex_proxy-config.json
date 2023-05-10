@@ -52,9 +52,6 @@
             }
         ]
     },
-    "TradingDB": {
-        "dsn": "postgres://master:fd97d13dad2e2da0f8aa62dfc28cc5d6742b9e8@trading-db.kdev/dev_trading"
-    },
     "RabbitMQ": {
         "url": "amqp://dev-sng-rmq.kdev"
     },
@@ -85,9 +82,9 @@
             "http_url": "https://goerli.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
             "ws_url": "wss://goerli.infura.io/ws/v3/d3bf8a4fe2744587bf47459446b7f170",
             "use_fee_history": true,
-            "percentile_priority_fee_fast": 20,
-            "percentile_priority_fee_med": 10,
-            "percentile_priority_fee_slow": 5
+            "percentile_priority_fee_fast": 10,
+            "percentile_priority_fee_med": 5,
+            "percentile_priority_fee_slow": 2
         },
         "max_allowed_gas_price_gwei": 500,
         "request_cache": {
