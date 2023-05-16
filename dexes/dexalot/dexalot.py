@@ -241,7 +241,11 @@ class Dexalot(DexCommon):
                 self._logger.debug('No open orders to cancel')
                 return 200, {'result': {'canceled_orders': [], 'failed_order_ids': []}}
 
-            order_ids = [order.order_id for order in orders]
+            order_ids = []
+            client_order_ids = {}
+            for order in orders:
+                order_ids.append(order.order_id)
+                client_order_ids[order.order_id] = order.client_order_id
 
             gas_price_wei = self.__gas_price_trackers[self._api.subnet.name].get_gas_price(priority_fee=PriorityFee.Fast)
 
@@ -265,7 +269,10 @@ class Dexalot(DexCommon):
                     failed_order_ids.extend(batch)
                 else:
                     self._logger.debug(f'Canceled orders {batch}')
-                    canceled_orders.extend([order.to_dict() for order in result.orders])
+                    for order in result.orders:
+                        if order.client_order_id == '':
+                            order.client_order_id = client_order_ids.get(order.order_id, '')
+                        canceled_orders.append(order.to_dict())
 
             return 200, {'result': {'canceled_orders': canceled_orders, 'failed_order_ids': failed_order_ids}}
 
