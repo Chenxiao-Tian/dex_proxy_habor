@@ -63,7 +63,7 @@ class TransactionsStatusPoller:
                             else:
                                 request_status = RequestStatus.FAILED
 
-                        await self.__dex.on_request_status_update(client_request_id, request_status)
+                        await self.__dex.on_request_status_update(client_request_id, request_status, receipt)
 
                 except Exception as e:
                     if not isinstance(e, TransactionNotFound):

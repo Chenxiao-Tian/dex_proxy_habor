@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 import logging
 
 from pantheon import Pantheon
@@ -114,7 +115,7 @@ class DexCommon(ABC):
         await self._transactions_status_poller.start()
         await self._request_cache.start(self._transactions_status_poller)
 
-    def get_request(self, client_request_id):
+    def get_request(self, client_request_id) -> Optional[Request]:
         self._logger.debug(f'Getting request: client_request_id={client_request_id}')
         return self._request_cache.get(client_request_id)
 

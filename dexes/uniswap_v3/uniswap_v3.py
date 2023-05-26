@@ -150,11 +150,17 @@ class UniswapV3(DexCommon):
     def _get_gas_price(self, request, priority_fee: PriorityFee):
         return self.__gas_price_tracker.get_gas_price(priority_fee=priority_fee)
 
-    async def on_request_status_update(self, client_request_id, request_status):
+    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict):
+        request = self.get_request(client_request_id)
+        if (request == None):
+            return
+        
+        if (request_status == RequestStatus.SUCCEEDED):
+            await self.__compute_exec_price(request, tx_receipt)
+            
         await super().on_request_status_update(client_request_id, request_status)
 
-        request = self.get_request(client_request_id)
-        if request and request.request_type == RequestType.ORDER:
+        if request.request_type == RequestType.ORDER:
             event = {
                 'jsonrpc': '2.0',
                 'method': 'subscription',
@@ -192,6 +198,39 @@ class UniswapV3(DexCommon):
             except Exception as e:
                 self._logger.exception(
                     f'Error occurred while handling WS message: %r', e)
+                
+    async def  __compute_exec_price(self, request: OrderRequest, tx_receipt: dict):
+        try:
+            for log in tx_receipt['logs']:
+                topic = Web3.toHex(log['topics'][0])
+                
+                # 0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67 is the topic for the Swap event
+                if topic == '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67':
+                    swap_log = self._api.get_swap_log(log['address'], tx_receipt)
+                    self._logger.debug(f'Swap_log={swap_log}')
+                    # Sample swap_log:
+                    # (AttributeDict({'args': AttributeDict({'sender': '0xE592427A0AEce92De3Edee1F18E0157C05861564', 
+                    # 'recipient': '0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB', 'amount0': 100000000000, 'amount1': -332504806775,
+                    # 'sqrtPriceX96': 144687485274156549416468062839, 'liquidity': 580197578039432673188, 'tick': 12045}), 
+                    # 'event': 'Swap', 'logIndex': 222, 'transactionIndex': 120, 'transactionHash': 
+                    # HexBytes('0x858c864355ca60d342c2b250ed4d641d66f4a922039ce4d2307101d75d5450eb'), 
+                    # 'address': '0x03AfDFB6CaBd6BA2a9e54015226F67E9295a9Bea', 'blockHash': 
+                    # HexBytes('0xdd5186fa2d0298777165467ddfcc944b073f68a9d1060b332c3fdfa7b5e90fbc'), 'blockNumber': 9065089}),)
+                    
+                    instrument = self.__instruments.get_instrument(InstrumentId(self.__exchange_name, request.symbol))
+                    base_ccy_symbol = instrument.base_currency
+                    quote_ccy_symbol = instrument.quote_currency
+                    
+                    if (request.side == Side.BUY):
+                        base_ccy_bought_amount = Decimal(self._api.from_native_amount(base_ccy_symbol, abs(swap_log[0]['args']['amount0'])))
+                        quote_ccy_sold_amount = Decimal(self._api.from_native_amount(quote_ccy_symbol, abs(swap_log[0]['args']['amount1'])))
+                        request.exec_price = quote_ccy_sold_amount/base_ccy_bought_amount
+                    else:
+                        base_ccy_sold_amount = Decimal(self._api.from_native_amount(base_ccy_symbol, abs(swap_log[0]['args']['amount1'])))
+                        quote_ccy_bought_amount = Decimal(self._api.from_native_amount(quote_ccy_symbol, abs(swap_log[0]['args']['amount0'])))
+                        request.exec_price = quote_ccy_bought_amount/base_ccy_sold_amount
+        except Exception as ex:
+            self._logger.exception(f'Error occurred while computing execution price of request={request}: %r', ex)
 
     async def start(self, private_key):
         await super().start(private_key)
