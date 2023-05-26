@@ -60,7 +60,7 @@ class Dexalot(DexCommon):
     async def process_request(self, ws, request_id, method, params: dict):
         return False
 
-    async def on_request_status_update(self, client_request_id, request_status):
+    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict):
         await super().on_request_status_update(client_request_id, request_status)
 
     async def _amend_transaction(self, request, params, gas_price_wei):
