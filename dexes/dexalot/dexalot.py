@@ -41,8 +41,6 @@ class Dexalot(DexCommon):
         self._server.register('POST', '/private/insert-order', self.__insert_order)
         self._server.register('DELETE', '/private/cancel-order', self.__cancel_order)
 
-        self._server.register('POST', '/private/fill-up-nonce-gap', self.__fill_up_nonce_gap)
-
         self._server.register('GET', '/public/get-proof', self.__get_proof)
 
     async def on_new_connection(self, ws):
@@ -127,32 +125,6 @@ class Dexalot(DexCommon):
         else:
             raise RuntimeError(f'Neither a mainnet request or a subnet request, client_request_id='
                                f'{request.client_request_id}')
-
-    async def __fill_up_nonce_gap(self, path, params: dict, received_at_ms):
-        try:
-            env = params['env']
-            nonce = params['nonce']
-            gas_price_wei = params.get('gas_price_wei')
-            if gas_price_wei is None:
-                gas_price_wei = self.__gas_price_trackers[env].get_gas_price(priority_fee=PriorityFee.Fast)
-
-            self._logger.debug(f'Filling up nonce gap: nonce={nonce}, gas_price_wei={gas_price_wei}')
-
-            if env == self._api.mainnet.name:
-                result = await self._api.mainnet.fill_up_nonce_gap(nonce, int(gas_price_wei))
-            elif env == self._api.subnet.name:
-                result = await self._api.subnet.fill_up_nonce_gap(nonce, int(gas_price_wei))
-            else:
-                return 400, {'error': {'message': f'Unknown env {env}'}}
-
-            if result.error_type == ErrorType.NO_ERROR:
-                return 200, {'result': {'tx_hash': result.tx_hash}}
-            else:
-                return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
-
-        except Exception as e:
-            self._logger.exception(f'Failed to fill up nonce gap: %r', e)
-            return 400, {'error': {'message': repr(e)}}
 
     async def __insert_order(self, path, params: dict, received_at_ms):
         try:
