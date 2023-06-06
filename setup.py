@@ -25,8 +25,8 @@ setuptools.setup(
         'boto3==1.26.55',
         'eth-account==0.8.0',
         'ujson==5.7.0',
-        'pantheon @ git+ssh://bitbucket.org/kenetic/pytheon.git@pytheon-1.2.4-py10',
-        'pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@6675f3b',
+        'pantheon @ git+ssh://bitbucket.org/kenetic/pytheon.git@pytheon-1.2.5-py10',
+        'pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@pyutils-1.8.15-py10',
         # refs/tags/v6.0.0-beta.8
         # require w3 beta 6 to fix dependency conflict with solana/websockets.
         'Web3 @ git+https://github.com/ethereum/web3.py.git@de95191dea8eb56e5176693946fb1e50957b8a5c',
