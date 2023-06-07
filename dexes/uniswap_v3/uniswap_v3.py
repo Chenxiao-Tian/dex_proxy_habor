@@ -202,7 +202,7 @@ class UniswapV3(DexCommon):
     async def  __compute_exec_price(self, request: OrderRequest, tx_receipt: dict):
         try:
             for log in tx_receipt['logs']:
-                topic = Web3.toHex(log['topics'][0])
+                topic = Web3.to_hex(log['topics'][0])
                 
                 # 0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67 is the topic for the Swap event
                 if topic == '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67':
