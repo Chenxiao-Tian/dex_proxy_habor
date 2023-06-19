@@ -1,0 +1,104 @@
+{
+    "logging": {
+        "level": "debug",
+        "overrides": [
+            {
+                "logger_name": "aio_pika",
+                "level": "info"
+            },
+            {
+                "logger_name": "botocore",
+                "level": "info"
+            },
+            {
+                "logger_name": "aiormq.connection",
+                "level": "info"
+            },
+            {
+                "logger_name": "aiormq.channel",
+                "level": "critical"
+            },
+            {
+                "logger_name": "urllib3.connectionpool",
+                "level": "info"
+            },
+            {
+                "logger_name": "web3.RequestManager",
+                "level": "info"
+            },
+            {
+                "logger_name": "web3.providers.HTTPProvider",
+                "level": "info"
+            },
+            {
+                "logger_name": "pantheon.app_health",
+                "level": "info"
+            },
+            {
+                "logger_name": "aio_pika.exchange",
+                "level": "info"
+            },
+            {
+                "logger_name": "aiohttp.access",
+                "level": "warn"
+            },
+            {
+                "logger_name": "websockets",
+                "level": "info"
+            },
+            {
+                "logger_name": "gas_tracker",
+                "level": "warn"
+            }
+        ]
+    },
+    "RabbitMQ": {
+        "url": "amqp://dev-sng-rmq.kdev"
+    },
+    "Redis": {
+        "host": "localhost",
+        "port": 6379
+    },
+    "server": {
+        "port": 1958
+    },
+    "_comment_0": "change following to ./dexes/uniswap_v3/test/wallet.json to run dex-proxy locally",
+    "_key_store_file_path": "/app/auros/secret/wallet.json",
+    "key_store_file_path": "./dexes/paradex/test/wallet.json",
+    "dex": {
+        "name": "pdex",
+        "chain_name": "Ethereum Goerli Testnet",
+        "native_token": "ETH",
+        "connectors": {
+            "paradex": {
+                "rest": {
+                    "base_uri": "https://api.testnet.paradex.trade",
+                    "api_path": "/v1",
+                    "request_timeout": 60,
+                    "rate_limits": {
+                        "limits": [{ "key": "api.testnet.paradex.trade", "interval": 60, "limit": 100 }]
+                    }
+                },
+                "web3": {
+                    "http": "https://goerli.infura.io/v3/12a345a0a065429f9aec1a06ba94373e"
+                }
+            }
+        },
+        "exchange_token_refresh_interval_s": 240,
+        "max_signature_generators": 2,
+        "gas_price_tracker": {
+            "http_url": "https://goerli.infura.io/v3/12a345a0a065429f9aec1a06ba94373e",
+            "ws_url": "wss://goerli.infura.io/ws/v3/12a345a0a065429f9aec1a06ba94373e",
+            "use_fee_history": true,
+            "percentile_priority_fee_fast": 10,
+            "percentile_priority_fee_med": 5,
+            "percentile_priority_fee_slow": 2
+        },
+        "request_cache": {
+            "finalised_requests_cleanup_after_s": 600
+        },
+        "transactions_status_poller": {
+            "poll_interval_s": 15
+        }
+    }
+}

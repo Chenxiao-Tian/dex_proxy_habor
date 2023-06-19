@@ -72,3 +72,25 @@ build dex_proxy-chainEth-uni3-main-1:
     - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_CHAINETH_UNI3_MAIN_1}
     - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-prod.git
     - *default_build_script
+
+
+build dex_proxy-pdex-main:
+  stage: build
+  script:
+    - export PROCESS_NAME=dex_proxy-pdex-main
+    - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_PDEX_MAIN}
+    - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_PDEX_MAIN}
+    - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_PDEX_MAIN}
+    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-prod.git
+    - *default_build_script
+
+
+build dex_proxy-pdex-testnet:
+  stage: build
+  script:
+    - export PROCESS_NAME=dex_proxy-pdex-testnet
+    - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_PDEX_TESTNET}
+    - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_PDEX_TESTNET}
+    - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_PDEX_TESTNET}
+    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-dev.git
+    - *default_build_script

@@ -1,0 +1,40 @@
+{
+    "Ethereum Mainnet": {
+        "tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0x345d8e3a1f62ee6b1d483890976fd66168e390f2"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+                "valid_withdrawal_addresses": [
+                    "0x345d8e3a1f62ee6b1d483890976fd66168e390f2"
+                ]
+            }
+        ]
+    },
+    "Ethereum Goerli Testnet": {
+        "tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68",
+                    "0x194c851021ABc7f64B51D11b58e251A8370d54dc"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "address": "0x0d4ED9d0E0Ca8bF6f640256B298a2690DEC5f3cC",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68",
+                    "0x194c851021ABc7f64B51D11b58e251A8370d54dc"
+                ]
+            }
+        ]
+    }
+}
