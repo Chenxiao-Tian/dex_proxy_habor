@@ -10,7 +10,7 @@ COPY . /app/auros
 WORKDIR /app/auros
 
 RUN apt-get update \
-  && apt-get install -y openssh-client python3-venv \
+  && apt-get install -y openssh-client python3-venv libgmp3-dev \
   && mkdir -p /build/private ~/.ssh \
   && chmod 700 /build/private \
   && echo ${SSH_PRIVATE_KEY_BASE64} | base64 -i -d > /build/private/key \
