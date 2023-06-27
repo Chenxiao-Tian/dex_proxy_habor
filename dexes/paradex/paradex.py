@@ -315,8 +315,8 @@ class Paradex(DexCommon):
     def _get_gas_price(self, request, priority_fee: PriorityFee):
         return self.__gas_price_tracker.get_gas_price(priority_fee=priority_fee)
 
-    async def on_request_status_update(self, client_request_id, request_status):
-        await super().on_request_status_update(client_request_id, request_status)
+    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict):
+        await super().on_request_status_update(client_request_id, request_status, tx_receipt)
 
     async def _get_all_open_requests(self, path: str, params: dict, received_at_ms: int):
         return await super()._get_all_open_requests(path, params, received_at_ms)
