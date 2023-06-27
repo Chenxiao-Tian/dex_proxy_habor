@@ -10,7 +10,7 @@
             {
                 "symbol": "AVAX",
                 "valid_withdrawal_addresses": [
-                    "0x345d8e3a1f62ee6b1d483890976fd66168e390f2",
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
                     "0x5bc16aa07420d06da9adec1e60d37486f17d4a6a"
                 ]
             },
@@ -24,7 +24,7 @@
                 "symbol": "USDC",
                 "address": "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
                 "valid_withdrawal_addresses": [
-                    "0x345d8e3a1f62ee6b1d483890976fd66168e390f2",
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
                     "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
                 ]
             },
@@ -32,7 +32,7 @@
                 "symbol": "USDt",
                 "address": "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7",
                 "valid_withdrawal_addresses": [
-                    "0x345d8e3a1f62ee6b1d483890976fd66168e390f2",
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
                     "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
                     "0x11bc3397975ba857009124a1cfec98cc8ecf4cfd",
                     "0xC4c945CBC846A3cC43C1F2eAc555EE9d86A7fcd3",
