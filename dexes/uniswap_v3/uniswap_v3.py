@@ -158,7 +158,7 @@ class UniswapV3(DexCommon):
         if (request_status == RequestStatus.SUCCEEDED):
             await self.__compute_exec_price(request, tx_receipt)
             
-        await super().on_request_status_update(client_request_id, request_status)
+        await super().on_request_status_update(client_request_id, request_status, tx_receipt)
 
         if request.request_type == RequestType.ORDER:
             event = {

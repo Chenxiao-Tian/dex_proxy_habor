@@ -59,7 +59,7 @@ class Dexalot(DexCommon):
         return False
 
     async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict):
-        await super().on_request_status_update(client_request_id, request_status)
+        await super().on_request_status_update(client_request_id, request_status, tx_receipt)
 
     async def _amend_transaction(self, request, params, gas_price_wei):
         if request.request_type == RequestType.TRANSFER:

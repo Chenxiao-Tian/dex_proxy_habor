@@ -103,7 +103,7 @@ class DexCommon(ABC):
         pass
 
     @abstractmethod
-    async def on_request_status_update(self, client_request_id, request_status):
+    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict):
         """
         Called when a request status is changed, usually by `TransactionsStatusPoller`
         The default implementation is merely to finalise the request.
