@@ -4,7 +4,8 @@
             {
                 "symbol": "ETH",
                 "valid_withdrawal_addresses": [
-                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155"
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
                 ]
             },
             {
@@ -21,7 +22,8 @@
                 "symbol": "USDC",
                 "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
                 "valid_withdrawal_addresses": [
-                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155"
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
                 ]
             },
             {
@@ -33,7 +35,8 @@
                 "symbol": "USDT",
                 "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
                 "valid_withdrawal_addresses": [
-                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155"
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
                 ]
             }
         ],
@@ -45,7 +48,8 @@
             {
                 "symbol": "ETH",
                 "valid_withdrawal_addresses": [
-                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB"
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
                 ]
             },
             {
@@ -53,14 +57,15 @@
                 "address": "0x11fE4B6AE13d2a6055C8D9cF65c55bac32B5d844",
                 "valid_withdrawal_addresses": [
                     "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
-                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
                 ]
             },
             {
                 "symbol": "WETH",
                 "address": "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6",
                 "valid_withdrawal_addresses": [
-                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
                 ]
             },
             {
@@ -68,7 +73,7 @@
                 "address": "0xC2C527C0CACF457746Bd31B2a698Fe89de2b6d49",
                 "valid_withdrawal_addresses": [
                     "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
-                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
                 ]
             },
             {
@@ -76,7 +81,7 @@
                 "address": "0xC04B0d3107736C32e19F1c62b2aF67BE61d63a05",
                 "valid_withdrawal_addresses": [
                     "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
-                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
                 ]
             },
             {
@@ -84,7 +89,7 @@
                 "address": "0xD87Ba7A50B2E7E660f678A895E4B72E7CB4CCd9C",
                 "valid_withdrawal_addresses": [
                     "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
-                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
                 ]
             }
         ],
