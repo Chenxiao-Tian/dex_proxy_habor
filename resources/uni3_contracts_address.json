@@ -4,8 +4,21 @@
             {
                 "symbol": "ETH",
                 "valid_withdrawal_addresses": [
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65",
                     "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
-                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
+                    "0x2A0CE75A67353Ad5E3DBD28C4cd5bd862CB6A82B",
+                    "0xa4c5b4d3b48cdb05d5b80e9616abf98cc980fcf6",
+                    "0x7d075840895353f4e58822d80d48e581349dccb4",
+                    "0x714b5fe769fd80c20f1582b3a3988ced857e0ff6",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0xb5B2a3B109b837F2dd37A6ef8ACe7A696A41aB9A",
+                    "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974",
+                    "0x2609de9377dB593088aF94435a49D745A7f310eB",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0x5C2aB5dC71CED4d3A07F048dC9c068DfD4fC4D53",
+                    "0xc72f6cc407b39437723fd2f5e9168a79d158a499",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x5F64d9c81F5a30F4b29301401f96138792DC5f58"
                 ]
             },
             {
@@ -22,21 +35,49 @@
                 "symbol": "USDC",
                 "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
                 "valid_withdrawal_addresses": [
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65",
                     "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
-                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
+                    "0xa4c5b4d3b48cdb05d5b80e9616abf98cc980fcf6",
+                    "0x7d075840895353f4e58822d80d48e581349dccb4",
+                    "0x714b5fe769fd80c20f1582b3a3988ced857e0ff6",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0xb5B2a3B109b837F2dd37A6ef8ACe7A696A41aB9A",
+                    "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974",
+                    "0x2609de9377dB593088aF94435a49D745A7f310eB",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0x5C2aB5dC71CED4d3A07F048dC9c068DfD4fC4D53",
+                    "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x5f64d9c81f5a30f4b29301401f96138792dc5f58"
                 ]
             },
             {
                 "symbol": "EXRD",
                 "address": "0x6468e79a80c0eab0f9a2b574c8d5bc374af59414",
-                "valid_withdrawal_addresses": []
+                "valid_withdrawal_addresses": [
+                    "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974",
+                    "0xC4c945CBC846A3cC43C1F2eAc555EE9d86A7fcd3",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD"
+                ]
             },
             {
                 "symbol": "USDT",
                 "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
                 "valid_withdrawal_addresses": [
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65",
                     "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
-                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
+                    "0x2A0CE75A67353Ad5E3DBD28C4cd5bd862CB6A82B",
+                    "0xa4c5b4d3b48cdb05d5b80e9616abf98cc980fcf6",
+                    "0x7d075840895353f4e58822d80d48e581349dccb4",
+                    "0x714b5fe769fd80c20f1582b3a3988ced857e0ff6",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974",
+                    "0x2609de9377dB593088aF94435a49D745A7f310eB",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0x5C2aB5dC71CED4d3A07F048dC9c068DfD4fC4D53",
+                    "0xc72f6cc407b39437723fd2f5e9168a79d158a499",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x5f64d9c81f5a30f4b29301401f96138792dc5f58"
                 ]
             }
         ],
