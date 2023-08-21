@@ -26,7 +26,7 @@ RUN apt-get update \
 
 
 # SHASUM pin of registry.gitlab.com/auros/baseimg/ubuntu:22.04-enclave
-FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:b7eee582ad570eaf02fd7c05571db85734f0f15c811c59334462fcdf760973aa
+FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:76331325b0d2fc0db44d7ded3e2326a57d145720094b9178c437be79ae8b145c
 
 # Valet/authentication/enclave configuration
 # Context ID is unique to this enclave.
