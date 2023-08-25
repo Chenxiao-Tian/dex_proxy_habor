@@ -3,7 +3,7 @@ stages:
 
 
 variables:
-  ENCLAVE_BUILD_IMAGE: registry.gitlab.com/auros/enclave-builder@sha256:ea8814e4157bed0889ba268c40af1fa2ebdce52d6944433d8e9c0ac093f8aca1
+  ENCLAVE_BUILD_IMAGE: registry.gitlab.com/auros/enclave-builder@sha256:5ebd1fe845df7d5751f4c95171002cca37b922dc1cf8add28d5961a8ea471952
   DOCKER_HOST: tcp://docker:2375
 
 
