@@ -143,6 +143,31 @@
                     "0xc72f6cc407b39437723fd2f5e9168a79d158a499",
                     "0x5F8215eE653Cb7225c741C7aA8591468d1f158b8"
                 ]
+            },
+            {
+                "symbol": "1INCH",
+                "address": "0x111111111117dc0aa78b770fa6a738034120c302",
+                "valid_withdrawal_addresses": []
+            },
+            {
+                "symbol": "AAVE",
+                "address": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
+                "valid_withdrawal_addresses": []
+            },
+            {
+                "symbol": "SUSHI",
+                "address": "0x6b3595068778dd592e39a122f4f5a5cf09c90fe2",
+                "valid_withdrawal_addresses": []
+            },
+            {
+                "symbol": "WBTC",
+                "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+                "valid_withdrawal_addresses": []
+            },
+            {
+                "symbol": "WLD",
+                "address": "0x163f8C2467924be0ae7B5347228CABF260318753",
+                "valid_withdrawal_addresses": []
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
