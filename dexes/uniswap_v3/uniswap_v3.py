@@ -28,7 +28,7 @@ class UniswapV3(DexCommon):
         self._server.register('POST', '/private/insert-order', self.__insert_order)
 
         self.__instruments = None
-        self.__exchange_name = config['name']
+        self.__exchange_name = config['exchange_name']
         self.__chain_name = config['chain_name']
         self.__native_token = config['native_token']
 
@@ -142,7 +142,7 @@ class UniswapV3(DexCommon):
                                            nonce=request.nonce)
 
     async def _cancel_transaction(self, request, gas_price_wei):
-        return self._api.cancel_transaction(request.nonce, gas_price_wei)
+        return await self._api.cancel_transaction(request.nonce, gas_price_wei)
 
     async def get_transaction_receipt(self, request, tx_hash):
         return await self._api.get_transaction_receipt(tx_hash)
@@ -155,7 +155,7 @@ class UniswapV3(DexCommon):
         if (request == None):
             return
         
-        if (request_status == RequestStatus.SUCCEEDED):
+        if (request_status == RequestStatus.SUCCEEDED and request.request_type == RequestType.ORDER):
             await self.__compute_exec_price(request, tx_receipt)
             
         await super().on_request_status_update(client_request_id, request_status, tx_receipt)

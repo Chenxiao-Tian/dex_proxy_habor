@@ -9,7 +9,7 @@ import os
 from pantheon import Pantheon, StandardArgParser
 
 from web_server import WebServer
-from dexes import Dexalot, UniswapV3, Paradex
+from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex
 
 from eth_account import Account
 
@@ -42,6 +42,9 @@ class DexProxy:
         name = dex_config['name']
         if name == 'dexa':
             self.__exchange = Dexalot(
+                pantheon, dex_config, self.__server, self)
+        elif name == 'chainEth-uni3-blx':
+            self.__exchange = UniswapV3Bloxroute(
                 pantheon, dex_config, self.__server, self)
         elif name == 'chainEth-uni3' or name == 'chainGoerli-uni3':
             self.__exchange = UniswapV3(
