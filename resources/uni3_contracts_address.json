@@ -237,6 +237,60 @@
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
         "uniswap_router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564"
     },
+    "Ethereum Mainnet For Testing": {
+        "_comment_1": "Ethereum Mainnet For Testing: it has valid ethereum mainnet tokens address but the withdrawal_addresses are of our internal test wallets, it is created for testing purposes as bloxroute do not support any testnet",
+        "tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            },
+            {
+                "symbol": "DAI",
+                "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            },
+            {
+                "symbol": "WETH",
+                "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            },
+            {
+                "symbol": "USDT",
+                "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            },
+            {
+                "symbol": "WBTC",
+                "address": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            }
+        ],
+        "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
+        "uniswap_router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564"
+    },
     "Ethereum Goerli Testnet": {
         "tokens": [
             {

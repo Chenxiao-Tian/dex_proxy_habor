@@ -153,6 +153,7 @@ class RequestsCache:
 
             await self.pantheon.sleep(25)
 
+    # retries adding requests in redis which failed to be added in redis in all previous attempts
     async def __retry_failed_add_in_redis(self):
         self.__logger.debug(
             f'Starting poller to retry adding requests in redis')

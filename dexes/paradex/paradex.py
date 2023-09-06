@@ -298,7 +298,7 @@ class Paradex(DexCommon):
         if self.__is_l2_request(request):
             raise Exception("Cancelling L2 transactions is not supported")
 
-        return self._api.cancel_transaction(request.nonce, gas_price_wei)
+        return await self._api.cancel_transaction(request.nonce, gas_price_wei)
 
     async def get_transaction_receipt(self, request, tx_hash):
         if not self.__is_l2_request(request):

@@ -62,25 +62,26 @@
     "server": {
         "port": 1958
     },
-    "_comment_0": "change following to ./dexes/uniswap_v3/test/wallet.json to run dex-proxy locally",
-    "key_store_file_path": "/app/auros/secret/wallet.json",
+    "key_store_file_path": "./dexes/uniswap_v3/test/wallet.json",
     "dex": {
-        "name": "chainGoerli-uni3",
-        "chain_name": "Ethereum Goerli Testnet",
+        "name": "chainEth-uni3-blx",
+        "exchange_name": "chainEth-uni3",
+        "chain_name": "Ethereum Mainnet For Testing",
         "native_token": "ETH",
+        "blx_authorisation_header": "OGUyNDY1YzUtNjYyNC00Yjc3LWEyY2UtODU0MDExN2RmYTA2OjRjMzUxOGI2ZjE4ODQwMWQ0YzYwOTEyZjAxOGQ0YzI4",
         "connectors": {
             "uniswap_v3": {
                 "web3": {
-                    "http": "https://goerli.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170"
+                    "http": "https://mainnet.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170"
                 },
                 "websocket": {
-                    "base_uri": "wss://eth-goerli.g.alchemy.com/v2/qYOcvHNenpMYrDCfgpS-sg75t2ouBmnY"
+                    "base_uri": "wss://eth-mainnet.g.alchemy.com/v2/qYOcvHNenpMYrDCfgpS-sg75t2ouBmnY"
                 }
             }
         },
         "gas_price_tracker": {
-            "http_url": "https://goerli.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
-            "ws_url": "wss://goerli.infura.io/ws/v3/d3bf8a4fe2744587bf47459446b7f170",
+            "http_url": "https://mainnet.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
+            "ws_url": "wss://mainnet.infura.io/ws/v3/d3bf8a4fe2744587bf47459446b7f170",
             "use_fee_history": true,
             "percentile_priority_fee_fast": 10,
             "percentile_priority_fee_med": 5,
