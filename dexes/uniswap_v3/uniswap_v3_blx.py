@@ -351,7 +351,7 @@ class UniswapV3Bloxroute(DexCommon):
                 else:
                     decoded_binary_secret = base64.b64decode(secret['SecretBinary'])
                     auth_json = json.loads(decoded_binary_secret)
-                return auth_json['auth_json']
+                return auth_json['auth_header']
             except Exception as ex:
                 self._logger.exception(
                     f'Error in getting blx authorisation header: %r', ex)
