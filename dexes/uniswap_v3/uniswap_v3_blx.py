@@ -342,7 +342,7 @@ class UniswapV3Bloxroute(DexCommon):
             return self.__config['blx_authorisation_header']
         else:
             session = boto3.Session()
-            client = session.client(service_name='secretsmanager')
+            client = session.client(service_name='secretsmanager', region_name='ap-southeast-1')
             try:
                 secret = client.get_secret_value(
                     SecretId=f'{self.pantheon.process_name}/3a5f7520d84c7b01d2a94f860d4202ba720')
