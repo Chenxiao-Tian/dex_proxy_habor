@@ -208,27 +208,52 @@ class UniswapV3(DexCommon):
                 if topic == '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67':
                     swap_log = self._api.get_swap_log(log['address'], tx_receipt)
                     self._logger.debug(f'Swap_log={swap_log}')
+                    # https://docs.uniswap.org/contracts/v3/reference/core/interfaces/pool/IUniswapV3PoolEvents#swap
+
                     # Sample swap_log:
-                    # (AttributeDict({'args': AttributeDict({'sender': '0xE592427A0AEce92De3Edee1F18E0157C05861564', 
+                    # (AttributeDict({'args': AttributeDict({'sender': '0xE592427A0AEce92De3Edee1F18E0157C05861564',
                     # 'recipient': '0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB', 'amount0': 100000000000, 'amount1': -332504806775,
-                    # 'sqrtPriceX96': 144687485274156549416468062839, 'liquidity': 580197578039432673188, 'tick': 12045}), 
-                    # 'event': 'Swap', 'logIndex': 222, 'transactionIndex': 120, 'transactionHash': 
-                    # HexBytes('0x858c864355ca60d342c2b250ed4d641d66f4a922039ce4d2307101d75d5450eb'), 
-                    # 'address': '0x03AfDFB6CaBd6BA2a9e54015226F67E9295a9Bea', 'blockHash': 
+                    # 'sqrtPriceX96': 144687485274156549416468062839, 'liquidity': 580197578039432673188, 'tick': 12045}),
+                    # 'event': 'Swap', 'logIndex': 222, 'transactionIndex': 120, 'transactionHash':
+                    # HexBytes('0x858c864355ca60d342c2b250ed4d641d66f4a922039ce4d2307101d75d5450eb'),
+                    # 'address': '0x03AfDFB6CaBd6BA2a9e54015226F67E9295a9Bea', 'blockHash':
                     # HexBytes('0xdd5186fa2d0298777165467ddfcc944b073f68a9d1060b332c3fdfa7b5e90fbc'), 'blockNumber': 9065089}),)
-                    
-                    instrument = self.__instruments.get_instrument(InstrumentId(self.__exchange_name, request.symbol))
+
+                    # positive amount means that the corresponding token is added to the pool while negative amount means corresponding token is taken out of the pool
+
+                    instrument = self.__instruments.get_instrument(
+                        InstrumentId(self.__exchange_name, request.symbol))
                     base_ccy_symbol = instrument.base_currency
                     quote_ccy_symbol = instrument.quote_currency
-                    
+
+                    token0_amount = Decimal(swap_log[0]['args']['amount0'])
+                    token1_amount = Decimal(swap_log[0]['args']['amount1'])
+
                     if (request.side == Side.BUY):
-                        base_ccy_bought_amount = Decimal(self._api.from_native_amount(base_ccy_symbol, abs(swap_log[0]['args']['amount0'])))
-                        quote_ccy_sold_amount = Decimal(self._api.from_native_amount(quote_ccy_symbol, abs(swap_log[0]['args']['amount1'])))
-                        request.exec_price = quote_ccy_sold_amount/base_ccy_bought_amount
+                        if (token0_amount > 0):
+                            base_ccy_amount = Decimal(
+                                self._api.from_native_amount(base_ccy_symbol, abs(token1_amount)))
+                            quote_ccy_amount = Decimal(
+                                self._api.from_native_amount(quote_ccy_symbol, token0_amount))
+                        else:
+                            base_ccy_amount = Decimal(
+                                self._api.from_native_amount(base_ccy_symbol, abs(token0_amount)))
+                            quote_ccy_amount = Decimal(
+                                self._api.from_native_amount(quote_ccy_symbol, token1_amount))
                     else:
-                        base_ccy_sold_amount = Decimal(self._api.from_native_amount(base_ccy_symbol, abs(swap_log[0]['args']['amount1'])))
-                        quote_ccy_bought_amount = Decimal(self._api.from_native_amount(quote_ccy_symbol, abs(swap_log[0]['args']['amount0'])))
-                        request.exec_price = quote_ccy_bought_amount/base_ccy_sold_amount
+                        if (token0_amount > 0):
+                            base_ccy_amount = Decimal(
+                                self._api.from_native_amount(base_ccy_symbol, token0_amount))
+                            quote_ccy_amount = Decimal(
+                                self._api.from_native_amount(quote_ccy_symbol, abs(token1_amount)))
+                        else:
+                            base_ccy_amount = Decimal(
+                                self._api.from_native_amount(base_ccy_symbol, token1_amount))
+                            quote_ccy_amount = Decimal(
+                                self._api.from_native_amount(quote_ccy_symbol, abs(token0_amount)))
+
+                    request.exec_price = round(
+                        quote_ccy_amount/base_ccy_amount, 8).normalize()
         except Exception as ex:
             self._logger.exception(f'Error occurred while computing execution price of request={request}: %r', ex)
 
