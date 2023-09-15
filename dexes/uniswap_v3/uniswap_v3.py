@@ -137,12 +137,17 @@ class UniswapV3(DexCommon):
             return await self._api.withdraw(
                 request.symbol, request.address_to, request.amount, request.gas_limit, gas_price_wei,
                 nonce=request.nonce)
-        else:
+        elif request.request_type == RequestType.APPROVE:
             return await self._api.approve(request.symbol, request.amount, request.gas_limit, gas_price_wei,
                                            nonce=request.nonce)
+        else:
+            raise Exception('Unsupported request type for amending')
 
     async def _cancel_transaction(self, request, gas_price_wei):
-        return await self._api.cancel_transaction(request.nonce, gas_price_wei)
+        if request.request_type == RequestType.ORDER or request.request_type == RequestType.TRANSFER or request.request_type == RequestType.APPROVE:
+            return await self._api.cancel_transaction(request.nonce, gas_price_wei)
+        else:
+            raise Exception(f"Cancelling not supported for the {request.request_type}")
 
     async def get_transaction_receipt(self, request, tx_hash):
         return await self._api.get_transaction_receipt(tx_hash)

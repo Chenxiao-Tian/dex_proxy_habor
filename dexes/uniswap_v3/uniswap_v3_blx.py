@@ -29,6 +29,10 @@ class UniswapV3Bloxroute(DexCommon):
 
         self._server.register(
             'POST', '/private/insert-order', self.__insert_order)
+        
+        # TODO: maybe move this endpoint to dex_common
+        self._server.register(
+            'POST', '/private/wrap-unwrap-eth', self.__wrap_unwrap_eth)
 
         self.__instruments = None
         self.__config = config
@@ -123,6 +127,76 @@ class UniswapV3Bloxroute(DexCommon):
             self._request_cache.finalise_request(
                 client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': repr(e)}}
+        
+    async def __wrap_unwrap_eth(self, path, params: dict, received_at_ms):
+        client_request_id = ''
+        try:
+            client_request_id = params['client_request_id']
+
+            if self._request_cache.get(client_request_id) is not None:
+                return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
+            
+            request = params['request']
+            assert request == 'wrap' or request == 'unwrap', 'Unknown request, should be either wrap or unwrap'
+            amount = Decimal(params['amount'])
+            gas_price_wei = int(params['gas_price_wei'])
+            gas_limit = int(params['gas_limit'])
+            
+            wrap_unwrap = WrapUnwrapRequest(client_request_id, request, amount, gas_limit, received_at_ms)
+
+            self._logger.debug(
+                f'{"Wrapping" if wrap_unwrap.request == "wrap" else "Unwrapping"}={wrap_unwrap}, gas_price_wei={gas_price_wei}')
+            self._request_cache.add(wrap_unwrap)
+
+            ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
+            if not ok:
+                self._request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
+                return 400, {'error': {'message': reason}}
+
+            if not self._api.is_blx_mev_ws_ready():
+                self._request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
+                return 400, {'error': {'message': 'Bloxroute mev WS not ready'}}
+
+            next_block_num = (await self._api.get_current_block_num()) + 1
+            if (next_block_num > self.__next_targeted_block):
+                self.__next_targeted_block = next_block_num
+                self.__txs_in_next_targeted_block = []
+
+            nonce = await self._api.get_total_txs_so_far() + len(self.__txs_in_next_targeted_block)
+            
+            if wrap_unwrap.request == 'wrap':
+                built_tx = self._api.build_wrap_tx('WETH', amount, gas_limit, gas_price_wei, nonce)
+            else:
+                built_tx = self._api.build_unwrap_tx('WETH', amount, gas_limit, gas_price_wei, nonce)
+            signed_tx = self._api.sign_tx(built_tx)
+            
+            self.__txs_in_next_targeted_block.append(
+                signed_tx.rawTransaction.hex()[2:])
+            tx_hash = Web3.to_hex(signed_tx.hash)
+            self.__tx_hash_with_targeted_block.append(
+                (tx_hash, next_block_num))
+
+            await self._api.send_bundle(self.__txs_in_next_targeted_block, self.__next_targeted_block)
+
+            wrap_unwrap.nonce = nonce
+            wrap_unwrap.tx_hashes.append((tx_hash, RequestType.WRAP_UNWRAP.name))
+            wrap_unwrap.used_gas_prices_wei.append(gas_price_wei)
+
+            self._transactions_status_poller.add_for_polling(
+                tx_hash, client_request_id, RequestType.WRAP_UNWRAP)
+            self._request_cache.add_or_update_request_in_redis(
+                client_request_id)
+
+            return 200, {'tx_hash': tx_hash}
+
+        except Exception as e:
+            self._logger.exception(f'Failed to handle wrap_unwrap request: %r', e)
+            self._request_cache.finalise_request(
+                client_request_id, RequestStatus.FAILED)
+            return 400, {'error': {'message': repr(e)}}
+            
 
     async def _cancel_all(self, path, params, received_at_ms):
         return 400, {'error': {'message': repr(Exception('Cancel all request not supported by uni3 dex-proxy with '
@@ -225,6 +299,8 @@ class UniswapV3Bloxroute(DexCommon):
             }
 
             await self._event_sink.on_event('ORDER', event)
+        else:
+            self._logger.debug(f'On request status update: {request}')
 
     async def __get_tx_status_ws(self):
         self.pantheon.spawn(self.__get_mined_tx_hash())
