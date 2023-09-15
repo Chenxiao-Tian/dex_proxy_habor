@@ -136,7 +136,8 @@ class DexCommon(ABC):
     async def _get_all_open_requests(self, path, params, received_at_ms):
         try:
             assert params['request_type'] == 'ORDER' or params['request_type'] == 'TRANSFER' or \
-                   params['request_type'] == 'APPROVE', 'Unknown request type'
+                params['request_type'] == 'APPROVE' or params['request_type'] == 'WRAP_UNWRAP', \
+                'Unknown request type'
             request_type = RequestType[params['request_type']]
 
             self._logger.debug(f'Getting all open requests: request_type={request_type.name}')
@@ -204,7 +205,8 @@ class DexCommon(ABC):
     async def _cancel_all(self, path, params, received_at_ms):
         try:
             assert params['request_type'] == 'ORDER' or params['request_type'] == 'TRANSFER' \
-                   or params['request_type'] == 'APPROVE', 'Unknown transaction type'
+                or params['request_type'] == 'APPROVE' or params['request_type'] == 'WRAP_UNWRAP', \
+                'Unknown transaction type'
             request_type = RequestType[params['request_type']]
 
             self._logger.debug(f'Canceling all requests, request_type={request_type.name}')

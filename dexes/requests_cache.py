@@ -15,7 +15,8 @@ from pyutils.exchange_apis.dex_common import (
     RequestStatus,
     OrderRequest,
     TransferRequest,
-    ApproveRequest
+    ApproveRequest,
+    WrapUnwrapRequest
 )
 
 from .transactions_status_poller import TransactionsStatusPoller
@@ -124,8 +125,12 @@ class RequestsCache:
                     request = OrderRequest.from_json(request_json)
                 elif request_json['request_type'] == RequestType.TRANSFER.name:
                     request = TransferRequest.from_json(request_json)
-                else:
+                elif request_json['request_type'] == RequestType.APPROVE.name:
                     request = ApproveRequest.from_json(request_json)
+                elif request_json['request_type'] == RequestType.WRAP_UNWRAP.name:
+                    request = WrapUnwrapRequest.from_json(request_json)
+                else:
+                    assert False
 
                 self.__requests[request.client_request_id] = request
 

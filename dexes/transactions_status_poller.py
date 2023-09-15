@@ -61,7 +61,7 @@ class TransactionsStatusPoller:
                         
                         # No need to check receipt['status'] in case of RequestType.CANCEL because
                         # it doesn't matter whether the transaction which was used to cancel the original
-                        # ORDER/TRANSFER/APPROVE request has succeeded or not, even if it has failed
+                        # ORDER/TRANSFER/APPROVE/WRAP_UNWRAP request has succeeded or not, even if it has failed
                         # the nonce is used up and hence the original request by the client is cancelled now
                         if request_type == RequestType.CANCEL:
                             request_status = RequestStatus.CANCELED
