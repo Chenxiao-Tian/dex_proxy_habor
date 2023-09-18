@@ -232,6 +232,20 @@
                     "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5",
                     "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
                 ]
+            },
+            {
+                "symbol": "PEPE",
+                "address": "0x6982508145454Ce325dDbE47a25d4ec3d2311933",
+                "valid_withdrawal_addresses": [
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x714b5fe769fd80c20f1582b3a3988ced857e0ff6",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0xC4c945CBC846A3cC43C1F2eAc555EE9d86A7fcd3",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
+                ]
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
