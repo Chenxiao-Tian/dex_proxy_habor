@@ -393,10 +393,13 @@ class UniswapV3Bloxroute(DexCommon):
     async def __finalise_missed_txs(self):
         while True:
             try:
+                await self.pantheon.sleep(1)
                 self._logger.debug(
                     'Polling for finalising txs missing targeted block')
-                curr_block_num = await self._api.get_current_block_num()
                 num_of_txs = len(self.__tx_hash_with_targeted_block)
+                if num_of_txs == 0:
+                    continue     
+                curr_block_num = await self._api.get_current_block_num()
 
                 for i in range(0, num_of_txs):
                     try:
@@ -408,7 +411,7 @@ class UniswapV3Bloxroute(DexCommon):
                             if receipt is None:
                                 # the current_block is >= than the targeted_block and receipt is None which means that
                                 # the request has failed to get mined
-                                self._transactions_status_poller.finalise(
+                                await self._transactions_status_poller.finalise(
                                     tx_hash, RequestStatus.FAILED)
                             # else:
                                 # transaction_status_poller will handle finalising the request
@@ -431,7 +434,6 @@ class UniswapV3Bloxroute(DexCommon):
             except Exception as e:
                 self._logger.exception(
                     f'Error in polling for finalising txs missing targeted block: %r', e)
-            await self.pantheon.sleep(1)
 
     def __get_blx_authorisation_header(self) -> str:
         if 'blx_authorisation_header' in self.__config:
