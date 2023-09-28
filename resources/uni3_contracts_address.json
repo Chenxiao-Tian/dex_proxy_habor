@@ -262,6 +262,18 @@
                     "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5",
                     "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED"
                 ]
+            },
+            {
+                "symbol": "PYUSD",
+                "address": "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8",
+                "valid_withdrawal_addresses": [
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0x45Cd6e72Ac7d669135DC738316b6C70ceF6065fD",
+                    "0x4bbc34d5fb8ef42c65b1538c42dc95acea08bdcb",
+                    "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5"
+                ]
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
