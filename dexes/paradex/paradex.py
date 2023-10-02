@@ -190,7 +190,7 @@ class Paradex(DexCommon):
             req_id = self.order_req_id
             self.order_req_id += 1
 
-            start = time.now()
+            start = time.time()
 
             self._logger.debug(f"order request ({req_id}) received at {start}")
 
@@ -206,7 +206,7 @@ class Paradex(DexCommon):
                 params["price"]
             )
 
-            es_delay = int(time.now() * 1000) - params["order_creation_ts_ms"]
+            es_delay = int(time.time() * 1000) - params["order_creation_ts_ms"]
             self._logger.debug(f"order request ({req_id}) to sign => {msg}, delay from es {es_delay}")
 
             msg_signature = await self.pantheon.loop.run_in_executor(
@@ -215,7 +215,7 @@ class Paradex(DexCommon):
                 msg
             )
 
-            end = time.now()
+            end = time.time()
             sign_time = (end - start)*1000
 
             self._logger.debug(f"order request ({req_id}) signature => {msg_signature}, at {end}, took {sign_time} ms")
