@@ -207,7 +207,7 @@ class Paradex(DexCommon):
             )
 
             es_delay = int(time.time() * 1000) - int(params["order_creation_ts_ms"])
-            self._logger.debug(f"order request ({req_id}) to sign => {msg}, delay from es {es_delay}")
+            self._logger.debug(f"order request ({req_id}) to sign => {msg}, delay from es {es_delay} ms")
 
             msg_signature = await self.pantheon.loop.run_in_executor(
                 self.__process_pool,
