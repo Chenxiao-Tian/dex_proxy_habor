@@ -26,13 +26,12 @@ setuptools.setup(
         # CVE-2023-37276
         'aiohttp>=3.8.5',
         'pantheon @ git+ssh://bitbucket.org/kenetic/pytheon.git@aiohttp-upgrade-3.8.5',
-        'pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@aiohttp-upgrade-3.8.5',
+        'pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@30a4e9f48d4b639683b2fad459d8cbf9579f350e',
         # refs/tags/v6.0.0-beta.8
         # require w3 beta 6 to fix dependency conflict with solana/websockets.
         'Web3 @ git+https://github.com/ethereum/web3.py.git@de95191dea8eb56e5176693946fb1e50957b8a5c',
 
         # paradex
-        'cairo-lang==0.11.1.1',
-        'starknet.py==0.16.0a0'
+        'starknet.py==0.16.1'
     ]
 )
