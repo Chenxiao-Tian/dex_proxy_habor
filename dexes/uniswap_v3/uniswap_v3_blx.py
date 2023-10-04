@@ -7,7 +7,7 @@ import boto3
 
 from collections import deque
 from decimal import Decimal
-from web3.exceptions import TransactionNotFound
+from hexbytes import HexBytes
 
 from pantheon import Pantheon
 from pantheon.instruments_source import InstrumentLifecycle, InstrumentUsageExchanges
@@ -197,7 +197,6 @@ class UniswapV3Bloxroute(DexCommon):
                 client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': repr(e)}}
             
-
     async def _cancel_all(self, path, params, received_at_ms):
         return 400, {'error': {'message': repr(Exception('Cancel all request not supported by uni3 dex-proxy with '
                                                          'Bloxroute integrated'))}}
@@ -407,30 +406,35 @@ class UniswapV3Bloxroute(DexCommon):
                         self._logger.debug(
                             f'tx_hash={tx_hash} targeted_block={targeted_block}')
                         if curr_block_num >= targeted_block:
-                            receipt = await self.get_transaction_receipt(request=None, tx_hash=tx_hash)
-                            if receipt is None:
-                                # the current_block is >= than the targeted_block and receipt is None which means that
+                            block_data = await self._api.get_block(targeted_block)
+                            self._logger.debug(
+                                f'block_num={targeted_block}, block_data={block_data}')
+
+                            if len(block_data.transactions) == 0:
+                                self._logger.error(
+                                    'Transactions list is empty of the targetted block.')
+                                self.__tx_hash_with_targeted_block.appendleft(
+                                    (tx_hash, targeted_block))
+                                break
+
+                            if HexBytes(tx_hash) not in block_data.transactions:
                                 # the request has failed to get mined
                                 await self._transactions_status_poller.finalise(
                                     tx_hash, RequestStatus.FAILED)
-                            # else:
+                            else:
+                                self._logger.debug(f'tx_hash={tx_hash} is mined')
                                 # transaction_status_poller will handle finalising the request
                         else:
                             self.__tx_hash_with_targeted_block.appendleft(
                                 (tx_hash, targeted_block))
                             break
                     except Exception as ex:
-                        if isinstance(ex, TransactionNotFound):
-                            # the current_block is >= than the targeted_block and receipt is not found which means that
-                            # the request has failed to get mined
-                            await self._transactions_status_poller.finalise(
-                                tx_hash, RequestStatus.FAILED)
-                        else:
-                            # retry after 1 sec
-                            self._logger.exception(
-                                f'Error in polling tx_hash={tx_hash} targeted_block={targeted_block} for finalising txs missing targeted block: %r', ex)
-                            self.__tx_hash_with_targeted_block.append(
-                                (tx_hash, targeted_block))
+                        # retry after 1 sec
+                        self._logger.exception(
+                            f'Error in polling tx_hash={tx_hash} targeted_block={targeted_block} for finalising txs missing targeted block: %r', ex)
+                        self.__tx_hash_with_targeted_block.append(
+                            (tx_hash, targeted_block))
+                        break
             except Exception as e:
                 self._logger.exception(
                     f'Error in polling for finalising txs missing targeted block: %r', e)
