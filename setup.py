@@ -25,8 +25,8 @@ setuptools.setup(
         'ujson==5.7.0',
         # CVE-2023-37276
         'aiohttp>=3.8.5',
-        'pantheon @ git+ssh://bitbucket.org/kenetic/pytheon.git@aiohttp-upgrade-3.8.5',
-        'pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@cec1e8e2709b5c42c384511566f1361049748ab2',
+        'pantheon @ git+ssh://bitbucket.org/kenetic/pytheon.git@pytheon-1.2.22',
+        'pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@73d4b6eadbe7bf6b1ec1192470d5869226a20870',
         # refs/tags/v6.0.0-beta.8
         # require w3 beta 6 to fix dependency conflict with solana/websockets.
         'Web3 @ git+https://github.com/ethereum/web3.py.git@de95191dea8eb56e5176693946fb1e50957b8a5c',
