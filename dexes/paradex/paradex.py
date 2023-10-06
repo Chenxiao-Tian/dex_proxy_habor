@@ -219,7 +219,7 @@ class Paradex(DexCommon):
 
             msg_signature = await self.pantheon.loop.run_in_executor(
                 self.__process_pool,
-                self.sign_order_request_helper,
+                self.__sign_order_request_helper,
                 req_id,
                 msg
             )
