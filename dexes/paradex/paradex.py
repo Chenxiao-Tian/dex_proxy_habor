@@ -183,6 +183,14 @@ class Paradex(DexCommon):
         assert len(received_keys) == len(expected_keys), f"Request does not contain the correct set of fields. Expected [{', '.join(expected_keys)}]"
         for key in expected_keys: assert key in received_keys, f"Missing field({key}) in the request"
 
+    def __sign_order_request_helper(self, req_id, msg) -> str:
+        self._logger.debug(f"Starting sign for {req_id}")
+        start = time.time()
+        r = self.__pdex_account.sign_msg(msg)
+        delay = (time.time() - start) * 1000
+        self._logger.debug(f"Finished sign for {req_id}, took {delay} ms")
+        return r
+
     async def __sign_order_request(
         self, path: str, params: dict, received_at_ms: int
     ) -> Tuple[int, dict]:
@@ -211,7 +219,8 @@ class Paradex(DexCommon):
 
             msg_signature = await self.pantheon.loop.run_in_executor(
                 self.__process_pool,
-                self.__pdex_account.sign_msg,
+                self.sign_order_request_helper,
+                req_id,
                 msg
             )
 
