@@ -49,8 +49,10 @@ class Paradex(DexCommon):
         self.__gas_price_tracker = GasPriceTracker(pantheon, config['gas_price_tracker'])
 
         self.__process_pool = concurrent.futures.ProcessPoolExecutor(
-            config["max_signature_generators"]
+            max_workers=config["max_signature_generators"]
         )
+
+        self.order_req_id = 0
 
     def __set_exchange_url_prefix(self, config):
         base_uri = config["connectors"]["paradex"]["rest"]["base_uri"]
@@ -185,6 +187,13 @@ class Paradex(DexCommon):
         self, path: str, params: dict, received_at_ms: int
     ) -> Tuple[int, dict]:
         try:
+            req_id = self.order_req_id
+            self.order_req_id += 1
+
+            start = time.time()
+
+            self._logger.debug(f"order request ({req_id}) received at {start}")
+
             self.__assert_order_request_schema(params.keys())
 
             msg = StarknetMessages.order_request(
@@ -197,15 +206,22 @@ class Paradex(DexCommon):
                 params["price"]
             )
 
-            self._logger.debug(f"order request to sign => {msg}")
+            es_delay = int(time.time() * 1000) - int(params["order_creation_ts_ms"])
+            self._logger.debug(f"order request ({req_id}) to sign => {msg}, delay from es {es_delay} ms")
+
             msg_signature = await self.pantheon.loop.run_in_executor(
                 self.__process_pool,
                 self.__pdex_account.sign_msg,
                 msg
             )
-            self._logger.debug(f"order request signature => {msg_signature}")
+
+            end = time.time()
+            sign_time = (end - start)*1000
+
+            self._logger.debug(f"order request ({req_id}) signature => {msg_signature}, at {end}, took {sign_time} ms")
 
             return 200, {"signature": msg_signature}
+
         except Exception as e:
             return 400, {"error": str(e)}
 
