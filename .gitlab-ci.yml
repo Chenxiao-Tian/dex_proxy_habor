@@ -1,6 +1,11 @@
+include:
+  - project: auros/ci-pipeline-includes
+    ref: master
+    file: Container-Scanning.yml
+
 stages:
   - build
-
+  - audit
 
 variables:
   ENCLAVE_BUILD_IMAGE: registry.gitlab.com/auros/enclave-builder@sha256:5ebd1fe845df7d5751f4c95171002cca37b922dc1cf8add28d5961a8ea471952
@@ -12,85 +17,71 @@ default:
     name: $ENCLAVE_BUILD_IMAGE
     entrypoint: [""]
   services:
-    - docker:20-dind
+    - name: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker:24-dind
+      alias: docker
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
   retry: 2
 
 
-.default_build_script: &default_build_script
+.build and publish:
+  stage: build
+  script:
   - export CONTAINER_NAME=${PROCESS_NAME}
   - echo ${SSH_PRIVATE_KEY_BASE64} | base64 -d -w 0 > ~/.ssh/id_rsa
   - chmod 600 ~/.ssh/id_rsa
   - ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
+  - ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
   - git clone --depth 1 ${CONFIG_REPO_URI} config
+  - export _NORMALISED_NAME=${PROCESS_NAME//-/_}
+  - export _NORMALISED_NAME=${_NORMALISED_NAME^^}
+  - export _INFERRED_VAULT_APPROLE_ID=VAULT_APPROLE_ID_${_NORMALISED_NAME}
+  - export _INFERRED_VAULT_SECRET_ID=VAULT_SECRET_ID_${_NORMALISED_NAME}
+  - export _INFERRED_VAULT_WALLET_NAME=VAULT_WALLET_NAME_${_NORMALISED_NAME}
+  - export VAULT_APPROLE_ID=${!_INFERRED_VAULT_APPROLE_ID}
+  - export VAULT_SECRET_ID=${!_INFERRED_VAULT_SECRET_ID}
+  - export VAULT_WALLET_NAME=${!_INFERRED_VAULT_WALLET_NAME}
+  - "[[ \"${VAULT_APPROLE_ID}\" ]] || { echo \"VAULT_APPROLE_ID is not defined\"; }"
+  - "[[ \"${VAULT_SECRET_ID}\" ]] || { echo \"VAULT_SECRET_ID is not defined\"; }"
+  - "[[ \"${VAULT_WALLET_NAME}\" ]] || { echo \"VAULT_WALLET_NAME is not defined\"; }"
   - "[[ -f config/${PROCESS_NAME}.json ]] || { echo \"No config found for ${PROCESS_NAME}\"; }"
   - export CONTEXT_ID=$(jq -r '.enclave.cid | select(. != null)' config/${PROCESS_NAME}.json)
   - rm -rf config
   - ./ImageBuilder.sh --enclave
 
 
-build dex_proxy-dexa-main:
-  stage: build
-  script:
-    - export PROCESS_NAME=dex_proxy-dexa-main
-    - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_DEXA_MAIN}
-    - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_DEXA_MAIN}
-    - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_DEXA_MAIN}
-    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-prod.git
-    - *default_build_script
+.enclaves: &enclaves
+  - PROCESS_NAME: dex_proxy-dexa-main
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
+  - PROCESS_NAME: dex_proxy-dexa-fuji
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-dev.git
+  - PROCESS_NAME: dex_proxy-uni3-goerli-4
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-dev.git
+  - PROCESS_NAME: dex_proxy-chainEth-uni3-main-1
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
+  - PROCESS_NAME: dex_proxy-pdex-main
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
+  - PROCESS_NAME: dex_proxy-pdex-testnet
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-dev.git
 
 
-build dex_proxy-dexa-fuji:
-  stage: build
-  script:
-    - export PROCESS_NAME=dex_proxy-dexa-fuji
-    - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_DEXA_FUJI}
-    - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_DEXA_FUJI}
-    - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_DEXA_FUJI}
-    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-dev.git
-    - *default_build_script
+build:
+  extends:
+    - .build and publish
+  parallel:
+    matrix: *enclaves
 
 
-build dex_proxy-uni3-goerli-4:
-  stage: build
-  script:
-    - export PROCESS_NAME=dex_proxy-uni3-goerli-4
-    - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_UNI3_GOERLI_4}
-    - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_UNI3_GOERLI_4}
-    - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_UNI3_GOERLI_4}
-    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-dev.git
-    - *default_build_script
-
-
-build dex_proxy-chainEth-uni3-main-1:
-  stage: build
-  script:
-    - export PROCESS_NAME=dex_proxy-chainEth-uni3-main-1
-    - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_CHAINETH_UNI3_MAIN_1}
-    - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_CHAINETH_UNI3_MAIN_1}
-    - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_CHAINETH_UNI3_MAIN_1}
-    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-prod.git
-    - *default_build_script
-
-
-build dex_proxy-pdex-main:
-  stage: build
-  script:
-    - export PROCESS_NAME=dex_proxy-pdex-main
-    - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_PDEX_MAIN}
-    - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_PDEX_MAIN}
-    - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_PDEX_MAIN}
-    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-prod.git
-    - *default_build_script
-
-
-build dex_proxy-pdex-testnet:
-  stage: build
-  script:
-    - export PROCESS_NAME=dex_proxy-pdex-testnet
-    - export VAULT_APPROLE_ID=${VAULT_APPROLE_ID_DEX_PROXY_PDEX_TESTNET}
-    - export VAULT_SECRET_ID=${VAULT_SECRET_ID_DEX_PROXY_PDEX_TESTNET}
-    - export VAULT_WALLET_NAME=${VAULT_WALLET_NAME_DEX_PROXY_PDEX_TESTNET}
-    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-dev.git
-    - *default_build_script
+container_scanning:
+  before_script: []
+  parallel:
+    matrix: *enclaves
+  # TODO: this would speed up the pipeline quite a bit, but it is not yet supported.
+  # https://gitlab.com/gitlab-org/gitlab/-/issues/396845
+  #dependencies:
+  #  - "build: [${DOCKERFILE}, ${CONTAINER_ADDITIONAL_TAG}, ${CONTAINER_NAME}]"
+  variables:
+    CS_IMAGE: ${CI_REGISTRY_IMAGE}/${PROCESS_NAME}:${CI_COMMIT_SHA}
+    DTRACK_PROJECT_NAME: ${PROCESS_NAME}
+    DTRACK_PROJECT_VERSION: ${CI_COMMIT_SHA}
+    DTRACK_PROJECT_PARENT_NAME: dex-proxy
