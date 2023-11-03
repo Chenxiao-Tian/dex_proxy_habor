@@ -338,6 +338,14 @@
                     "0xe71cab44917bf40b072b47138a76006558cb29c6",
                     "0xFF0CEfDbd6bf757cc0CC361ddfBdE432186Ccaa6"
                 ]
+            },
+            {
+                "symbol": "TRX",
+                "address": "0x50327c6c5a14DCaDE707ABad2E27eB517df87AB5",
+                "valid_withdrawal_addresses": [
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x5f64d9c81f5a30f4b29301401f96138792dc5f58"
+                ]
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
