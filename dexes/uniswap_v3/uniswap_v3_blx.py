@@ -29,7 +29,7 @@ class UniswapV3Bloxroute(DexCommon):
 
         self._server.register(
             'POST', '/private/insert-order', self.__insert_order)
-        
+
         # TODO: maybe move this endpoint to dex_common
         self._server.register(
             'POST', '/private/wrap-unwrap-eth', self.__wrap_unwrap_eth)
@@ -59,7 +59,7 @@ class UniswapV3Bloxroute(DexCommon):
             side = Side.BUY if params['side'] == 'BUY' else Side.SELL
             fee_rate = int(params['fee_rate'])
             gas_price_wei = int(params['gas_price_wei'])
-            gas_limit = 210000  # TODO: Check for the most suitable value
+            gas_limit = 500000  # TODO: Check for the most suitable value
             timeout_s = int(time.time() + params['timeout_s'])
 
             instrument = self.__instruments.get_instrument(
@@ -127,7 +127,7 @@ class UniswapV3Bloxroute(DexCommon):
             self._request_cache.finalise_request(
                 client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': repr(e)}}
-        
+
     async def __wrap_unwrap_eth(self, path, params: dict, received_at_ms):
         client_request_id = ''
         try:
@@ -135,13 +135,13 @@ class UniswapV3Bloxroute(DexCommon):
 
             if self._request_cache.get(client_request_id) is not None:
                 return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
-            
+
             request = params['request']
             assert request == 'wrap' or request == 'unwrap', 'Unknown request, should be either wrap or unwrap'
             amount = Decimal(params['amount'])
             gas_price_wei = int(params['gas_price_wei'])
             gas_limit = int(params['gas_limit'])
-            
+
             wrap_unwrap = WrapUnwrapRequest(client_request_id, request, amount, gas_limit, received_at_ms)
 
             self._logger.debug(
@@ -165,13 +165,13 @@ class UniswapV3Bloxroute(DexCommon):
                 self.__txs_in_next_targeted_block = []
 
             nonce = await self._api.get_total_txs_so_far() + len(self.__txs_in_next_targeted_block)
-            
+
             if wrap_unwrap.request == 'wrap':
                 built_tx = self._api.build_wrap_tx('WETH', amount, gas_limit, gas_price_wei, nonce)
             else:
                 built_tx = self._api.build_unwrap_tx('WETH', amount, gas_limit, gas_price_wei, nonce)
             signed_tx = self._api.sign_tx(built_tx)
-            
+
             self.__txs_in_next_targeted_block.append(
                 signed_tx.rawTransaction.hex()[2:])
             tx_hash = Web3.to_hex(signed_tx.hash)
@@ -196,7 +196,7 @@ class UniswapV3Bloxroute(DexCommon):
             self._request_cache.finalise_request(
                 client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': repr(e)}}
-            
+
     async def _cancel_all(self, path, params, received_at_ms):
         return 400, {'error': {'message': repr(Exception('Cancel all request not supported by uni3 dex-proxy with '
                                                          'Bloxroute integrated'))}}
@@ -397,7 +397,7 @@ class UniswapV3Bloxroute(DexCommon):
                     'Polling for finalising txs missing targeted block')
                 num_of_txs = len(self.__tx_hash_with_targeted_block)
                 if num_of_txs == 0:
-                    continue     
+                    continue
                 curr_block_num = await self._api.get_current_block_num()
 
                 for i in range(0, num_of_txs):

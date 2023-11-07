@@ -49,7 +49,7 @@ class UniswapV3(DexCommon):
             side = Side.BUY if params['side'] == 'BUY' else Side.SELL
             fee_rate = int(params['fee_rate'])
             gas_price_wei = int(params['gas_price_wei'])
-            gas_limit = 210000  # TODO: Check for the most suitable value
+            gas_limit = 500000  # TODO: Check for the most suitable value
             timeout_s = int(time.time() + params['timeout_s'])
 
             instrument = self.__instruments.get_instrument(InstrumentId(self.__exchange_name, symbol))
@@ -159,10 +159,10 @@ class UniswapV3(DexCommon):
         request = self.get_request(client_request_id)
         if (request == None):
             return
-        
+
         if (request_status == RequestStatus.SUCCEEDED and request.request_type == RequestType.ORDER):
             await self.__compute_exec_price(request, tx_receipt)
-            
+
         await super().on_request_status_update(client_request_id, request_status, tx_receipt)
 
         if request.request_type == RequestType.ORDER:
@@ -203,12 +203,12 @@ class UniswapV3(DexCommon):
             except Exception as e:
                 self._logger.exception(
                     f'Error occurred while handling WS message: %r', e)
-                
+
     async def  __compute_exec_price(self, request: OrderRequest, tx_receipt: dict):
         try:
             for log in tx_receipt['logs']:
                 topic = Web3.to_hex(log['topics'][0])
-                
+
                 # 0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67 is the topic for the Swap event
                 if topic == '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67':
                     swap_log = self._api.get_swap_log(log['address'], tx_receipt)
