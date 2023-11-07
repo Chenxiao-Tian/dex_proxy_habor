@@ -270,7 +270,7 @@ class DexCommon(ABC):
             symbol = params['symbol']
             amount = Decimal(params['amount'])
             gas_price_wei = int(params['gas_price_wei'])
-            gas_limit = 100000  # TODO: Check for the most suitable value
+            gas_limit = 500000  # TODO: Check for the most suitable value
 
             ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
             if not ok:
