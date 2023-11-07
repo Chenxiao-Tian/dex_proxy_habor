@@ -41,10 +41,10 @@ default:
   - export VAULT_APPROLE_ID=${!_INFERRED_VAULT_APPROLE_ID}
   - export VAULT_SECRET_ID=${!_INFERRED_VAULT_SECRET_ID}
   - export VAULT_WALLET_NAME=${!_INFERRED_VAULT_WALLET_NAME}
-  - "[[ \"${VAULT_APPROLE_ID}\" ]] || { echo \"VAULT_APPROLE_ID is not defined\"; }"
-  - "[[ \"${VAULT_SECRET_ID}\" ]] || { echo \"VAULT_SECRET_ID is not defined\"; }"
-  - "[[ \"${VAULT_WALLET_NAME}\" ]] || { echo \"VAULT_WALLET_NAME is not defined\"; }"
-  - "[[ -f config/${PROCESS_NAME}.json ]] || { echo \"No config found for ${PROCESS_NAME}\"; }"
+  - "[[ \"${VAULT_APPROLE_ID}\" ]] || { echo \"VAULT_APPROLE_ID is not defined\"; exit 1; }"
+  - "[[ \"${VAULT_SECRET_ID}\" ]] || { echo \"VAULT_SECRET_ID is not defined\"; exit 1; }"
+  - "[[ \"${VAULT_WALLET_NAME}\" ]] || { echo \"VAULT_WALLET_NAME is not defined\"; exit 1; }"
+  - "[[ -f config/${PROCESS_NAME}.json ]] || { echo \"No config found for ${PROCESS_NAME}\"; exit 1; }"
   - export CONTEXT_ID=$(jq -r '.enclave.cid | select(. != null)' config/${PROCESS_NAME}.json)
   - rm -rf config
   - ./ImageBuilder.sh --enclave
