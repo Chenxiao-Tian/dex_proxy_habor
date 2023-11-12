@@ -410,13 +410,6 @@ class UniswapV3Bloxroute(DexCommon):
                             self._logger.debug(
                                 f'block_num={targeted_block}, block_data={block_data}')
 
-                            if len(block_data.transactions) == 0:
-                                self._logger.error(
-                                    'Transactions list is empty of the targetted block.')
-                                self.__tx_hash_with_targeted_block.appendleft(
-                                    (tx_hash, targeted_block))
-                                break
-
                             if HexBytes(tx_hash) not in block_data.transactions:
                                 # the request has failed to get mined
                                 await self._transactions_status_poller.finalise(
