@@ -114,6 +114,7 @@ class UniswapV3Bloxroute(DexCommon):
             order.nonce = nonce
             order.tx_hashes.append((tx_hash, RequestType.ORDER.name))
             order.used_gas_prices_wei.append(gas_price_wei)
+            order.dex_specific = {'targeted_block_num': next_block_num}
 
             self._transactions_status_poller.add_for_polling(
                 tx_hash, client_request_id, RequestType.ORDER)
@@ -177,6 +178,7 @@ class UniswapV3Bloxroute(DexCommon):
             tx_hash = Web3.to_hex(signed_tx.hash)
             self.__tx_hash_with_targeted_block.append(
                 (tx_hash, next_block_num))
+            wrap_unwrap.dex_specific = {'targeted_block_num': next_block_num}
 
             await self._api.send_bundle(self.__txs_in_next_targeted_block, self.__next_targeted_block)
 
@@ -210,7 +212,7 @@ class UniswapV3Bloxroute(DexCommon):
     async def process_request(self, ws, request_id, method, params: dict):
         return False
 
-    async def _approve(self, symbol, amount, gas_limit, gas_price_wei, nonce=None):
+    async def _approve(self, request, symbol, amount, gas_limit, gas_price_wei, nonce=None):
         if not self._api.is_blx_mev_ws_ready():
             return ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message='Bloxroute mev WS not ready')
 
@@ -228,12 +230,13 @@ class UniswapV3Bloxroute(DexCommon):
             signed_tx.rawTransaction.hex()[2:])
         tx_hash = Web3.to_hex(signed_tx.hash)
         self.__tx_hash_with_targeted_block.append((tx_hash, next_block_num))
+        request.dex_specific = {'targeted_block_num': next_block_num}
 
         await self._api.send_bundle(self.__txs_in_next_targeted_block, self.__next_targeted_block)
 
         return ApiResult(nonce, tx_hash)
 
-    async def _transfer(self, path, symbol, address_to, amount, gas_limit, gas_price_wei, nonce=None):
+    async def _transfer(self, request, path, symbol, address_to, amount, gas_limit, gas_price_wei, nonce=None):
         if path == '/private/withdraw':
             assert address_to is not None
 
@@ -255,6 +258,7 @@ class UniswapV3Bloxroute(DexCommon):
             tx_hash = Web3.to_hex(signed_tx.hash)
             self.__tx_hash_with_targeted_block.append(
                 (tx_hash, next_block_num))
+            request.dex_specific = {'targeted_block_num': next_block_num}
 
             await self._api.send_bundle(self.__txs_in_next_targeted_block, self.__next_targeted_block)
 
@@ -271,6 +275,11 @@ class UniswapV3Bloxroute(DexCommon):
             'Cancel request not supported by uni3 dex-proxy with Bloxroute integrated')
 
     async def get_transaction_receipt(self, request, tx_hash):
+        # add for finalization polling
+        if request.dex_specific is not None and 'targeted_block_num' in request.dex_specific:
+            self.__tx_hash_with_targeted_block.append((tx_hash,
+                request.dex_specific['targeted_block_num']))
+
         return await self._api.get_transaction_receipt(tx_hash)
 
     def _get_gas_price(self, request, priority_fee):

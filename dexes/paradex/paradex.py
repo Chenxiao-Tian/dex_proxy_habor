@@ -272,6 +272,7 @@ class Paradex(DexCommon):
 
     async def _approve(
         self,
+        request,
         symbol: str,
         amount: Decimal,
         gas_limit: int,
@@ -284,6 +285,7 @@ class Paradex(DexCommon):
 
     async def _transfer(
          self,
+         request,
          path: str,
          symbol: str,
          address_to: str,
