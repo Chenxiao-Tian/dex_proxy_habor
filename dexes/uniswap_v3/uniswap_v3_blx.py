@@ -276,7 +276,7 @@ class UniswapV3Bloxroute(DexCommon):
 
     async def get_transaction_receipt(self, request, tx_hash):
         # add for finalization polling
-        if  'targeted_block_num' in request.dex_specific:
+        if  request.dex_specific.get('targeted_block_num') is not None:
             self.__tx_hash_with_targeted_block.append((tx_hash,
                 request.dex_specific['targeted_block_num']))
 
