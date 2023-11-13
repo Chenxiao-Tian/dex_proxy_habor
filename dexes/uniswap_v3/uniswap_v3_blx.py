@@ -453,8 +453,6 @@ class UniswapV3Bloxroute(DexCommon):
                 raise ex
 
     async def start(self, private_key):
-        await super().start(private_key)
-
         self.__instruments = await self.pantheon.get_instruments_live_source(
             exchanges=[self.__exchange_name],
             symbols=[],
@@ -487,6 +485,8 @@ class UniswapV3Bloxroute(DexCommon):
             uniswap_router_address = contracts_address_json["uniswap_router_address"]
 
         await self._api.initialize(private_key, uniswap_router_address, tokens_list)
+
+        await super().start(private_key)
 
         self.pantheon.spawn(self.__get_tx_status_ws())
 
