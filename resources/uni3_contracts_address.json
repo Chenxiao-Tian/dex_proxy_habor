@@ -274,6 +274,78 @@
                     "0x4bbc34d5fb8ef42c65b1538c42dc95acea08bdcb",
                     "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5"
                 ]
+            },
+            {
+                "symbol": "GALA",
+                "address": "0xd1d2eb1b1e90b638588728b4130137d262c87cae",
+                "valid_withdrawal_addresses": [
+                    "0x095C494B3f81F010b97DD6f7aE3Fad73944e34e7",
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x5f64d9c81f5a30f4b29301401f96138792dc5f58",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x7d075840895353f4e58822d80d48e581349dccb4",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5",
+                    "0xC4c945CBC846A3cC43C1F2eAc555EE9d86A7fcd3",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0xFF0CEfDbd6bf757cc0CC361ddfBdE432186Ccaa6"
+                ]
+            },
+            {
+                "symbol": "GRT",
+                "address": "0xc944e90c64b2c07662a292be6244bdf05cda44a7",
+                "valid_withdrawal_addresses": [
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x5C2aB5dC71CED4d3A07F048dC9c068DfD4fC4D53",
+                    "0x5f64d9c81f5a30f4b29301401f96138792dc5f58",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x7d075840895353f4e58822d80d48e581349dccb4",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5",
+                    "0xC4c945CBC846A3cC43C1F2eAc555EE9d86A7fcd3",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6"
+                ]
+            },
+            {
+                "symbol": "LRC",
+                "address": "0xbbbbca6a901c926f240b89eacb641d8aec7aeafd",
+                "valid_withdrawal_addresses": [
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x5C2aB5dC71CED4d3A07F048dC9c068DfD4fC4D53",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x7d075840895353f4e58822d80d48e581349dccb4",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5",
+                    "0xC4c945CBC846A3cC43C1F2eAc555EE9d86A7fcd3",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6"
+                ]
+            },
+            {
+                "symbol": "SAND",
+                "address": "0x3845badAde8e6dFF049820680d1F14bD3903a5d0",
+                "valid_withdrawal_addresses": [
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x5C2aB5dC71CED4d3A07F048dC9c068DfD4fC4D53",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x7d075840895353f4e58822d80d48e581349dccb4",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5",
+                    "0xC4c945CBC846A3cC43C1F2eAc555EE9d86A7fcd3",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0xFF0CEfDbd6bf757cc0CC361ddfBdE432186Ccaa6"
+                ]
+            },
+            {
+                "symbol": "TRX",
+                "address": "0x50327c6c5a14DCaDE707ABad2E27eB517df87AB5",
+                "valid_withdrawal_addresses": [
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x5f64d9c81f5a30f4b29301401f96138792dc5f58"
+                ]
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
