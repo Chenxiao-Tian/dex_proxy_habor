@@ -114,7 +114,7 @@ class UniswapV3Bloxroute(DexCommon):
             order.nonce = nonce
             order.tx_hashes.append((tx_hash, RequestType.ORDER.name))
             order.used_gas_prices_wei.append(gas_price_wei)
-            order.targeted_block_num = next_block_num
+            order.dex_specific = {'targeted_block_num': next_block_num}
 
             self._transactions_status_poller.add_for_polling(
                 tx_hash, client_request_id, RequestType.ORDER)
@@ -178,7 +178,7 @@ class UniswapV3Bloxroute(DexCommon):
             tx_hash = Web3.to_hex(signed_tx.hash)
             self.__tx_hash_with_targeted_block.append(
                 (tx_hash, next_block_num))
-            wrap_unwrap.targeted_block_num = next_block_num
+            wrap_unwrap.dex_specific = {'targeted_block_num': next_block_num}
 
             await self._api.send_bundle(self.__txs_in_next_targeted_block, self.__next_targeted_block)
 
@@ -230,7 +230,7 @@ class UniswapV3Bloxroute(DexCommon):
             signed_tx.rawTransaction.hex()[2:])
         tx_hash = Web3.to_hex(signed_tx.hash)
         self.__tx_hash_with_targeted_block.append((tx_hash, next_block_num))
-        request.targeted_block_num = next_block_num
+        request.dex_specific = {'targeted_block_num': next_block_num}
 
         await self._api.send_bundle(self.__txs_in_next_targeted_block, self.__next_targeted_block)
 
@@ -258,7 +258,7 @@ class UniswapV3Bloxroute(DexCommon):
             tx_hash = Web3.to_hex(signed_tx.hash)
             self.__tx_hash_with_targeted_block.append(
                 (tx_hash, next_block_num))
-            request.targeted_block_num = next_block_num
+            request.dex_specific = {'targeted_block_num': next_block_num}
 
             await self._api.send_bundle(self.__txs_in_next_targeted_block, self.__next_targeted_block)
 
@@ -276,8 +276,9 @@ class UniswapV3Bloxroute(DexCommon):
 
     async def get_transaction_receipt(self, request, tx_hash):
         # add for finalization polling
-        if hasattr(request, 'targeted_block_num'):
-            self.__tx_hash_with_targeted_block.append((tx_hash, request.targeted_block_num))
+        if  'targeted_block_num' in request.dex_specific:
+            self.__tx_hash_with_targeted_block.append((tx_hash,
+                request.dex_specific['targeted_block_num']))
 
         return await self._api.get_transaction_receipt(tx_hash)
 
