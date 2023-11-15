@@ -29,6 +29,8 @@ class DexCommon(ABC):
 
         self._logger = logging.getLogger(config['name'])
 
+        self.started = False
+
         self._server = server
         self._event_sink = event_sink
 
@@ -50,6 +52,7 @@ class DexCommon(ABC):
         self._server.register('DELETE', '/private/cancel-all', self._cancel_all)
         self._server.register('GET', '/public/get-all-open-requests', self._get_all_open_requests)
         self._server.register('GET', '/public/get-request-status', self.__get_request_status)
+        self._server.register('GET', '/public/status', self.__get_status)
 
     @abstractmethod
     async def on_new_connection(self, ws):
@@ -114,6 +117,7 @@ class DexCommon(ABC):
     async def start(self, private_key):
         await self._transactions_status_poller.start()
         await self._request_cache.start(self._transactions_status_poller)
+        self.started = True
 
     def get_request(self, client_request_id) -> Optional[Request]:
         self._logger.debug(f'Getting request: client_request_id={client_request_id}')
@@ -146,6 +150,13 @@ class DexCommon(ABC):
         except Exception as e:
             self._logger.exception(f'Failed to get all open requests: %r', e)
             return 400, {'error': {'message': str(e)}}
+
+    async def __get_status(self, path, params, received_at_ms):
+        if self.started:
+            return 200, {"status": "ok"}
+        else:
+            return 503, {"status": "starting"}
+
 
     async def __cancel_request(self, path, params: dict, received_at_ms):
         try:
