@@ -347,6 +347,17 @@
                     "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
                     "0x5f64d9c81f5a30f4b29301401f96138792dc5f58"
                 ]
+            },
+            {
+                "symbol": "FLIP",
+                "address": "0x826180541412D574cf1336d22c0C0a287822678A",
+                "valid_withdrawal_addresses": [
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0xc72f6cc407b39437723fd2f5e9168a79d158a499"
+                ]
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
