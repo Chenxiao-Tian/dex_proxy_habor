@@ -70,14 +70,14 @@ class DexCommon(ABC):
         pass
 
     @abstractmethod
-    async def _approve(self, symbol, amount, gas_limit, gas_price_wei, nonce=None):
+    async def _approve(self, request, symbol, amount, gas_limit, gas_price_wei, nonce=None):
         """
         Initiates a transaction to allow a designated spender to use a certain amount of token.
         """
         pass
 
     @abstractmethod
-    async def _transfer(self, path, symbol, address_to, amount, gas_limit, gas_price_wei, nonce=None):
+    async def _transfer(self, request, path, symbol, address_to, amount, gas_limit, gas_price_wei, nonce=None):
         """
         Initiates a transaction to transfer a certain amount of token to a designated address.
         """
