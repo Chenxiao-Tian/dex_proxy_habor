@@ -1,11 +1,15 @@
-from abc import ABC, abstractmethod
-from typing import Optional
 import logging
+
+from abc import ABC, abstractmethod
+from collections import defaultdict
+from typing import Optional
+from web3 import Web3
 
 from pantheon import Pantheon
 
 from .requests_cache import RequestsCache
 from .transactions_status_poller import TransactionsStatusPoller
+from .whitelisting_manager import WhitelistingManager
 
 from pyutils.gas_pricing.eth import PriorityFee
 from pyutils.exchange_connectors import ConnectorFactory, ConnectorType
@@ -21,16 +25,17 @@ class DexCommon(ABC):
     Any dex specific logic should be handled in a subclass.
     """
 
-    def __init__(self, pantheon: Pantheon, connector_type: ConnectorType, config, server: 'WebServer', event_sink: 'DexProxy'):
+    def __init__(self, pantheon: Pantheon, connector_type: ConnectorType, config, server: "WebServer", event_sink: "DexProxy"):
         self.pantheon = pantheon
 
-        api_factory = ApiFactory(ConnectorFactory(config.get('connectors')))
+        api_factory = ApiFactory(ConnectorFactory(config.get("connectors")))
         self._api = api_factory.create(self.pantheon, connector_type)
 
         self._logger = logging.getLogger(config['name'])
 
         self.started = False
 
+        self._config = config
         self._server = server
         self._event_sink = event_sink
 
@@ -42,8 +47,15 @@ class DexCommon(ABC):
         else:
             self.__max_allowed_gas_price_wei = None
 
+        # from resources file
         # symbol -> list of whitelisted withdrawal addresses
-        self._withdrawal_address_whitelists = {}
+        # created a variable for this so that we don't have to read resources file again and again
+        self._withdrawal_address_whitelists_from_res_file = defaultdict(set)
+
+        # from resources file + fireblocks
+        # symbol -> list of whitelisted withdrawal addresses
+        # whitelisted addresses from fireblocks will be refreshed periodically
+        self._withdrawal_address_whitelists = defaultdict(set)
 
         self._server.register('POST', '/private/approve-token', self.__approve_token)
         self._server.register('POST', '/private/withdraw', self.transfer)
@@ -117,7 +129,12 @@ class DexCommon(ABC):
     async def start(self, private_key):
         await self._transactions_status_poller.start()
         await self._request_cache.start(self._transactions_status_poller)
-        self.started = True
+
+        if "fireblocks" in self._config:
+            self.__whitelist_manager = WhitelistingManager(self.pantheon, self, self._config)
+            await self.__whitelist_manager.start()
+        else:
+            self._withdrawal_address_whitelists = self._withdrawal_address_whitelists_from_res_file
 
     def get_request(self, client_request_id) -> Optional[Request]:
         self._logger.debug(f'Getting request: client_request_id={client_request_id}')
@@ -184,7 +201,8 @@ class DexCommon(ABC):
 
                 # replacement transaction should have gas_price at least greater than 10% of the last gas_price used otherwise
                 # 'replacement transaction underpriced' error will occur. https://ethereum.stackexchange.com/a/44875
-                gas_price_wei = max(gas_price_wei, int(1.1 * request.used_gas_prices_wei[-1]))
+                if (len(request.used_gas_prices_wei) > 0):
+                    gas_price_wei = max(gas_price_wei, int(1.1 * request.used_gas_prices_wei[-1]))
 
             ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
             if not ok:
@@ -237,7 +255,8 @@ class DexCommon(ABC):
                         cancel_requested.append(request.client_request_id)
                         continue
 
-                    gas_price_wei = max(gas_price_wei, int(1.1 * request.used_gas_prices_wei[-1]))
+                    if (len(request.used_gas_prices_wei) > 0):
+                        gas_price_wei = max(gas_price_wei, int(1.1 * request.used_gas_prices_wei[-1]))
 
                     ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
                     if not ok:
@@ -406,7 +425,7 @@ class DexCommon(ABC):
             return False, f'Unknown token={symbol}'
 
         assert address_to is not None
-        if address_to not in self._withdrawal_address_whitelists[symbol]:
+        if Web3.to_checksum_address(address_to) not in self._withdrawal_address_whitelists[symbol]:
             self._logger.error(
                 f'HIGH ALERT: client_request_id={client_request_id} tried to withdraw token={symbol} '
                 f'to unknown address={address_to}')
@@ -419,3 +438,13 @@ class DexCommon(ABC):
             return False, f'gas_price_wei={gas_price_wei} is greater than max_allowed_gas_price_wei' \
                           f'={self.__max_allowed_gas_price_wei}'
         return True, ''
+
+    # If a dex needs fireblocks tokens whitelist then that dex should override this method
+    # tokens_from_fireblocks : token_symbol -> (fireblocks_token_id, token_address)
+    def _on_fireblocks_tokens_whitelist_refresh(self, tokens_from_fireblocks: dict):
+        return
+
+    def _on_fireblocks_withdrawal_whitelist_refresh(self, fireblocks_withdrawal_address_whitelist: defaultdict(set)):
+        self._withdrawal_address_whitelists = self._withdrawal_address_whitelists_from_res_file.copy()
+        for symbol in fireblocks_withdrawal_address_whitelist:
+            self._withdrawal_address_whitelists[symbol].update(fireblocks_withdrawal_address_whitelist[symbol])

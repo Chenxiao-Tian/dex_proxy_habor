@@ -14,7 +14,6 @@ from pyutils.gas_pricing.eth import GasPriceTracker, PriorityFee
 
 from ..dex_common import DexCommon
 
-
 class Dexalot(DexCommon):
     CHANNELS = ['ORDER', 'TRADE']
 
@@ -339,11 +338,12 @@ class Dexalot(DexCommon):
 
             for token in mainnet_whitelists['tokens']:
                 symbol = token["symbol"]
-                if symbol in self._withdrawal_address_whitelists:
+                if symbol in self._withdrawal_address_whitelists_from_res_file:
                     raise RuntimeError(f'Duplicate token {symbol} in contracts address file')
 
                 if "valid_withdrawal_addresses" in token:
-                    self._withdrawal_address_whitelists[symbol] = token["valid_withdrawal_addresses"]
+                    for withdrawal_address in token["valid_withdrawal_addresses"]:
+                        self._withdrawal_address_whitelists_from_res_file[symbol].add(Web3.to_checksum_address(withdrawal_address))
 
                 if "address" in token:
                     address = token["address"]
@@ -357,6 +357,8 @@ class Dexalot(DexCommon):
                 self._api.subnet.whitelist_exchange_contract(deployment_type, address)
 
         self.pantheon.spawn(self.__connect_to_exchange())
+
+        self.started = True
 
     async def __connect_to_exchange(self):
         self._logger.debug('Connecting to exchange')

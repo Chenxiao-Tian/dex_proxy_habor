@@ -442,8 +442,8 @@ class UniswapV3Bloxroute(DexCommon):
                     f'Error in polling for finalising txs missing targeted block: %r', e)
 
     def __get_blx_authorisation_header(self) -> str:
-        if 'blx_authorisation_header' in self.__config:
-            return self.__config['blx_authorisation_header']
+        if 'blx_authorisation_header' in self._config:
+            return self._config['blx_authorisation_header']
         else:
             session = boto3.Session()
             client = session.client(service_name='secretsmanager', region_name='ap-southeast-1')
@@ -479,21 +479,21 @@ class UniswapV3Bloxroute(DexCommon):
                 self.__chain_name]
 
             tokens_list_json = contracts_address_json["tokens"]
-            tokens_list = []
+            self.__tokens_from_res_file = {}
             for token_json in tokens_list_json:
                 symbol = token_json["symbol"]
-                if symbol in self._withdrawal_address_whitelists:
+                if symbol in self._withdrawal_address_whitelists_from_res_file:
                     raise RuntimeError(
                         f'Duplicate token : {symbol} in contracts_address file')
-                self._withdrawal_address_whitelists[symbol] = token_json["valid_withdrawal_addresses"]
+                for withdrawal_address in token_json["valid_withdrawal_addresses"]:
+                    self._withdrawal_address_whitelists_from_res_file[symbol].add(Web3.to_checksum_address(withdrawal_address))
 
                 if symbol != self.__native_token:
-                    tokens_list.append(ERC20Token(
-                        token_json["symbol"], Web3.to_checksum_address(token_json["address"])))
+                    self.__tokens_from_res_file[symbol] = ERC20Token(token_json["symbol"], Web3.to_checksum_address(token_json["address"]))
 
             uniswap_router_address = contracts_address_json["uniswap_router_address"]
 
-        await self._api.initialize(private_key, uniswap_router_address, tokens_list)
+        await self._api.initialize(private_key, uniswap_router_address, self.__tokens_from_res_file.values())
 
         await super().start(private_key)
 
@@ -503,3 +503,21 @@ class UniswapV3Bloxroute(DexCommon):
         await self._api.initialise_and_maintain_blx_mev_ws(blx_authorisation_header)
 
         self.pantheon.spawn(self.__finalise_missed_txs())
+
+        self.started = True
+
+    def _on_fireblocks_tokens_whitelist_refresh(self, tokens_from_fireblocks: dict):
+        if self.started == False:
+            return
+
+        for symbol, (_, address) in tokens_from_fireblocks.items():
+            address = Web3.to_checksum_address(address)
+            if symbol in self.__tokens_from_res_file:
+                if address != self.__tokens_from_res_file[symbol].address:
+                    self._logger.error(f'Symbol={symbol} address did not match: Fireblocks: {address} Resources File: {self.__tokens_from_res_file[symbol].address}')
+                continue
+
+            try:
+                self._api._add_or_update_erc20_contract(symbol, Web3.to_checksum_address(address))
+            except Exception as ex:
+                self._logger.exception(f'Error in adding or updating ERC20 token (symbol={symbol}, address={address}): %r', ex)

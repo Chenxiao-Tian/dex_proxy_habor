@@ -52,30 +52,47 @@
             }
         ]
     },
-    "RabbitMQ": {
-        "url": "amqp://dev-sng-rmq.kdev"
-    },
     "Redis": {
-        "host": "localhost",
+        "host": "dev-sng-red0.kdev",
         "port": 6379
+    },
+    "RabbitMQ": {
+        "url": "amqp://dev-ore-rmq.kdev"
     },
     "server": {
         "port": 1958
     },
-    "key_store_file_path": "./dexes/uniswap_v3/test/wallet.json",
+    "key_store_file_path": "./dexes/lyra/test/wallet.json",
     "dex": {
-        "name": "chainEth-uni3-blx",
-        "exchange_name": "chainEth-uni3",
-        "chain_name": "Ethereum Mainnet For Testing",
-        "native_token": "ETH",
-        "blx_authorisation_header": "OGUyNDY1YzUtNjYyNC00Yjc3LWEyY2UtODU0MDExN2RmYTA2OjRjMzUxOGI2ZjE4ODQwMWQ0YzYwOTEyZjAxOGQ0YzI4",
+        "name": "lyra",
+        "chain_name": "Ethereum Sepolia Testnet",
+        "max_signature_generators": 2,
         "connectors": {
-            "uniswap_v3": {
-                "web3": {
-                    "http": "https://mainnet.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170"
+            "lyra": {
+                "credentials": {
+                    "wallet_address": "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB"
+                },
+                "rest": {
+                    "base_uri": "https://api-demo.lyra.finance",
+                    "api_path": "",
+                    "request_timeout": 60,
+                    "rate_limits": {
+                        "limits": [
+                            {
+                                "key": "api-demo.lyra.finance",
+                                "interval": 60,
+                                "limit": 100
+                            }
+                        ]
+                    }
                 },
                 "websocket": {
-                    "base_uri": "wss://eth-mainnet.g.alchemy.com/v2/qYOcvHNenpMYrDCfgpS-sg75t2ouBmnY"
+                    "base_uri": "wss://api-demo.lyra.finance",
+                    "api_path": "/ws"
+                },
+                "web3": {
+                    "l1_http": "https://sepolia.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
+                    "l2_http": "https://l2-prod-testnet-0eakp60405.t.conduit.xyz"
                 }
             },
             "fireblocks": {
@@ -100,14 +117,13 @@
             }
         },
         "gas_price_tracker": {
-            "http_url": "https://mainnet.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
-            "ws_url": "wss://mainnet.infura.io/ws/v3/d3bf8a4fe2744587bf47459446b7f170",
+            "http_url": "https://sepolia.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
+            "ws_url": "wss://sepolia.infura.io/ws/v3/d3bf8a4fe2744587bf47459446b7f170",
             "use_fee_history": true,
             "percentile_priority_fee_fast": 10,
             "percentile_priority_fee_med": 5,
             "percentile_priority_fee_slow": 2
         },
-        "max_allowed_gas_price_gwei": 500,
         "request_cache": {
             "finalised_requests_cleanup_after_s": 600
         },

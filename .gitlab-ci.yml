@@ -63,6 +63,14 @@ default:
     CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
   - PROCESS_NAME: dex_proxy-pdex-testnet
     CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-dev.git
+  - PROCESS_NAME: dex_proxy-lyra-testnet
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-dev.git
+  - PROCESS_NAME: dex_proxy-lyra-1
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
+  - PROCESS_NAME: dex_proxy-lyra-2
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
+  - PROCESS_NAME: dex_proxy-lyra-3
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
 
 
 build:
