@@ -44,7 +44,6 @@ class Paradex(DexCommon):
         self.__jwt: Optional[JWT] = None
 
         self.__chain_name = config['chain_name']
-        self.__native_token = config['native_token']
 
         self.__gas_price_tracker = GasPriceTracker(pantheon, config['gas_price_tracker'])
 
@@ -79,6 +78,8 @@ class Paradex(DexCommon):
         self.__pdex_account = PdexAccount(eth_private_key, self.__pdex_config)
         await self.__pdex_account.onboard_account(self.__pdex_config, self.__exchange_url_prefix)
 
+        self.__load_whitelist()
+
         await self._api.initialize(
             private_key_or_mnemonic=eth_private_key,
             paradex_account_address=self.__pdex_account.address,
@@ -86,8 +87,6 @@ class Paradex(DexCommon):
         )
 
         await super().start(eth_private_key)
-
-        self.__load_whitelist()
 
         await self.__gas_price_tracker.start()
         await self.__gas_price_tracker.wait_gas_price_ready()
@@ -100,6 +99,8 @@ class Paradex(DexCommon):
         max_nonce_cached = self._request_cache.get_max_nonce()
         self._api.initialize_starting_nonce(max_nonce_cached + 1)
 
+        self.started = True
+
     def __load_whitelist(self):
         file_prefix = os.path.dirname(os.path.realpath(__file__))
         addresses_whitelists_file_path = f'{file_prefix}/../../resources/pdex_contracts_address.json'
@@ -108,16 +109,12 @@ class Paradex(DexCommon):
             contracts_address_json = json.load(contracts_address_file)[self.__chain_name]
 
             tokens_list_json = contracts_address_json["tokens"]
-            tokens_list = []
             for token_json in tokens_list_json:
                 symbol = token_json["symbol"]
-                if symbol in self._withdrawal_address_whitelists:
+                if symbol in self._withdrawal_address_whitelists_from_res_file:
                     raise RuntimeError(f'Duplicate token : {symbol} in contracts_address file')
-                self._withdrawal_address_whitelists[symbol] = token_json["valid_withdrawal_addresses"]
-
-                if symbol != self.__native_token:
-                    tokens_list.append(ERC20Token(
-                        token_json["symbol"], Web3.to_checksum_address(token_json["address"])))
+                for withdrawal_address in token_json["valid_withdrawal_addresses"]:
+                    self._withdrawal_address_whitelists_from_res_file[symbol].add(Web3.to_checksum_address(withdrawal_address))
 
     async def __get_jwt(self, *_) -> Tuple[int, dict]:
         # Periodicaly query the exchange for a new jwt token.
@@ -318,7 +315,7 @@ class Paradex(DexCommon):
         if self.__is_l2_request(request):
             raise Exception("Cancelling L2 transactions is not supported")
 
-        if request.request_type == RequestType.ORDER or request.request_type == RequestType.TRANSFER or request.request_type == RequestType.APPROVE:
+        if request.request_type == RequestType.TRANSFER or request.request_type == RequestType.APPROVE:
             return await self._api.cancel_transaction(request.nonce, gas_price_wei)
         else:
             raise Exception(f"Cancelling not supported for the {request.request_type}")
@@ -403,7 +400,6 @@ class Paradex(DexCommon):
         except Exception as e:
             self._logger.exception(f'Failed to cancel all: %r', e)
             return 400, {'error': {'message': str(e)}}
-        raise NotImplementedError('Method not implemented')
 
     async def __deposit_into_l2(
         self,

@@ -11,19 +11,18 @@ def run(*cmd):
     return p.stdout.read().decode().rstrip()
 
 
-tag = run('git', 'for-each-ref', '--format=%(refname:short)',
-          '--sort=-authordate', '--count=1', 'refs/tags')
-rev = run('git', 'rev-parse', '--short=8', 'HEAD')
+tag = run("git", "for-each-ref", "--format=%(refname:short)", "--sort=-authordate", "--count=1", "refs/tags")
+rev = run("git", "rev-parse", "--short=8", "HEAD")
 
 setuptools.setup(
-    name='dex_proxy',
-    version=f'{tag}+{rev}',
+    name="dex_proxy",
+    version=f"{tag}+{rev}",
     py_modules=[],
     install_requires=[
-        'boto3==1.26.55',
-        'eth-account==0.8.0',
-        'ujson==5.7.0',
-        'pantheon @ git+ssh://git@bitbucket.org/kenetic/pytheon.git@pytheon-1.2.27',
-        'pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@pyutils-1.9.13'
-    ]
+        "boto3==1.26.55",
+        "eth-account==0.8.0",
+        "ujson==5.7.0",
+        "pantheon @ git+ssh://git@bitbucket.org/kenetic/pytheon.git@pytheon-1.2.35",
+        "pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@e1058c74b286909ec15e1a20ed2d4ce88811bb59",
+    ],
 )
