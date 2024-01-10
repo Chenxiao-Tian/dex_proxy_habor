@@ -187,6 +187,9 @@ class Lyra(DexCommon):
 
         self.order_req_id = 0
 
+        self.__bidding_wallet_whitelist = []
+        self.__bidding_subaccount_whitelist = []
+
     def __register_endpoints(self, server: WebServer) -> None:
         server.register("POST", "/private/create-account", self.__create_account)
         server.register("POST", "/private/create-subaccount", self.__create_subaccount)
@@ -212,6 +215,10 @@ class Lyra(DexCommon):
         server.register("POST", "/private/withdraw-from-l2", self.__withdraw_from_l2)
 
         server.register("GET", "/private/get-l2-balance", self.__get_l2_balance)
+
+        server.register("POST", "/private/transfer-position", self.__transfer_position)
+        server.register("POST", "/private/request-eject-subaccount-from-trading", self.__request_eject_subaccount_from_trading)
+        server.register("POST", "/private/transfer-bidding-subaccount-ownership", self.__transfer_bidding_subaccount_ownership)
 
     async def start(self, eth_private_key: str):
         bridge_details = self.__load_whitelist()
@@ -254,6 +261,14 @@ class Lyra(DexCommon):
                     raise RuntimeError(f"Duplicate token : {symbol} in contracts_address file")
                 for withdrawal_address in token_json["valid_withdrawal_addresses"]:
                     self._withdrawal_address_whitelists_from_res_file[symbol].add(Web3.to_checksum_address(withdrawal_address))
+
+            whitelisted_bidding_wallets_json = contracts_address_json["whitelisted_bidding_wallets"]
+            for address in whitelisted_bidding_wallets_json:
+                self.__bidding_wallet_whitelist.append(address)
+
+            whitelisted_bidding_subaccount_ids_json = contracts_address_json["whitelisted_bidding_subaccount_ids"]
+            for subaccount_id in whitelisted_bidding_subaccount_ids_json:
+                self.__bidding_subaccount_whitelist.append(subaccount_id)
 
             return contracts_address_json["bridge_details"]
 
@@ -890,6 +905,125 @@ class Lyra(DexCommon):
             symbol = params["symbol"]
             balance = await self._api.get_l2_wallet_balance(symbol)
             return 200, {"balance": str(balance)}
+        except Exception as e:
+            return 400, {"error": {"message": repr(e)}}
+
+    def __get_lyra_api_nonce(self) -> int:
+        random_suffix = int(random.random() * 999)
+        start_ms = int(time.time() * 1000)
+        return int(f"{start_ms}{random_suffix}")
+
+    async def __build_order_dict_for_position_transfer(self, instrument_name: str, subaccount_id: int, direction: str,
+                                                       limit_price: str, amount: str, max_fee: str,
+                                                       asset_address: str, asset_sub_id: str) -> dict:
+        nonce = self.__get_lyra_api_nonce()
+        signature_expiry = int(time.time()) + 600
+
+        req_id = self.order_req_id
+        self.order_req_id += 1
+
+        order = Order(
+            req_id,
+            int(Decimal(limit_price) * int(1e18)),
+            int(Decimal(amount) * int(1e18)),
+            int(Decimal(max_fee) * int(1e18)),
+            int(subaccount_id),
+            direction == "buy",
+            nonce,
+            signature_expiry,
+            asset_address,
+            int(asset_sub_id),
+        )
+
+        signature = await self.pantheon.loop.run_in_executor(
+            self.__process_pool, generate_order_signature, self.signing_data, order
+        )
+
+        return {
+            'instrument_name': instrument_name,
+            'direction': direction,
+            'amount': amount,
+            'limit_price': limit_price,
+            'max_fee': max_fee,
+            'nonce': nonce,
+            'signature': signature,
+            'signature_expiry_sec': signature_expiry,
+            'signer': self._api.l2_api._wallet_address,
+            'subaccount_id': subaccount_id,
+        }
+
+    '''
+    Transferring a position means closing that position in the source account
+    and opening the same position in the dest account. For example
+
+    - Transferring a short -0.5 BTC-PERP position from A to B means
+      buying 0.5 BTC-PERP in A and selling 0.5 BTC-PERP in B
+    - Transferring a long 0.4 ETH-PERP position from A to B means
+      selling 0.4 ETH-PERP in A and buying 0.4 ETH-PERP in B
+    '''
+    async def __transfer_position(self, path: str, params: dict, received_at_ms: int) -> Tuple[int, dict]:
+        try:
+            amount = params["amount"]
+            max_fee = '0'
+            limit_price = '1' # Anything > 0  will do herre I think
+
+            amount_in_decimal = Decimal(amount)
+            maker_direction = "buy" if amount_in_decimal < 0 else "sell"
+            taker_direction = "buy" if maker_direction == "sell" else "sell"
+
+            amount = str(abs(amount_in_decimal))
+
+            maker_order = await self.__build_order_dict_for_position_transfer(params["instrument_name"],
+                                                                              params["from_subaccount_id"],
+                                                                              maker_direction,
+                                                                              limit_price,
+                                                                              amount,
+                                                                              max_fee,
+                                                                              params["asset_address"],
+                                                                              params["asset_sub_id"])
+
+            taker_order = await self.__build_order_dict_for_position_transfer(params["instrument_name"],
+                                                                              params["to_subaccount_id"],
+                                                                              taker_direction,
+                                                                              limit_price,
+                                                                              amount,
+                                                                              max_fee,
+                                                                              params["asset_address"],
+                                                                              params["asset_sub_id"])
+
+            response = await self._api.l2_api.transfer_position(maker_order, taker_order)
+
+            return 200, {"transfer-position": str(response)}
+        except Exception as e:
+            return 400, {"error": {"message": repr(e)}}
+
+    async def __request_eject_subaccount_from_trading(self, path: str, params: dict, received_at_ms: int) -> Tuple[int, dict]:
+        try:
+            subaccount_id = params["subaccount_id"]
+            result = await self._api.l2_api.request_withdraw_subaccount(subaccount_id)
+            if result.error_type == ErrorType.NO_ERROR:
+                return 200, {"tx_hash": result.tx_hash}
+            else:
+                return 400, {"error": {"code": result.error_type.value, "message": result.error_message}}
+        except Exception as e:
+            return 400, {"error": {"message": repr(e)}}
+
+    async def __transfer_bidding_subaccount_ownership(self, path: str, params: dict, received_at_ms: int) -> Tuple[int, dict]:
+        try:
+            subaccount_id = params["subaccount_id"]
+            to_wallet = params["to_wallet"]
+
+            if subaccount_id not in self.__bidding_subaccount_whitelist:
+                return 400, {"error": {"message": "subaccount id not whitelisted for withdrawal"}}
+
+            if to_wallet not in self.__bidding_wallet_whitelist:
+                return 400, {"error": {"message": "wallet address not whitelisted for withdrawal"}}
+
+            result = await self._api.l2_api.transfer_ownership_of_subaccount(self._api.l2_api._wallet_address, to_wallet, subaccount_id)
+            if result.error_type == ErrorType.NO_ERROR:
+                return 200, {"tx_hash": result.tx_hash}
+            else:
+                return 400, {"error": {"code": result.error_type.value, "message": result.error_message}}
         except Exception as e:
             return 400, {"error": {"message": repr(e)}}
 
