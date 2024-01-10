@@ -1,6 +1,7 @@
 {
     "Ethereum Mainnet": {
         "bridge_details": {
+            "matching_address": "0xeB8d770ec18DB98Db922E9D83260A585b9F0DeAD",
             "cash_address": "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
             "deposit_module_address": "0x9B3FE5E5a3bcEa5df4E08c41Ce89C4e3Ff01Ace3",
             "withdraw_module_address": "0x9d0E8f5b25384C7310CB8C6aE32C8fbeb645d083",
@@ -74,6 +75,7 @@
     },
     "Ethereum Sepolia Testnet": {
         "bridge_details": {
+            "matching_address": "0x3cc154e220c2197c5337b7Bd13363DD127Bc0C6E",
             "cash_address": "0x6caf294DaC985ff653d5aE75b4FF8E0A66025928",
             "deposit_module_address": "0x43223Db33AdA0575D2E100829543f8B04A37a1ec",
             "withdraw_module_address": "0xe850641C5207dc5E9423fB15f89ae6031A05fd92",
@@ -117,6 +119,12 @@
                     "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
                 ]
             }
+        ],
+        "whitelisted_bidding_wallets": [
+            "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+        ],
+        "whitelisted_bidding_subaccount_ids": [
+            25418
         ]
     },
     "Ethereum Goerli Testnet": {
