@@ -69,7 +69,9 @@
                     "0xE49b5c875E13a349ef9F106553210ba71eD461A9"
                 ]
             }
-        ]
+        ],
+        "whitelisted_bidding_wallets": [],
+        "whitelisted_bidding_subaccount_ids": []
     },
     "Ethereum Sepolia Testnet": {
         "bridge_details": {
@@ -169,6 +171,8 @@
                     "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
                 ]
             }
-        ]
+        ],
+        "whitelisted_bidding_wallets": [],
+        "whitelisted_bidding_subaccount_ids": []
     }
 }
