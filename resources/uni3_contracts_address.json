@@ -625,6 +625,11 @@
                     "0xe71cab44917bf40b072b47138a76006558cb29c6",
                     "0xFF0CEfDbd6bf757cc0CC361ddfBdE432186Ccaa6"
                 ]
+            },
+            {
+                "symbol": "FORTH",
+                "address": "0x77FbA179C79De5B7653F68b5039Af940AdA60ce0",
+                "valid_withdrawal_addresses": []
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
