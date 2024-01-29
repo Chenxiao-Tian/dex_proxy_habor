@@ -54,10 +54,10 @@ class RequestsCache:
     def get(self, client_request_id: str) -> Optional[Request]:
         return self.__requests.get(client_request_id, None)
 
-    def get_all(self, request_type: RequestType) -> List[Request]:
+    def get_all(self, request_type: RequestType = None) -> List[Request]:
         requests_list = []
         for request in self.__requests.values():
-            if not request.is_finalised() and request.request_type == request_type:
+            if (not request.is_finalised()) and (request_type == None or request.request_type == request_type):
                 requests_list.append(request)
         return requests_list
 
