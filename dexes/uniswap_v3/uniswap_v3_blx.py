@@ -1,11 +1,11 @@
 import asyncio
+import boto3
 import base64
 import json
 import os
 import time
-import boto3
+import uuid
 
-from collections import deque
 from decimal import Decimal
 from hexbytes import HexBytes
 
@@ -35,14 +35,18 @@ class UniswapV3Bloxroute(DexCommon):
             'POST', '/private/wrap-unwrap-eth', self.__wrap_unwrap_eth)
 
         self.__instruments = None
-        self.__config = config
         self.__exchange_name = config['exchange_name']
         self.__chain_name = config['chain_name']
         self.__native_token = config['native_token']
 
-        self.__next_targeted_block = 0
-        self.__txs_in_next_targeted_block = []
-        self.__tx_hash_with_targeted_block = deque()
+        self.__targeted_block = 0
+        self.__targeted_block_uuid: str = None
+        self.__bundles_sent_for_targeted_block = 0
+
+        self.__max_bundles_per_block = self._config['max_bundles_per_block']
+
+        self.__raw_txs_in_targeted_block = []
+        self.__order_client_requ_id_vs_raw_txs = {}
 
     async def __insert_order(self, path, params: dict, received_at_ms):
         client_request_id = ''
@@ -74,23 +78,17 @@ class UniswapV3Bloxroute(DexCommon):
                 f'Inserting={order}, gas_price_wei={gas_price_wei}')
             self._request_cache.add(order)
 
-            ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
+            next_block_num, next_block_uuid = await self.__update_and_get_next_block_num()
+
+            ok, reason = self.__validate_can_send_via_blx(gas_price_wei)
             if not ok:
                 self._request_cache.finalise_request(
                     client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'message': reason}}
 
-            if not self._api.is_blx_mev_ws_ready():
-                self._request_cache.finalise_request(
-                    client_request_id, RequestStatus.FAILED)
-                return 400, {'error': {'message': 'Bloxroute mev WS not ready'}}
+            self.__bundles_sent_for_targeted_block += 1
 
-            next_block_num = (await self._api.get_current_block_num()) + 1
-            if (next_block_num > self.__next_targeted_block):
-                self.__next_targeted_block = next_block_num
-                self.__txs_in_next_targeted_block = []
-
-            nonce = await self._api.get_total_txs_so_far() + len(self.__txs_in_next_targeted_block)
+            nonce = await self._api.get_total_txs_so_far() + len(self.__raw_txs_in_targeted_block)
 
             if side == Side.BUY:
                 built_tx = self._api.build_swap_exact_output_single_tx(
@@ -102,31 +100,28 @@ class UniswapV3Bloxroute(DexCommon):
                     gas_limit, gas_price_wei, nonce)
 
             signed_tx = self._api.sign_tx(built_tx)
-            self.__txs_in_next_targeted_block.append(
-                signed_tx.rawTransaction.hex()[2:])
+            raw_tx = signed_tx.rawTransaction.hex()[2:]
+            self.__raw_txs_in_targeted_block.append(raw_tx)
+            self.__order_client_requ_id_vs_raw_txs[client_request_id] = raw_tx
+
             tx_hash = Web3.to_hex(signed_tx.hash)
-            self.__tx_hash_with_targeted_block.append(
-                (tx_hash, next_block_num))
-
-            await self._api.send_bundle(self.__txs_in_next_targeted_block, self.__next_targeted_block)
-
             order.order_id = tx_hash
             order.nonce = nonce
             order.tx_hashes.append((tx_hash, RequestType.ORDER.name))
             order.used_gas_prices_wei.append(gas_price_wei)
-            order.dex_specific = {'targeted_block_num': next_block_num}
+            order.dex_specific = {'targeted_block_num': next_block_num, 'uuid': next_block_uuid}
 
-            self._transactions_status_poller.add_for_polling(
-                tx_hash, client_request_id, RequestType.ORDER)
-            self._request_cache.add_or_update_request_in_redis(
-                client_request_id)
+            self._transactions_status_poller.add_for_polling(tx_hash, client_request_id, RequestType.ORDER)
+
+            await self._api.send_bundle(self.__raw_txs_in_targeted_block, next_block_num, next_block_uuid)
+
+            self._request_cache.add_or_update_request_in_redis(client_request_id)
 
             return 200, {'result': {'order_id': tx_hash, 'nonce': nonce}}
 
         except Exception as e:
             self._logger.exception(f'Failed to insert order: %r', e)
-            self._request_cache.finalise_request(
-                client_request_id, RequestStatus.FAILED)
+            self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': repr(e)}}
 
     async def __wrap_unwrap_eth(self, path, params: dict, received_at_ms):
@@ -149,23 +144,17 @@ class UniswapV3Bloxroute(DexCommon):
                 f'{"Wrapping" if wrap_unwrap.request == "wrap" else "Unwrapping"}={wrap_unwrap}, gas_price_wei={gas_price_wei}')
             self._request_cache.add(wrap_unwrap)
 
-            ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
+            next_block_num, next_block_uuid = await self.__update_and_get_next_block_num()
+
+            ok, reason = self.__validate_can_send_via_blx(gas_price_wei)
             if not ok:
                 self._request_cache.finalise_request(
                     client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'message': reason}}
 
-            if not self._api.is_blx_mev_ws_ready():
-                self._request_cache.finalise_request(
-                    client_request_id, RequestStatus.FAILED)
-                return 400, {'error': {'message': 'Bloxroute mev WS not ready'}}
+            self.__bundles_sent_for_targeted_block += 1
 
-            next_block_num = (await self._api.get_current_block_num()) + 1
-            if (next_block_num > self.__next_targeted_block):
-                self.__next_targeted_block = next_block_num
-                self.__txs_in_next_targeted_block = []
-
-            nonce = await self._api.get_total_txs_so_far() + len(self.__txs_in_next_targeted_block)
+            nonce = await self._api.get_total_txs_so_far() + len(self.__raw_txs_in_targeted_block)
 
             if wrap_unwrap.request == 'wrap':
                 built_tx = self._api.build_wrap_tx('WETH', amount, gas_limit, gas_price_wei, nonce)
@@ -173,23 +162,18 @@ class UniswapV3Bloxroute(DexCommon):
                 built_tx = self._api.build_unwrap_tx('WETH', amount, gas_limit, gas_price_wei, nonce)
             signed_tx = self._api.sign_tx(built_tx)
 
-            self.__txs_in_next_targeted_block.append(
-                signed_tx.rawTransaction.hex()[2:])
+            self.__raw_txs_in_targeted_block.append(signed_tx.rawTransaction.hex()[2:])
             tx_hash = Web3.to_hex(signed_tx.hash)
-            self.__tx_hash_with_targeted_block.append(
-                (tx_hash, next_block_num))
-            wrap_unwrap.dex_specific = {'targeted_block_num': next_block_num}
-
-            await self._api.send_bundle(self.__txs_in_next_targeted_block, self.__next_targeted_block)
-
             wrap_unwrap.nonce = nonce
             wrap_unwrap.tx_hashes.append((tx_hash, RequestType.WRAP_UNWRAP.name))
             wrap_unwrap.used_gas_prices_wei.append(gas_price_wei)
+            wrap_unwrap.dex_specific = {'targeted_block_num': next_block_num, 'uuid': next_block_uuid}
 
-            self._transactions_status_poller.add_for_polling(
-                tx_hash, client_request_id, RequestType.WRAP_UNWRAP)
-            self._request_cache.add_or_update_request_in_redis(
-                client_request_id)
+            self._transactions_status_poller.add_for_polling(tx_hash, client_request_id, RequestType.WRAP_UNWRAP)
+
+            await self._api.send_bundle(self.__raw_txs_in_targeted_block, next_block_num, next_block_uuid)
+
+            self._request_cache.add_or_update_request_in_redis(client_request_id)
 
             return 200, {'tx_hash': tx_hash}
 
@@ -213,26 +197,23 @@ class UniswapV3Bloxroute(DexCommon):
         return False
 
     async def _approve(self, request, symbol, amount, gas_limit, gas_price_wei, nonce=None):
-        if not self._api.is_blx_mev_ws_ready():
-            return ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message='Bloxroute mev WS not ready')
+        next_block_num, next_block_uuid = await self.__update_and_get_next_block_num()
 
-        next_block_num = (await self._api.get_current_block_num()) + 1
-        if (next_block_num > self.__next_targeted_block):
-            self.__next_targeted_block = next_block_num
-            self.__txs_in_next_targeted_block = []
+        ok, reason = self.__validate_can_send_via_blx(gas_price_wei)
+        if not ok:
+            return ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message=reason)
 
-        nonce = await self._api.get_total_txs_so_far() + len(self.__txs_in_next_targeted_block)
+        self.__bundles_sent_for_targeted_block += 1
 
-        built_tx = self._api.build_approve_tx(
-            symbol, amount, gas_limit, gas_price_wei, nonce)
+        nonce = await self._api.get_total_txs_so_far() + len(self.__raw_txs_in_targeted_block)
+
+        built_tx = self._api.build_approve_tx(symbol, amount, gas_limit, gas_price_wei, nonce)
         signed_tx = self._api.sign_tx(built_tx)
-        self.__txs_in_next_targeted_block.append(
-            signed_tx.rawTransaction.hex()[2:])
+        self.__raw_txs_in_targeted_block.append(signed_tx.rawTransaction.hex()[2:])
         tx_hash = Web3.to_hex(signed_tx.hash)
-        self.__tx_hash_with_targeted_block.append((tx_hash, next_block_num))
-        request.dex_specific = {'targeted_block_num': next_block_num}
+        request.dex_specific = {'targeted_block_num': next_block_num, 'uuid': next_block_uuid}
 
-        await self._api.send_bundle(self.__txs_in_next_targeted_block, self.__next_targeted_block)
+        await self._api.send_bundle(self.__raw_txs_in_targeted_block, next_block_num, next_block_uuid)
 
         return ApiResult(nonce, tx_hash)
 
@@ -240,46 +221,98 @@ class UniswapV3Bloxroute(DexCommon):
         if path == '/private/withdraw':
             assert address_to is not None
 
-            if not self._api.is_blx_mev_ws_ready():
-                return ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message='Bloxroute mev WS not ready')
+            next_block_num, next_block_uuid = await self.__update_and_get_next_block_num()
 
-            next_block_num = (await self._api.get_current_block_num()) + 1
-            if (next_block_num > self.__next_targeted_block):
-                self.__next_targeted_block = next_block_num
-                self.__txs_in_next_targeted_block = []
+            ok, reason = self.__validate_can_send_via_blx(gas_price_wei)
+            if not ok:
+                return ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message=reason)
 
-            nonce = await self._api.get_total_txs_so_far() + len(self.__txs_in_next_targeted_block)
+            self.__bundles_sent_for_targeted_block += 1
+
+            nonce = await self._api.get_total_txs_so_far() + len(self.__raw_txs_in_targeted_block)
 
             built_tx = self._api.build_withdraw_tx(
                 symbol, address_to, amount, gas_limit, gas_price_wei, nonce)
             signed_tx = self._api.sign_tx(built_tx)
-            self.__txs_in_next_targeted_block.append(
+            self.__raw_txs_in_targeted_block.append(
                 signed_tx.rawTransaction.hex()[2:])
             tx_hash = Web3.to_hex(signed_tx.hash)
-            self.__tx_hash_with_targeted_block.append(
-                (tx_hash, next_block_num))
-            request.dex_specific = {'targeted_block_num': next_block_num}
+            request.dex_specific = {'targeted_block_num': next_block_num, 'uuid': next_block_uuid}
 
-            await self._api.send_bundle(self.__txs_in_next_targeted_block, self.__next_targeted_block)
+            await self._api.send_bundle(self.__raw_txs_in_targeted_block, next_block_num, next_block_uuid)
 
             return ApiResult(nonce, tx_hash)
         else:
             assert False
 
-    async def _amend_transaction(self, request, params, gas_price_wei):
-        raise Exception(
-            'Amend request not supported by uni3 dex-proxy with Bloxroute integrated')
+    async def _amend_transaction(self, request: Request, params, gas_price_wei):
+        if request.request_type != RequestType.ORDER:
+            return ApiResult(error_type=ErrorType.TRANSACTION_FAILED,
+                      error_message=
+                      'Amend request not supported for non-order request by uni3 dex-proxy with Bloxroute integrated')
+
+        next_block_num, next_block_uuid = await self.__update_and_get_next_block_num()
+
+        ok, reason = self.__validate_can_send_via_blx(gas_price_wei)
+        if not ok:
+            return ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message=reason)
+
+        if request.client_request_id not in self.__order_client_requ_id_vs_raw_txs:
+
+            if request.nonce is None:
+                # Can happen if amend is too soon after insert
+                # Insert processing might be stuck at some `await` and the amend is processed before the insert
+                return ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message='RETRY. Cannot Amend: not inserted yet.')
+            else:
+                return ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message='Cannot Amend: missed targeted block')
+
+        old_raw_tx = self.__order_client_requ_id_vs_raw_txs[request.client_request_id]
+
+        raw_tx_idx = 0
+        while raw_tx_idx < len(self.__raw_txs_in_targeted_block):
+            if self.__raw_txs_in_targeted_block[raw_tx_idx] == old_raw_tx:
+                break
+            raw_tx_idx += 1
+
+        if raw_tx_idx >= len(self.__raw_txs_in_targeted_block):
+            # Should not happen ever. If somehow happens then investigate and fix.
+            raise Exception('Internal Error: Failed to Amend. Reach out to Dev.')
+
+        self.__bundles_sent_for_targeted_block += 1
+
+        instrument = self.__instruments.get_instrument(
+            InstrumentId(self.__exchange_name, request.symbol))
+        base_ccy_symbol = instrument.base_currency
+        quote_ccy_symbol = instrument.quote_currency
+
+        timeout_s = int(time.time() + params['timeout_s'])
+        request.deadline_since_epoch_s = timeout_s
+
+        if request.side == Side.BUY:
+            built_tx = self._api.build_swap_exact_output_single_tx(
+                quote_ccy_symbol, base_ccy_symbol, request.quote_ccy_qty, request.base_ccy_qty, request.fee_rate,
+                timeout_s, request.gas_limit, gas_price_wei, nonce=request.nonce)
+        else:
+            built_tx = self._api.build_swap_exact_input_single_tx(
+                base_ccy_symbol, quote_ccy_symbol, request.base_ccy_qty, request.quote_ccy_qty, request.fee_rate,
+                timeout_s, request.gas_limit, gas_price_wei, nonce=request.nonce)
+
+        signed_tx = self._api.sign_tx(built_tx)
+        new_raw_tx = signed_tx.rawTransaction.hex()[2:]
+        self.__raw_txs_in_targeted_block[raw_tx_idx] = new_raw_tx
+        self.__order_client_requ_id_vs_raw_txs[request.client_request_id] = new_raw_tx
+
+        tx_hash = Web3.to_hex(signed_tx.hash)
+
+        await self._api.send_bundle(self.__raw_txs_in_targeted_block, next_block_num, next_block_uuid)
+
+        return ApiResult(nonce=request.nonce, tx_hash=tx_hash)
 
     async def _cancel_transaction(self, request, gas_price_wei):
         raise Exception(
             'Cancel request not supported by uni3 dex-proxy with Bloxroute integrated')
 
     async def get_transaction_receipt(self, request, tx_hash):
-        # add for finalization polling
-        if request.dex_specific is not None and 'targeted_block_num' in request.dex_specific:
-            self.__tx_hash_with_targeted_block.append((tx_hash,
-                request.dex_specific['targeted_block_num']))
-
         return await self._api.get_transaction_receipt(tx_hash)
 
     def _get_gas_price(self, request, priority_fee):
@@ -398,48 +431,62 @@ class UniswapV3Bloxroute(DexCommon):
                 f'Error occurred while computing execution price of request={request}: %r', ex)
 
     # finalises requests who missed to get minned in the targeted block
-    async def __finalise_missed_txs(self):
+    async def __finalise_missed_requests(self):
         while True:
             try:
                 await self.pantheon.sleep(1)
-                self._logger.debug(
-                    'Polling for finalising txs missing targeted block')
-                num_of_txs = len(self.__tx_hash_with_targeted_block)
-                if num_of_txs == 0:
+
+                self._logger.debug('Polling for finalising requests missing targeted block')
+
+                open_requests = self._request_cache.get_all()
+                if len(open_requests) == 0:
                     continue
+
                 curr_block_num = await self._api.get_current_block_num()
 
-                for i in range(0, num_of_txs):
-                    try:
-                        tx_hash, targeted_block = self.__tx_hash_with_targeted_block.popleft()
-                        self._logger.debug(
-                            f'tx_hash={tx_hash} targeted_block={targeted_block}')
-                        if curr_block_num >= targeted_block:
-                            block_data = await self._api.get_block(targeted_block)
-                            self._logger.debug(
-                                f'block_num={targeted_block}, block_data={block_data}')
+                # Caching: so that we don't call rpc method self._api.get_block for same block_num
+                block_num_vs_block_data = {}
 
-                            if HexBytes(tx_hash) not in block_data.transactions:
-                                # the request has failed to get mined
-                                await self._transactions_status_poller.finalise(
-                                    tx_hash, RequestStatus.FAILED)
-                            else:
-                                self._logger.debug(f'tx_hash={tx_hash} is mined')
-                                # transaction_status_poller will handle finalising the request
+                for request in open_requests:
+                    try:
+                        if request.request_status != RequestStatus.PENDING:
+                            continue
+
+                        targeted_block_num = request.dex_specific.get('targeted_block_num')
+                        if  targeted_block_num == None or targeted_block_num > curr_block_num:
+                            continue
+
+                        if (targeted_block_num not in block_num_vs_block_data) or \
+                            (block_num_vs_block_data[targeted_block_num] == None):
+                            targeted_block_data = await self._api.get_block(targeted_block_num)
+                            block_num_vs_block_data[targeted_block_num] = targeted_block_data
+
+                            self._logger.debug(f'block_num={targeted_block_num}, block_data={targeted_block_data}')
                         else:
-                            self.__tx_hash_with_targeted_block.appendleft(
-                                (tx_hash, targeted_block))
-                            break
+                            targeted_block_data = block_num_vs_block_data[targeted_block_num]
+
+                        if targeted_block_data == None:
+                            continue
+
+                        request_mined = False
+                        for tx_hash, _ in request.tx_hashes:
+                            if HexBytes(tx_hash) in targeted_block_data.transactions:
+                                self._logger.debug(f'tx_hash={tx_hash} found in the targeted_block_num={targeted_block_num}')
+                                request_mined = True
+                                break
+
+                        if (not request_mined):
+                            await self.on_request_status_update(request.client_request_id, RequestStatus.FAILED, None)
+                        # else:
+                        #     transaction_status_poller will handle finalising the request
+
                     except Exception as ex:
                         # retry after 1 sec
                         self._logger.exception(
-                            f'Error in polling tx_hash={tx_hash} targeted_block={targeted_block} for finalising txs missing targeted block: %r', ex)
-                        self.__tx_hash_with_targeted_block.append(
-                            (tx_hash, targeted_block))
-                        break
+                            f'Error in polling tx_hashes of request={request} for finalising requests \
+                                missing targeted block: %r', ex)
             except Exception as e:
-                self._logger.exception(
-                    f'Error in polling for finalising txs missing targeted block: %r', e)
+                self._logger.exception(f'Error in polling for finalising request missing targeted block: %r', e)
 
     def __get_blx_authorisation_header(self) -> str:
         if 'blx_authorisation_header' in self._config:
@@ -489,7 +536,8 @@ class UniswapV3Bloxroute(DexCommon):
                     self._withdrawal_address_whitelists_from_res_file[symbol].add(Web3.to_checksum_address(withdrawal_address))
 
                 if symbol != self.__native_token:
-                    self.__tokens_from_res_file[symbol] = ERC20Token(token_json["symbol"], Web3.to_checksum_address(token_json["address"]))
+                    self.__tokens_from_res_file[symbol] = ERC20Token(token_json["symbol"],
+                                                                     Web3.to_checksum_address(token_json["address"]))
 
             uniswap_router_address = contracts_address_json["uniswap_router_address"]
 
@@ -502,7 +550,7 @@ class UniswapV3Bloxroute(DexCommon):
         blx_authorisation_header = self.__get_blx_authorisation_header()
         await self._api.initialise_and_maintain_blx_mev_ws(blx_authorisation_header)
 
-        self.pantheon.spawn(self.__finalise_missed_txs())
+        self.pantheon.spawn(self.__finalise_missed_requests())
 
         self.started = True
 
@@ -521,3 +569,28 @@ class UniswapV3Bloxroute(DexCommon):
                 self._api._add_or_update_erc20_contract(symbol, Web3.to_checksum_address(address))
             except Exception as ex:
                 self._logger.exception(f'Error in adding or updating ERC20 token (symbol={symbol}, address={address}): %r', ex)
+
+    async def __update_and_get_next_block_num(self)-> tuple[int, str]:
+        next_block_num = (await self._api.get_current_block_num()) + 1
+
+        if (next_block_num > self.__targeted_block):
+            self.__targeted_block = next_block_num
+            self.__targeted_block_uuid = str(uuid.uuid4())
+            self.__bundles_sent_for_targeted_block = 0
+            self.__raw_txs_in_targeted_block = []
+            self.__order_client_requ_id_vs_raw_txs = {}
+        elif (next_block_num < self.__targeted_block):
+            # Rare case but might happen when the node which served the call `self._api.get_current_block_num()` is lagging
+            next_block_num = self.__targeted_block
+
+        return next_block_num, self.__targeted_block_uuid
+
+    def __validate_can_send_via_blx(self, gas_price_wei: int) -> tuple[bool, str]:
+        if not self._api.is_blx_mev_ws_ready():
+            # 'RETRY.' at the begining of the error msg will be used by the ES to know whether to retry amends
+            return False, 'RETRY. Bloxroute mev WS not ready'
+
+        if self.__bundles_sent_for_targeted_block >= self.__max_bundles_per_block:
+            return False, 'Exhausted max bundles per block rate limit'
+
+        return self._check_max_allowed_gas_price(gas_price_wei)

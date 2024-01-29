@@ -108,6 +108,7 @@
             "percentile_priority_fee_slow": 2
         },
         "max_allowed_gas_price_gwei": 500,
+        "max_bundles_per_block": 4,
         "request_cache": {
             "finalised_requests_cleanup_after_s": 600
         },
