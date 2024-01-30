@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from pantheon import Pantheon
 from pantheon.market_data_types import Side
-from pantheon.instruments_source import InstrumentLifecycle, InstrumentUsageExchanges
+from pantheon.instruments_source import InstrumentLifecycle, InstrumentsLiveSource, InstrumentUsageExchanges
 from pantheon.market_data_types import InstrumentId
 
 from pyutils.exchange_apis.uniswapV3_api import *
@@ -27,7 +27,7 @@ class UniswapV3(DexCommon):
 
         self._server.register('POST', '/private/insert-order', self.__insert_order)
 
-        self.__instruments = None
+        self.__instruments: InstrumentsLiveSource = None
         self.__exchange_name = config['exchange_name']
         self.__chain_name = config['chain_name']
         self.__native_token = config['native_token']
@@ -56,15 +56,20 @@ class UniswapV3(DexCommon):
             base_ccy_symbol = instrument.base_currency
             quote_ccy_symbol = instrument.quote_currency
 
-            ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
-            if not ok:
-                return 400, {'error': {'message': reason}}
-
             order = OrderRequest(client_request_id, symbol, base_ccy_qty,
                                  quote_ccy_qty, side, fee_rate, gas_limit, timeout_s, received_at_ms)
 
             self._logger.debug(f'Inserting={order}, gas_price_wei={gas_price_wei}')
             self._request_cache.add(order)
+
+            ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
+            if not ok:
+                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+                return 400, {'error': {'message': reason}}
+
+            if (not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol)):
+                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+                return 400, {'error': {'message': 'unexpected instrument native code'}}
 
             if side == Side.BUY:
                 result = await self._api.swap_exact_output_single(
@@ -124,6 +129,9 @@ class UniswapV3(DexCommon):
 
             timeout_s = int(time.time() + params['timeout_s'])
             request.deadline_since_epoch_s = timeout_s
+
+            if (not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol)):
+                ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message='unexpected instrument native code')
 
             if request.side == Side.BUY:
                 return await self._api.swap_exact_output_single(
@@ -317,3 +325,8 @@ class UniswapV3(DexCommon):
                 self._api._add_or_update_erc20_contract(symbol, Web3.to_checksum_address(address))
             except Exception as ex:
                 self._logger.exception(f'Error in adding or updating ERC20 token (symbol={symbol}, address={address}): %r', ex)
+
+    def __validate_tokens_address(self, instr_native_code: str, base_ccy: str, quote_ccy: str) -> bool:
+        base_ccy_address = self._api.get_erc20_contract(base_ccy).address
+        quote_ccy_address = self._api.get_erc20_contract(quote_ccy).address
+        return instr_native_code.upper().endswith("-" + base_ccy_address.upper() + "-" + quote_ccy_address.upper())
