@@ -80,6 +80,12 @@ class UniswapV3Bloxroute(DexCommon):
 
             next_block_num, next_block_uuid = await self.__update_and_get_next_block_num()
 
+            targeted_block = params.get('targeted_block')
+            if ((targeted_block is not None) and (int(targeted_block) != next_block_num)):
+                self._request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
+                return 400, {'error': {'message': f'targeted_block={targeted_block} != next_block={next_block_num}'}}
+
             ok, reason = self.__validate_can_send_via_blx(gas_price_wei)
             if not ok:
                 self._request_cache.finalise_request(
@@ -449,7 +455,11 @@ class UniswapV3Bloxroute(DexCommon):
 
                 for request in open_requests:
                     try:
-                        if request.request_status != RequestStatus.PENDING:
+                        if (
+                            request.request_status == RequestStatus.SUCCEEDED
+                            or request.request_status == RequestStatus.CANCELED
+                            or request.request_status == RequestStatus.FAILED
+                        ):
                             continue
 
                         targeted_block_num = request.dex_specific.get('targeted_block_num')
