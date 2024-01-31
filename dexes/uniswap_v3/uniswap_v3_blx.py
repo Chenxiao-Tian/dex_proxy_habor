@@ -10,7 +10,7 @@ from decimal import Decimal
 from hexbytes import HexBytes
 
 from pantheon import Pantheon
-from pantheon.instruments_source import InstrumentLifecycle, InstrumentUsageExchanges
+from pantheon.instruments_source import InstrumentLifecycle, InstrumentsLiveSource, InstrumentUsageExchanges
 from pantheon.market_data_types import InstrumentId, Side
 
 from pyutils.exchange_apis.uniswapV3_api import *
@@ -34,7 +34,7 @@ class UniswapV3Bloxroute(DexCommon):
         self._server.register(
             'POST', '/private/wrap-unwrap-eth', self.__wrap_unwrap_eth)
 
-        self.__instruments = None
+        self.__instruments: InstrumentsLiveSource = None
         self.__exchange_name = config['exchange_name']
         self.__chain_name = config['chain_name']
         self.__native_token = config['native_token']
@@ -77,6 +77,11 @@ class UniswapV3Bloxroute(DexCommon):
             self._logger.debug(
                 f'Inserting={order}, gas_price_wei={gas_price_wei}')
             self._request_cache.add(order)
+
+            if (not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol)):
+                self._request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
+                return 400, {'error': {'message': 'unexpected instrument native code'}}
 
             next_block_num, next_block_uuid = await self.__update_and_get_next_block_num()
 
@@ -293,6 +298,9 @@ class UniswapV3Bloxroute(DexCommon):
 
         timeout_s = int(time.time() + params['timeout_s'])
         request.deadline_since_epoch_s = timeout_s
+
+        if (not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol)):
+            return ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message='unexpected instrument native code')
 
         if request.side == Side.BUY:
             built_tx = self._api.build_swap_exact_output_single_tx(
@@ -604,3 +612,8 @@ class UniswapV3Bloxroute(DexCommon):
             return False, 'Exhausted max bundles per block rate limit'
 
         return self._check_max_allowed_gas_price(gas_price_wei)
+
+    def __validate_tokens_address(self, instr_native_code: str, base_ccy: str, quote_ccy: str) -> bool:
+        base_ccy_address = self._api.get_erc20_contract(base_ccy).address
+        quote_ccy_address = self._api.get_erc20_contract(quote_ccy).address
+        return instr_native_code.upper().endswith("-" + base_ccy_address.upper() + "-" + quote_ccy_address.upper())
