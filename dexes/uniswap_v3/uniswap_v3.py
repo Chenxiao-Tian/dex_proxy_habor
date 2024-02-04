@@ -271,8 +271,6 @@ class UniswapV3(DexCommon):
             self._logger.exception(f'Error occurred while computing execution price of request={request}: %r', ex)
 
     async def start(self, private_key):
-        await super().start(private_key)
-
         await self.__gas_price_tracker.start()
         await self.__gas_price_tracker.wait_gas_price_ready()
 
@@ -302,9 +300,11 @@ class UniswapV3(DexCommon):
                 if symbol != self.__native_token:
                     self.__tokens_from_res_file[symbol] = ERC20Token(token_json["symbol"], Web3.to_checksum_address(token_json["address"]))
 
-            uniswap_router_address = contracts_address_json["uniswap_router_address"]
+            uniswap_router_address = Web3.to_checksum_address(contracts_address_json["uniswap_router_address"])
 
         await self._api.initialize(private_key, uniswap_router_address, self.__tokens_from_res_file.values())
+
+        await super().start(private_key)
 
         max_nonce_loaded = self._request_cache.get_max_nonce()
         self._api.initialize_starting_nonce(max_nonce_loaded + 1)
@@ -314,15 +314,19 @@ class UniswapV3(DexCommon):
         self.started = True
 
     def _on_fireblocks_tokens_whitelist_refresh(self, tokens_from_fireblocks: dict):
-        if self.started == False:
-            return
-
         for symbol, (_, address) in tokens_from_fireblocks.items():
+            if len(address) == 0:
+                assert symbol == self.__native_token
+                continue
+
+            address = Web3.to_checksum_address(address)
             if symbol in self.__tokens_from_res_file:
+                if address != self.__tokens_from_res_file[symbol].address:
+                    self._logger.error(f'Symbol={symbol} address did not match: Fireblocks: {address} Resources File: {self.__tokens_from_res_file[symbol].address}')
                 continue
 
             try:
-                self._api._add_or_update_erc20_contract(symbol, Web3.to_checksum_address(address))
+                self._api._add_or_update_erc20_contract(symbol, address)
             except Exception as ex:
                 self._logger.exception(f'Error in adding or updating ERC20 token (symbol={symbol}, address={address}): %r', ex)
 
