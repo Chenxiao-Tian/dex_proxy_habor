@@ -80,7 +80,7 @@ class WhitelistingManager:
                         id = token["id"]
                         address = token["contractAddress"]
 
-                        assert len(address)
+                        assert len(address) or token["type"] == "BASE_ASSET"
 
                         tokens_from_fireblocks[symbol] = (id, address)
                         supported_tokens_id[id] = symbol
