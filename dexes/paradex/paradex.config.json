@@ -122,7 +122,8 @@
         "fireblocks": {
             "native_asset": "ETH",
             "token_types": [
-                "ERC20"
+                "ERC20",
+                "BASE_ASSET"
             ]
         }
     }

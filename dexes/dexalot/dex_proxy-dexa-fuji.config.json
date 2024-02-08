@@ -127,7 +127,8 @@
     "fireblocks": {
       "native_asset": "AVAX",
       "token_types": [
-        "ERC20"
+        "ERC20",
+        "BASE_ASSET"
       ]
     }
   }
