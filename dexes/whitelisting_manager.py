@@ -61,14 +61,22 @@ class WhitelistingManager:
         for token in response:
             try:
                 if (token["nativeAsset"] == self.__config["native_asset"]) and (token["type"] in self.__config["token_types"]):
-                    symbol = str(token["id"]).split("_")[0]
-                    assert len(symbol)
+                    temp = str(token["id"]).split("_")[0]
+                    # remove all non-alphabetic characters to get symbol
+                    symbol = "".join([ch for ch in temp if ch.isalpha()])
+
+                    if len(symbol) == 0:
+                        continue
 
                     if symbol in seen_tokens:
-                        # Two or more tokens may have same symbol in fireblocks api
-                        # e.g. both has symbol 1INCH
-                        # 1INCH Token: 0x111111111117dC0aa78b770fA6A738034120C302
-                        # 1INCH Token (Vested): 0x03d1B1A56708FA298198DD5e23651a29B76a16d2
+                        # Two or more tokens may have same computed symbol
+                        # e.g:
+                        # [
+                        #   { "id": "1INCH", "name": "1INCH Token", "type": "ERC20", "contractAddress": "0x111111111117dC0aa78b770fA6A738034120C302", "nativeAsset": "ETH", "decimals": 18 },
+                        #   { "id": "1INCH_ETH", "name": "1INCH Token (Vested)", "type": "ERC20", "contractAddress": "0x03d1B1A56708FA298198DD5e23651a29B76a16d2", "nativeAsset": "ETH", "decimals": 18 },
+                        #   { "id": "GALA", "name": "Gala V1", "type": "ERC20", "contractAddress": "0x15D4c048F83bd7e37d49eA4C83a07267Ec4203dA", "nativeAsset": "ETH", "decimals": 8 },
+                        #   { "id": "GALA2", "name": "Gala V2", "type": "ERC20", "contractAddress": "0xd1d2Eb1B1e90B638588728b4130137D262C87cae", "nativeAsset": "ETH", "decimals": 8 }
+                        # ]
                         #
                         # To avoid confusion do not use fireblocks api for such tokens
                         if symbol in tokens_from_fireblocks:
