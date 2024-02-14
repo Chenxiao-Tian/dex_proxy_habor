@@ -1,0 +1,16 @@
+{
+    "logging": {
+        "level": "debug"
+    },
+    "key_store_file_path": "./test/wallet_2.txt",
+    "server": {
+        "port": 3002
+    },
+    "dex": {
+        "_sui_full_node_url": "http://dev-ore-sui2.kdev:9000/",
+        "sui_full_node_url": "https://mysten-rpc.testnet.sui.io:443",
+        "wallet_address": "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
+        "order_account_cap_id": "0x27b7899981b4d6a4a7ff0b8c6eaecfbd8190147990739952d1c7cfb1ace53e3e",
+        "transfer_account_cap_id": "0xe0d1089aa8eb01ed13969a84c80460b8b202b8c4ad58303df37fcd9ac1d85565"
+    }
+}

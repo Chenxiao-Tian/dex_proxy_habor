@@ -1,6 +1,7 @@
 # SHASUM pin of registry.gitlab.com/auros/baseimg/ubuntu:22.04
 FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:dcc12ea35886641ad46771c037f8541585ba105a0bc2634845df082b8748f1bf as builder
 
+ARG TS_DEX_PATH
 ARG SSH_PRIVATE_KEY_BASE64
 
 RUN /bin/bash -c '[[ "${SSH_PRIVATE_KEY_BASE64}" ]] || { echo "SSH_PRIVATE_KEY_BASE64 build argument not set"; exit 1; }'
@@ -9,19 +10,19 @@ COPY . /app/auros
 
 WORKDIR /app/auros
 
+# Major version of nodejs to use
+ENV NODE_MAJOR=20
+
 RUN apt-get update \
-  && apt-get install -y openssh-client python3-venv libgmp3-dev \
-  && mkdir -p /build/private ~/.ssh \
-  && chmod 700 /build/private \
-  && echo ${SSH_PRIVATE_KEY_BASE64} | base64 -i -d > /build/private/key \
-  && chmod 600 /build/private/key \
-  && eval $(ssh-agent) \
-  && ssh-add /build/private/key \
-  && ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts \
-  && python3 -m venv /app/auros \
-  && . /app/auros/bin/activate \
-  && pip3 install . \
-  && rm -f /build/private/key \
+  && apt-get install -y curl gpg \
+  && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+  && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+  && apt-get update \
+  && apt-get install -y nodejs \
+  && npm i -g typescript \
+  && cd /app/auros/${TS_DEX_PATH} \
+  && npm i \
+  && tsc \
   && rm -rf /app/auros/.git
 
 
@@ -38,6 +39,8 @@ ARG VAULT_WALLET_NAME
 ARG CONFIG_PATH
 ARG SSH_PRIVATE_KEY_BASE64
 ARG CONFIG_REPO_URI
+ARG TS_DEX_PATH
+ARG WALLET_FORMAT=eth
 
 ENV CONTEXT_ID=${CONTEXT_ID}
 ENV PROCESS_NAME=${PROCESS_NAME}
@@ -45,16 +48,19 @@ ENV VAULT_APPROLE_ID=${VAULT_APPROLE_ID}
 ENV VAULT_SECRET_ID=${VAULT_SECRET_ID}
 ENV VAULT_WALLET_NAME=${VAULT_WALLET_NAME}
 ENV CONFIG_REPO_URI=${CONFIG_REPO_URI}
+# Need to know where the `dist` files are.
+ENV TS_DEX_PATH=${TS_DEX_PATH}
 # Private key is required to pull down CONFIG_REPO_URI at enclave boot.
 ENV SSH_PRIVATE_KEY_BASE64=${SSH_PRIVATE_KEY_BASE64}
 
 # Set some defaults
-ENV WALLET_FORMAT=eth
+ENV WALLET_FORMAT=${WALLET_FORMAT}
 
 # Application configuration
 ENV APPLICATION_LISTEN_PORT=8000
 
 COPY --from=builder /app/auros/ /app/auros/
-COPY container/run /app/auros/run
+COPY container/run.ts /app/auros/run
+COPY container/egress-implicit-postgres-5432.toml /etc/horust/services/
 
 ENTRYPOINT [ "/init" ]

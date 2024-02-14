@@ -1,0 +1,27 @@
+{
+    "id": {
+        "txDigest": "2sFieaQBk3TM9eGEZD3ma1vPSGMCvKkzMsPdAuTJUifV",
+        "eventSeq": "0"
+    },
+    "packageId": "0x000000000000000000000000000000000000000000000000000000000000dee9",
+    "transactionModule": "clob_v2",
+    "sender": "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c",
+    "type": "0xdee9::clob_v2::OrderFilled<0xf398b9ecb31aed96c345538fb59ca5a1a2c247c5e60087411ead6c637129f1c4::gold::GOLD, 0xf398b9ecb31aed96c345538fb59ca5a1a2c247c5e60087411ead6c637129f1c4::fish::FISH>",
+    "parsedJson": {
+        "base_asset_quantity_filled": "1000000",
+        "base_asset_quantity_remaining": "999000000",
+        "is_bid": false,
+        "maker_address": "0x27b7899981b4d6a4a7ff0b8c6eaecfbd8190147990739952d1c7cfb1ace53e3e",
+        "maker_client_order_id": "1",
+        "maker_rebates": "76500",
+        "order_id": "9223372036854777087",
+        "original_quantity": "1000000000",
+        "pool_id": "0x538091bde22b3e38aae569ed1fb8621714c8193bc6819ea2e5ebb9ae700a42d2",
+        "price": "51000000000",
+        "taker_address": "0x27db71ddf34661fe5c49901d737b4ecc7482e1b9cd4541a5512d9f1a9401d07a",
+        "taker_client_order_id": "1",
+        "taker_commission": "127500"
+    },
+    "bcs": "9GjebWGMU6Mse4nGzirEHRgB2J2uc5cTxjSMpcingefRdjiuKCKLEf6aS3vXGLrZKXZugSjSLS1QZC7Apg4KvWotR2EJrRZr9b8K874CJd1kyXoMSPgNhwBEmdNidccM6D2UNTwh7rfmbCQWkthBXnEa1MH1n3SzPY7xyjZ3TcadwaLpHpubSuXFfoNEesCy9Dg9nH3DDaqdU1wr5EekkqrPN81UdnDDCJ5aKaw",
+    "timestampMs": "1702976062866"
+}

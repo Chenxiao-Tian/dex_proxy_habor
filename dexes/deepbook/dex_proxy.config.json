@@ -1,0 +1,44 @@
+{
+    "logging": {
+        "level": "debug"
+    },
+    "key_store_file_path": "./test/wallet.txt",
+    "server": {
+        "port": 3000
+    },
+    "dex": {
+        "rest_api_url": "https://mysten-rpc.testnet.sui.io:443",
+        "websocket_url": "wss://rpc.ankr.com/sui/ws/5bcaecaab6d6d910804b8eac4b9654fa66334afe065c137abe6b5f1da35448cc",
+        "wallet_address": "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c",
+        "account_cap_ids": {
+            "_tag": "testnet",
+            "main": "0x27db71ddf34661fe5c49901d737b4ecc7482e1b9cd4541a5512d9f1a9401d07a",
+            "children": [
+                {
+                    "pool_name": "GOLD_FISH",
+                    "pool_id": "0x538091bde22b3e38aae569ed1fb8621714c8193bc6819ea2e5ebb9ae700a42d2",
+                    "for_orders": [
+                        "0x2605db4d2e7028c8679fcc006fe2c247f51006f900c3881103303475343adff2"
+                    ],
+                    "for_transfers": "0x0cc98ca37176afff5c8265f988382132828ef9dc13f9545047047b168a8f9ca7"
+                },
+                {
+                    "pool_name": "SUI_GOLD",
+                    "pool_id": "0xc63426d2ffd3233f78a72a5e446fbfeea0651e69de4888791184f07c083fdaf8",
+                    "for_orders": [
+                        "0x1087331ff37a00ec630f24eb8612f8c701cecda9298f7686bd8ca95212f5a5c7"
+                    ],
+                    "for_transfers": "0x7bb93fe4894260d11ad8dd8549d8b0a39d1fe2d8315d2d542d378284a04aff18"
+                },
+                {
+                    "pool_name": "SUI_USDC",
+                    "pool_id": "0xb1e9e4f1cb78a9d2b6a0a2bd97ff7f0c886854a60e7c6c58063f5b13ad7d550b",
+                    "for_orders": [
+                        "0x1087331ff37a00ec630f24eb8612f8c701cecda9298f7686bd8ca95212f5a5c7"
+                    ],
+                    "for_transfers": "0x7bb93fe4894260d11ad8dd8549d8b0a39d1fe2d8315d2d542d378284a04aff18"
+                }
+            ]
+        }
+    }
+}

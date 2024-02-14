@@ -1,0 +1,12 @@
+{
+  "event_type": "order_filled",
+  "pool_id": "0x538091bde22b3e38aae569ed1fb8621714c8193bc6819ea2e5ebb9ae700a42d2",
+  "liquidity_indicator": "Taker",
+  "client_order_id": "1",
+  "trade_id": "F4h2pxmcFSsi8Wief6C36uXXBv4DiJSaAZuBbnWcNyn4_0",
+  "side": "SELL",
+  "exec_qty": "1000000",
+  "price": "51000000000",
+  "maker_rebates": "76500",
+  "taker_commission": "127500"
+}
