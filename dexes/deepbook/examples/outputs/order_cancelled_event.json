@@ -1,0 +1,10 @@
+{
+    "event_type": "order_cancelled",
+    "pool_id": "0x538091bde22b3e38aae569ed1fb8621714c8193bc6819ea2e5ebb9ae700a42d2",
+    "client_order_id": "1",
+    "exchange_order_id": "9223372036854777116",
+    "side": "SELL",
+    "qty": "1000000000",
+    "exec_qty": "1000000",
+    "price": "51000000000"
+}

@@ -24,7 +24,7 @@ default:
   retry: 2
 
 
-.build and publish:
+.build and publish enclave:
   stage: build
   script:
   - export CONTAINER_NAME=${PROCESS_NAME}
@@ -47,7 +47,22 @@ default:
   - "[[ -f config/${PROCESS_NAME}.json ]] || { echo \"No config found for ${PROCESS_NAME}\"; exit 1; }"
   - export CONTEXT_ID=$(jq -r '.enclave.cid | select(. != null)' config/${PROCESS_NAME}.json)
   - rm -rf config
-  - ./ImageBuilder.sh --enclave
+  - "[[ \"${TS_DEX_PATH}\" ]] && { DOCKERFILE=Dockerfile.ts; ADDITIONAL_BUILD_ARGS=\"${ADDITIONAL_BUILD_ARGS} --build-arg TS_DEX_PATH=${TS_DEX_PATH}\"; }"
+  - "[[ \"${WALLET_FORMAT}\" ]] && { ADDITIONAL_BUILD_ARGS=\"${ADDITIONAL_BUILD_ARGS} --build-arg WALLET_FORMAT=${WALLET_FORMAT}\"; }"
+  - ADDITIONAL_BUILD_ARGS=${ADDITIONAL_BUILD_ARGS} DOCKERFILE=${DOCKERFILE} ./ImageBuilder.sh --enclave
+
+
+# Some auxiliary applications in this repo need to be containerised, but not with an enclave userland.
+.build and publish container:
+  stage: build
+  script:
+    - ./ImageBuilder.sh
+
+
+.build on all commits and merge requests:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH
 
 
 .enclaves: &enclaves
@@ -75,24 +90,80 @@ default:
     CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
   - PROCESS_NAME: dex_proxy-lyra-4
     CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
+  - PROCESS_NAME: dex_proxy-deep-1
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-dev.git
+    TS_DEX_PATH: dexes/deepbook
+    WALLET_FORMAT: sui
+  - PROCESS_NAME: dex_proxy-deep-2
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-dev.git
+    TS_DEX_PATH: dexes/deepbook
+    WALLET_FORMAT: sui
+  - PROCESS_NAME: dex_proxy-deep-main
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
+    TS_DEX_PATH: dexes/deepbook
+    WALLET_FORMAT: sui
+  - PROCESS_NAME: dex_proxy-deep-main-2
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
+    TS_DEX_PATH: dexes/deepbook
+    WALLET_FORMAT: sui
 
 
-build:
+# Use this for applications in this repo that need to be containerised, but not enclaved.
+.containers: &containers
+  - CONTAINER_NAME: dex-proxy-deepbook
+    DOCKERFILE: Dockerfile.deepbook
+
+
+build enclaves:
   extends:
-    - .build and publish
+    - .build and publish enclave
+    - .build on all commits and merge requests
   parallel:
     matrix: *enclaves
 
 
+build containers:
+  extends:
+    - .build and publish container
+    - .build on all commits and merge requests
+  parallel:
+    matrix: *containers
+
+
+# Don't allow the default scan job to run - we split it out into different jobs.
 container_scanning:
+  rules:
+    - when: never
+
+
+.container scanning:
+  extends:
+    - container_scanning
+    - .build on all commits and merge requests
   before_script: []
+  variables:
+    CS_IMAGE: ${CI_REGISTRY_IMAGE}/${PROCESS_NAME}${CONTAINER_NAME}:${CI_COMMIT_SHA}
+    DTRACK_PROJECT_NAME: ${PROCESS_NAME}${CONTAINER_NAME}
+    DTRACK_PROJECT_VERSION: ${CI_COMMIT_SHA}
+
+
+audit enclave userlands:
+  extends:
+    - .container scanning
   parallel:
     matrix: *enclaves
-  # TODO: this would speed up the pipeline quite a bit, but it is not yet supported.
-  # https://gitlab.com/gitlab-org/gitlab/-/issues/396845
-  #dependencies:
-  #  - "build: [${DOCKERFILE}, ${CONTAINER_ADDITIONAL_TAG}, ${CONTAINER_NAME}]"
-  variables:
-    CS_IMAGE: ${CI_REGISTRY_IMAGE}/${PROCESS_NAME}:${CI_COMMIT_SHA}
-    DTRACK_PROJECT_NAME: ${PROCESS_NAME}
-    DTRACK_PROJECT_VERSION: ${CI_COMMIT_SHA}
+  needs:
+    - job: build enclaves
+      parallel:
+        matrix: *enclaves
+
+
+audit container userlands:
+  extends:
+    - .container scanning
+  parallel:
+    matrix: *containers
+  needs:
+    - job: build containers
+      parallel:
+        matrix: *containers
