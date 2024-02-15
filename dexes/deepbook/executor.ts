@@ -78,8 +78,9 @@ export class Executor {
         throw new Error("All child account caps in use");
     }
 
-    execute = async (txBlockGenerator: TransactionBlockGenerator
-                    ,txBlockResponseOptions: SuiTransactionBlockResponseOptions):
+    execute = async (requestId: BigInt,
+                     txBlockGenerator: TransactionBlockGenerator,
+                     txBlockResponseOptions: SuiTransactionBlockResponseOptions):
         Promise<SuiTransactionBlockResponse> => {
 
         let accountCap: AccountCap | null = null;
@@ -90,7 +91,7 @@ export class Executor {
             gasCoin = this.#gasManager.getFreeGasCoin();
 
             let txBlock = await txBlockGenerator(accountCap);
-            this.#logger.debug(`gasCoin=${gasCoin.objectId}`);
+            this.#logger.debug(`[${requestId}] gasCoin=${gasCoin.objectId}`);
             txBlock.setGasPayment([gasCoin]);
             txBlock.setGasBudget(this.#gasBudgetMist);
 

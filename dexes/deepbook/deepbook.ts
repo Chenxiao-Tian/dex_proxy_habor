@@ -171,7 +171,6 @@ export class DeepBook {
         ["balance", new Map<string, string>([
             ["2", "INSUFFICIENT_BALANCE"]
         ])]
-        
     ]);
 
     public channels: Array<string> = ["ORDER", "TRADE"];
@@ -1136,7 +1135,8 @@ export class DeepBook {
 
             let txBlockResponseOptions = { showEffects: true, showEvents: true };
 
-            response = await this.executor!.execute(txBlockGenerator,
+            response = await this.executor!.execute(requestId,
+                                                    txBlockGenerator,
                                                     txBlockResponseOptions);
         } catch (error) {
             if (error instanceof Error) {
@@ -1254,7 +1254,6 @@ export class DeepBook {
         return result;
     }
 
-    
     insertOrders = async (requestId: bigint,
                           path: string,
                           params: any,
@@ -1307,7 +1306,8 @@ export class DeepBook {
 
             let txBlockResponseOptions = { showEffects: true, showEvents: true };
 
-            response = await this.executor!.execute(txBlockGenerator,
+            response = await this.executor!.execute(requestId,
+                                                    txBlockGenerator,
                                                     txBlockResponseOptions);
         } catch (error) {
             if (error instanceof Error) {
@@ -1431,7 +1431,8 @@ export class DeepBook {
 
             let txBlockResponseOptions = { showEffects: true, showEvents: true };
 
-            response = await this.executor!.execute(txBlockGenerator,
+            response = await this.executor!.execute(requestId,
+                                                    txBlockGenerator,
                                                     txBlockResponseOptions);
         } catch (error) {
             if (error instanceof Error) {
@@ -1539,7 +1540,8 @@ export class DeepBook {
 
             let txBlockResponseOptions = { showEffects: true, showEvents: true };
 
-            response = await this.executor!.execute(txBlockGenerator,
+            response = await this.executor!.execute(requestId,
+                                                    txBlockGenerator,
                                                     txBlockResponseOptions);
         } catch (error) {
             if (error instanceof Error) {
@@ -1616,7 +1618,8 @@ export class DeepBook {
 
             let txBlockResponseOptions = { showEffects: true, showEvents: true };
 
-            response = await this.executor!.execute(txBlockGenerator,
+            response = await this.executor!.execute(requestId,
+                                                    txBlockGenerator,
                                                     txBlockResponseOptions);
         } catch (error) {
             if (error instanceof Error) {
@@ -1741,20 +1744,10 @@ export class DeepBook {
                              receivedAtMs: number): Promise<RestResult> => {
         assertFields(params, MandatoryFields.TradesByTimeRequest);
 
-        this.logger.debug(`[${requestId}] Fetching trades by start_ts`);
-
         const startTs  = Number(params.get("start_ts"));
         const maxPages = Number(params.get("max_pages"));
         const txDigest = params.get("tx_digest");
         const eventSeq = params.get("event_seq");
-
-        const now = Date.now();
-        const fortyMinutesInMs = 40 * 60 * 1000;
-        if (now - startTs > fortyMinutesInMs) {
-            let error = "Can't query for trades more than 40 minutes in the past. Please update the field, `startTs` in the request";
-            this.logger.error(`[${requestId}] ${error}`);
-            throw new Error(error);
-        }
 
         let cursor: EventId | null = null;
         if (txDigest && eventSeq) {
@@ -1762,6 +1755,17 @@ export class DeepBook {
                 txDigest: txDigest,
                 eventSeq: eventSeq
             }
+        }
+
+        this.logger.debug(`[${requestId}] Fetching trades by time. start_ts=${startTs} max_pages=${maxPages} cursor=${cursor}`);
+
+
+        const now = Date.now();
+        const fortyMinutesInMs = 40 * 60 * 1000;
+        if (now - startTs > fortyMinutesInMs) {
+            let error = "Can't query for trades more than 40 minutes in the past. Please update the field, `startTs` in the request";
+            this.logger.error(`[${requestId}] ${error}`);
+            throw new Error(error);
         }
 
         let limit: number | null = Number(params.get("limit"));
@@ -1779,7 +1783,7 @@ export class DeepBook {
             }
             */
 
-            MoveModule: {
+            MoveEventModule: {
                 package: "0xdee9",
                 module: "clob_v2"
             }
@@ -1806,7 +1810,7 @@ export class DeepBook {
             ++pagesQueried;
         }
 
-        this.logger.debug(`[${requestId}] Fetched trades by start_ts]`);
+        this.logger.debug(`[${requestId}] Fetched ${response.orderFilledEvents.length} trades by time. start_ts=${startTs} max_pages=${maxPages} cursor=${cursor}`);
 
         return {
             statusCode: 200,
@@ -1982,7 +1986,8 @@ export class DeepBook {
                 showObjectChanges: true
             };
 
-            response = await this.executor!.execute(txBlockGenerator,
+            response = await this.executor!.execute(requestId,
+                                                    txBlockGenerator,
                                                     txBlockResponseOptions);
         } catch (error) {
             this.logger.error(`[${requestId}] ${error}`);
@@ -2060,7 +2065,8 @@ export class DeepBook {
                 showBalanceChanges: true
             };
 
-            response = await this.executor!.execute(txBlockGenerator,
+            response = await this.executor!.execute(requestId,
+                                                    txBlockGenerator,
                                                     txBlockResponseOptions);
         } catch (error) {
             this.logger.error(`[${requestId}] ${error}`);
