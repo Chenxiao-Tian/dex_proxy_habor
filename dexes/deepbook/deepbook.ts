@@ -1757,7 +1757,7 @@ export class DeepBook {
             }
         }
 
-        this.logger.debug(`[${requestId}] Fetching trades by time. start_ts=${startTs} max_pages=${maxPages} cursor=${cursor}`);
+        this.logger.debug(`[${requestId}] Fetching trades by time. start_ts=${startTs} max_pages=${maxPages} cursor=${JSON.stringify(cursor)}`);
 
 
         const now = Date.now();
@@ -1810,7 +1810,7 @@ export class DeepBook {
             ++pagesQueried;
         }
 
-        this.logger.debug(`[${requestId}] Fetched ${response.orderFilledEvents.length} trades by time. start_ts=${startTs} max_pages=${maxPages} cursor=${cursor}`);
+        this.logger.debug(`[${requestId}] Fetched ${response.orderFilledEvents.length} trades by time. start_ts=${startTs} max_pages=${maxPages} cursor=${JSON.stringify(cursor)}`);
 
         return {
             statusCode: 200,
