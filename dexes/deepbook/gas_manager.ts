@@ -38,12 +38,12 @@ export class GasCoin {
                 let fields = data.content.fields as any;
                 const updatedVersion = BigInt(data.version);
                 if (this.version < updatedVersion) {
-                    this.#logger.debug(`coin=${this.objectId} prevVersion=${this.version} newVersion=${data.version}`);
+                    this.#logger.debug(`prevVersion=${this.version} newVersion=${data.version}`);
                     this.digest = data.digest;
                     this.version = BigInt(data.version);
                     this.balanceMist = BigInt(fields.balance);
                 } else {
-                    this.#logger.debug(`coin=${this.objectId} prevVersion=${this.version} >= newVersion=${data.version}`);
+                    this.#logger.debug(`prevVersion=${this.version} >= newVersion=${data.version}`);
                 }
             }
         } catch (error) {
@@ -201,15 +201,12 @@ export class GasManager {
     #trackedCoinsToMerge = (): Array<string> => {
         let trackedCoinsToMerge = new Array<string>();
 
-        this.#logger.debug(`Finding tracked coins to merge`);
-
         for (let coin of this.#gasCoins.values()) {
-            this.#logger.debug(`Coin ${coin.objectId}, status ${coin.status}, balance ${coin.balanceMist}`);
             if (coin.status === GasCoinStatus.Free
                 && (coin.balanceMist <= this.#minBalancePerInstanceMist ||
                     coin.balanceMist > this.#balancePerInstanceMist)) {
                 coin.status = GasCoinStatus.InUse;
-                this.#logger.debug(`Coin ${coin.objectId} balance below threshold, prepare to merge`);
+                this.#logger.debug(`Coin=${coin.objectId} balance=${coin.balanceMist} out of bounds=(${this.#minBalancePerInstanceMist}, ${this.#balancePerInstanceMist}]`);
                 trackedCoinsToMerge.push(coin.objectId);
             }
         }
@@ -218,18 +215,22 @@ export class GasManager {
     }
 
     #onSyncTimer = async () => {
-        if (this.#mainGasCoin === undefined ||
-            this.#mainGasCoin.status !== GasCoinStatus.Free) {
+        if (this.#mainGasCoin === undefined) {
+            this.#logger.debug(`onSyncTimer: mainGasCoin not set. Skipping`);
+            return;
+        }
+        if (this.#mainGasCoin.status !== GasCoinStatus.Free) {
+            this.#logger.debug(`onSyncTimer: mainGasCoin is in use. Skipping`);
             return;
         }
 
-        this.#logger.debug(`On sync timer, checking gas coins`);
+        this.#logger.debug(`onSyncTimer: mainGasCoin=${this.#mainGasCoin.objectId} balanceMist=${this.#mainGasCoin.balanceMist}`);
 
         this.#mainGasCoin.status = GasCoinStatus.InUse;
 
         // Check for untracked SUI coins in the wallet and merge them into
         // the main gas coin.
-        // Merge coins with <= minBalancePerInstanceMist into the mainGasCoin
+        // Merge coins with <= minBalancePerInstanceMist and > balancePerinstanceMist into the mainGasCoin
         let untrackedCoinsToMerge = Array<string>();
         let trackedCoinsToMerge = Array<string>();
         let mergeStatus = false;
@@ -237,9 +238,10 @@ export class GasManager {
             untrackedCoinsToMerge = await this.#untrackedCoinsToMerge();
             trackedCoinsToMerge = this.#trackedCoinsToMerge();
 
-            this.#logger.debug(`Scanning found ${untrackedCoinsToMerge.length} untracked, ${trackedCoinsToMerge.length} tracked to merge`);
 
             if (trackedCoinsToMerge.length + untrackedCoinsToMerge.length > 0) {
+                this.#logger.debug(`Scanning found ${untrackedCoinsToMerge.length} untracked, ${trackedCoinsToMerge.length} tracked gas coins to merge`);
+
                 mergeStatus = await this.#mergeCoins(this.#mainGasCoin,
                                                      [...untrackedCoinsToMerge,
                                                       ...trackedCoinsToMerge]);
