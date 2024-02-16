@@ -26,7 +26,7 @@ class TransactionsStatusPoller:
         if tx_hash in self.__tx_hash_to_client_rid_and_request_type:
             await self.__poll_tx({tx_hash: self.__tx_hash_to_client_rid_and_request_type[tx_hash]})
         else:
-            self.__logger.error(f'No request found for the tx_hash={tx_hash}')
+            self.__logger.info(f'No request found for the tx_hash={tx_hash}')
 
     async def __poll_tx_for_status(self):
         self.__logger.debug(
@@ -72,7 +72,7 @@ class TransactionsStatusPoller:
                             else:
                                 request_status = RequestStatus.FAILED
 
-                        await self.__dex.on_request_status_update(client_request_id, request_status, receipt)
+                        await self.__dex.on_request_status_update(client_request_id, request_status, receipt, tx_hash)
 
                 except Exception as e:
                     if not isinstance(e, TransactionNotFound):

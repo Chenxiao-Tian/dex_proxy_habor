@@ -128,7 +128,7 @@ class UniswapV3Bloxroute(DexCommon):
 
             self._request_cache.add_or_update_request_in_redis(client_request_id)
 
-            return 200, {'result': {'order_id': tx_hash, 'nonce': nonce}}
+            return 200, {"result": {"tx_hash": tx_hash, "nonce": nonce}}
 
         except Exception as e:
             self._logger.exception(f'Failed to insert order: %r', e)
