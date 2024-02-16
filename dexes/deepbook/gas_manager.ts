@@ -89,8 +89,8 @@ export class GasManager {
     start = async () => {
         await this.#setupCoinInstances();
 
-        await setTimeout(async () => {await this.#onSyncTimer();},
-                         this.#syncIntervalMs);
+        setTimeout(async () => {await this.#onSyncTimer();},
+                   this.#syncIntervalMs);
     }
 
     #setMainGasCoin = () => {
@@ -106,40 +106,47 @@ export class GasManager {
     }
 
     #trackInstances = async () => {
-        let coins = await this.#suiClient.getOwnedObjects({
-            owner: this.#walletAddress,
-            filter: { StructType: GasManager.#suiCoinStructType },
-            options: { showContent: true }
-        });
+        try {
+            let coins = await this.#suiClient.getOwnedObjects({
+                owner: this.#walletAddress,
+                filter: { StructType: GasManager.#suiCoinStructType },
+                options: { showContent: true }
+            });
 
-        for (let coin of coins.data) {
-            let data = coin.data;
-            if (data && data.content && data.content.dataType === "moveObject") {
-                let fields = data.content.fields as any;
-                this.#logger.debug(`coin=${data.objectId} version=${data.version}`);
-                this.#gasCoins.set(data.objectId,
-                                   new GasCoin(this.#loggerFactory,
-                                               data.objectId,
-                                               data.digest,
-                                               data.version,
-                                               fields.balance));
+            for (let coin of coins.data) {
+                let data = coin.data;
+                if (data && data.content &&
+                    data.content.dataType === "moveObject") {
+                    let fields = data.content.fields as any;
+                    this.#logger.debug(`coin=${data.objectId} version=${data.version}`);
+                    this.#gasCoins.set(data.objectId,
+                                       new GasCoin(this.#loggerFactory,
+                                                   data.objectId,
+                                                   data.digest,
+                                                   data.version,
+                                                   fields.balance));
+                }
             }
-        }
 
-        this.#logger.info(`Found ${this.#gasCoins.size} gasCoin instance(s) in the linked wallet`);
+            this.#logger.info(`Found ${this.#gasCoins.size} gasCoin instance(s) in the linked wallet`);
+        } catch (error) {
+            const msg = `Unable to setup tracking of gasCoin instance(s). Error=${error}`;
+            this.#logger.error(msg);
+            throw new Error(msg);
+        }
     }
 
     #setupCoinInstances = async () => {
-        await this.#trackInstances();
-
-        this.#setMainGasCoin();
-
-        if (this.#mainGasCoin === undefined) {
-            throw new Error("Unable to set mainGasCoin");
-        }
-
-        this.#mainGasCoin.status = GasCoinStatus.InUse;
         try {
+            await this.#trackInstances();
+
+            this.#setMainGasCoin();
+
+            if (this.#mainGasCoin === undefined || this.#mainGasCoin === null) {
+                throw new Error("Unable to set mainGasCoin");
+            }
+
+            this.#mainGasCoin.status = GasCoinStatus.InUse;
             let trackedCoinsToMerge = this.#trackedCoinsToMerge();
             if (trackedCoinsToMerge.length > 0) {
                 this.#logger.info(`Merging ${trackedCoinsToMerge.length} coins with balance <= ${this.#minBalancePerInstanceMist} and balance > ${this.#balancePerInstanceMist} into the mainGasCoin`);
@@ -162,11 +169,13 @@ export class GasManager {
                 await this.#createChildInstances(instancesNeeded, instanceToSplit);
             }
         } finally {
-            await this.#mainGasCoin.updateInstance(this.#suiClient);
-            this.#mainGasCoin.status = GasCoinStatus.Free;
+            if (this.#mainGasCoin) {
+                await this.#mainGasCoin.updateInstance(this.#suiClient);
+                this.#mainGasCoin.status = GasCoinStatus.Free;
 
-            this.#gasCoinKeys = [...this.#gasCoins.keys()];
-            this.#nextCoinIdx = 0;
+                this.#gasCoinKeys = [...this.#gasCoins.keys()];
+                this.#nextCoinIdx = 0;
+            }
         }
     }
 
@@ -215,26 +224,26 @@ export class GasManager {
     }
 
     #onSyncTimer = async () => {
-        if (this.#mainGasCoin === undefined) {
-            this.#logger.debug(`onSyncTimer: mainGasCoin not set. Skipping`);
-            return;
-        }
-        if (this.#mainGasCoin.status !== GasCoinStatus.Free) {
-            this.#logger.debug(`onSyncTimer: mainGasCoin is in use. Skipping`);
-            return;
-        }
-
-        this.#logger.debug(`onSyncTimer: mainGasCoin=${this.#mainGasCoin.objectId} balanceMist=${this.#mainGasCoin.balanceMist}`);
-
-        this.#mainGasCoin.status = GasCoinStatus.InUse;
-
-        // Check for untracked SUI coins in the wallet and merge them into
-        // the main gas coin.
-        // Merge coins with <= minBalancePerInstanceMist and > balancePerinstanceMist into the mainGasCoin
-        let untrackedCoinsToMerge = Array<string>();
         let trackedCoinsToMerge = Array<string>();
+        let untrackedCoinsToMerge = Array<string>();
         let mergeStatus = false;
         try {
+            if (this.#mainGasCoin === undefined) {
+                this.#logger.debug(`onSyncTimer: mainGasCoin not set. Skipping`);
+                return;
+            }
+            if (this.#mainGasCoin.status !== GasCoinStatus.Free) {
+                this.#logger.debug(`onSyncTimer: mainGasCoin is in use. Skipping`);
+                return;
+            }
+
+            this.#logger.debug(`onSyncTimer: mainGasCoin=${this.#mainGasCoin.objectId} balanceMist=${this.#mainGasCoin.balanceMist}`);
+
+            this.#mainGasCoin.status = GasCoinStatus.InUse;
+
+            // Check for untracked SUI coins in the wallet and merge them into
+            // the main gas coin.
+            // Merge coins with <= minBalancePerInstanceMist and > balancePerinstanceMist into the mainGasCoin
             untrackedCoinsToMerge = await this.#untrackedCoinsToMerge();
             trackedCoinsToMerge = this.#trackedCoinsToMerge();
 
@@ -247,44 +256,47 @@ export class GasManager {
                                                       ...trackedCoinsToMerge]);
             }
         } finally {
-            if (trackedCoinsToMerge.length > 0) {
-                this.#logger.debug(`Updating details`);
+            setTimeout(async () => { await this.#onSyncTimer(); },
+                       this.#syncIntervalMs);
 
-                await this.#mainGasCoin.updateInstance(this.#suiClient);
+            if (this.#mainGasCoin) {
+                if (trackedCoinsToMerge.length > 0) {
+                    this.#logger.debug(`Updating details`);
 
-                if (mergeStatus) {
-                    for (let coin of trackedCoinsToMerge) {
-                        this.#gasCoins.delete(coin);
-                    }
+                    await this.#mainGasCoin.updateInstance(this.#suiClient);
 
-                    const instancesNeeded =
-                        this.#expectedCount - this.#gasCoins.size;
-                    const instanceToSplit = this.#mainGasCoin;
-                    if (instancesNeeded > 0) {
-                        this.#logger.info(`Available child gasCoinInstances=${this.#gasCoins.size} is less than the expectedCount=${this.#expectedCount}. Splitting the mainGasCoin`);
+                    if (mergeStatus) {
+                        for (let coin of trackedCoinsToMerge) {
+                            this.#gasCoins.delete(coin);
+                        }
 
-                        await this.#createChildInstances(instancesNeeded,
-                                                         instanceToSplit);
-                    }
-                } else {
-                    for (let coinId of trackedCoinsToMerge) {
-                        let coin = this.#gasCoins.get(coinId);
-                        if (coin) {
-                            await coin.updateInstance(this.#suiClient);
-                            coin.status = GasCoinStatus.Free;
+                        const instancesNeeded =
+                            this.#expectedCount - this.#gasCoins.size;
+                        const instanceToSplit = this.#mainGasCoin;
+                        if (instancesNeeded > 0) {
+                            this.#logger.info(`Available child gasCoinInstances=${this.#gasCoins.size} is less than the expectedCount=${this.#expectedCount}. Splitting the mainGasCoin`);
+
+                            await this.#createChildInstances(instancesNeeded,
+                                                             instanceToSplit);
+                        }
+                    } else {
+                        for (let coinId of trackedCoinsToMerge) {
+                            let coin = this.#gasCoins.get(coinId);
+                            if (coin) {
+                                await coin.updateInstance(this.#suiClient);
+                                coin.status = GasCoinStatus.Free;
+                            }
                         }
                     }
+                    await this.#mainGasCoin.updateInstance(this.#suiClient);
                 }
-                await this.#mainGasCoin.updateInstance(this.#suiClient);
+                if (untrackedCoinsToMerge.length > 0 && trackedCoinsToMerge.length ===0) {
+                    await this.#mainGasCoin.updateInstance(this.#suiClient);
+                }
+                this.#mainGasCoin.status = GasCoinStatus.Free;
             }
-            if (untrackedCoinsToMerge.length > 0 && trackedCoinsToMerge.length ===0) {
-                await this.#mainGasCoin.updateInstance(this.#suiClient);
-            }
-            this.#mainGasCoin.status = GasCoinStatus.Free;
         }
 
-        await setTimeout(async () => { await this.#onSyncTimer(); },
-                         this.#syncIntervalMs);
     };
 
     #createChildInstances = async (instancesNeeded: number,

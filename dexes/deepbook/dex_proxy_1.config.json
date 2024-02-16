@@ -7,15 +7,15 @@
     "port": 3001
   },
   "dex": {
-      "log_responses": true,
-    "chain_name": "Sui Testnet",
+    "log_responses": true,
+    "chain_name": "Sui Mainnet for Test",
     "wallet_address": "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c",
     "exchange_connectors": {
         "rest": {
-            "url": "https://sui-mainnet-rpc.allthatnode.com/dyxK3revHoiBSJmoJpkSBctb5sUsE7Og"
+            "url": "https://sui-mainnet-rpc.allthatnode.com/jUaHO5Ln9iumZgs24kEbKPvxT2buRqLp"
         },
         "ws": {
-            "url": "wss://sui-mainnet-rpc-ws.allthatnode.com/dyxK3revHoiBSJmoJpkSBctb5sUsE7Og",
+            "url": "wss://sui-mainnet-rpc.allthatnode.com/jUaHO5Ln9iumZgs24kEbKPvxT2buRqLp",
             "rpc_call_timeout_s": 30,
             "reconnect_timeout_s": 3,
             "max_reconnects": 5
@@ -47,7 +47,7 @@
         "balance_per_instance_mist": "2,000,000,000",
         "min_balance_per_instance_mist": "1,000,000,000",
         "gas_budget_mist": "100,000,000",
-        "sync_interval_s": 10
+        "sync_interval_s": 30
     },
     "order_cache": {
         "purge_interval_s": 600
