@@ -89,7 +89,7 @@ class UniswapV3(DexCommon):
                 self._transactions_status_poller.add_for_polling(result.tx_hash, client_request_id, RequestType.ORDER)
                 self._request_cache.add_or_update_request_in_redis(client_request_id)
 
-                return 200, {'result': {'order_id': result.tx_hash, 'nonce': result.nonce}}
+                return 200, {'result': {'tx_hash': result.tx_hash, 'nonce': result.nonce}}
             else:
                 self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
@@ -184,6 +184,8 @@ class UniswapV3(DexCommon):
             }
 
             await self._event_sink.on_event('ORDER', event)
+        else:
+            self._logger.debug(f"On request status update: {request}")
 
     async def __get_tx_status_ws(self):
         self.pantheon.spawn(self.__receive_ws_messages())

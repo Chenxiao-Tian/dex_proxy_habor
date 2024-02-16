@@ -118,12 +118,14 @@ class DexCommon(ABC):
         pass
 
     @abstractmethod
-    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict):
+    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict, mined_tx_hash: str):
         """
         Called when a request status is changed, usually by `TransactionsStatusPoller`
-        The default implementation is merely to finalise the request.
         """
-        self._request_cache.finalise_request(client_request_id, request_status)
+        request = self._request_cache.get(client_request_id)
+        if request:
+            request.dex_specific["mined_tx_hash"] = mined_tx_hash
+            self._request_cache.finalise_request(client_request_id, request_status)
 
     @abstractmethod
     async def start(self, private_key):
@@ -174,7 +176,6 @@ class DexCommon(ABC):
         else:
             return 503, {"status": "starting"}
 
-
     async def __cancel_request(self, path, params: dict, received_at_ms):
         try:
             client_request_id = params['client_request_id']
@@ -219,10 +220,7 @@ class DexCommon(ABC):
                 self._transactions_status_poller.add_for_polling(result.tx_hash, client_request_id, RequestType.CANCEL)
                 self._request_cache.add_or_update_request_in_redis(client_request_id)
 
-                if request.request_type == RequestType.ORDER:
-                    return 200, {'result': {'order_id': request.order_id}}
-                else:
-                    return 200, {'result': {'tx_hash': result.tx_hash}}
+                return 200, {'result': {'tx_hash': result.tx_hash}}
             else:
                 return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
 
@@ -405,10 +403,7 @@ class DexCommon(ABC):
                         result.tx_hash, client_request_id, request.request_type)
                     self._request_cache.add_or_update_request_in_redis(client_request_id)
 
-                    if request.request_type == RequestType.ORDER:
-                        return 200, {'result': {'order_id': request.order_id}}
-                    else:
-                        return 200, {'result': {'tx_hash': result.tx_hash}}
+                    return 200, {'result': {'tx_hash': result.tx_hash}}
                 else:
                     return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
             else:
