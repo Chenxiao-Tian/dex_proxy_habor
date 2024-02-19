@@ -37,15 +37,6 @@ class TransactionsStatusPoller:
             await self.__poll_tx(self.__tx_hash_to_client_rid_and_request_type)
             await self.pantheon.sleep(self.__poll_interval_s)
 
-    async def finalise(self, tx_hash: str, request_status: RequestStatus):
-        assert request_status is not None, 'Invalid request_status provided'
-
-        if tx_hash not in self.__tx_hash_to_client_rid_and_request_type:
-            return
-
-        client_request_id, _ = self.__tx_hash_to_client_rid_and_request_type[tx_hash]
-        await self.__dex.on_request_status_update(client_request_id, request_status, None)
-
     async def __poll_tx(self, tx_hash_to_client_r_id_and_request_type: dict):
         for tx_hash in list(tx_hash_to_client_r_id_and_request_type.keys()):
             self.__logger.debug(f'Polling tx_hash {tx_hash}')

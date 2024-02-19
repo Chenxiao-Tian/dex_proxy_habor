@@ -165,7 +165,7 @@ class Paradex(DexCommon):
                         self.__jwt = None
                         self._logger.error(f"Unable to refresh JWT. Exchange returned status_code({status_code}), error({response['error']}), details({response['message']})")
         except Exception as ex:
-           self._logger.error(f"Unable to refresh JWT. Error[{str(ex)}]")
+            self._logger.error(f"Unable to refresh JWT. Error[{str(ex)}]")
 
     def __assert_order_request_schema(self, received_keys: list) -> None:
         expected_keys = [
@@ -335,8 +335,8 @@ class Paradex(DexCommon):
     def _get_gas_price(self, request, priority_fee: PriorityFee):
         return self.__gas_price_tracker.get_gas_price(priority_fee=priority_fee)
 
-    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict):
-        await super().on_request_status_update(client_request_id, request_status, tx_receipt)
+    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict, mined_tx_hash: str = None):
+        await super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
 
     async def _get_all_open_requests(self, path: str, params: dict, received_at_ms: int):
         return await super()._get_all_open_requests(path, params, received_at_ms)

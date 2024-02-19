@@ -333,7 +333,7 @@ class UniswapV3Bloxroute(DexCommon):
         raise Exception(
             'Gas Price Tracker not supported by uni3 dex-proxy with Bloxroute integrated')
 
-    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict):
+    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict, mined_tx_hash: str = None):
         request = self.get_request(client_request_id)
         if (request == None):
             return
@@ -341,7 +341,7 @@ class UniswapV3Bloxroute(DexCommon):
         if (request_status == RequestStatus.SUCCEEDED and request.request_type == RequestType.ORDER):
             await self.__compute_exec_price(request, tx_receipt)
 
-        await super().on_request_status_update(client_request_id, request_status, tx_receipt)
+        await super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
 
         if request.request_type == RequestType.ORDER:
             event = {
