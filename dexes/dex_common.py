@@ -118,13 +118,14 @@ class DexCommon(ABC):
         pass
 
     @abstractmethod
-    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict, mined_tx_hash: str):
+    async def on_request_status_update(self, client_request_id, request_status: RequestStatus, tx_receipt: dict, mined_tx_hash: str = None):
         """
         Called when a request status is changed, usually by `TransactionsStatusPoller`
         """
         request = self._request_cache.get(client_request_id)
         if request:
-            request.dex_specific["mined_tx_hash"] = mined_tx_hash
+            if mined_tx_hash and (request_status == RequestStatus.SUCCEEDED or request_status == RequestStatus.CANCELED):
+                request.dex_specific["mined_tx_hash"] = mined_tx_hash
             self._request_cache.finalise_request(client_request_id, request_status)
 
     @abstractmethod

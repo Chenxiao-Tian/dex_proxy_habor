@@ -163,7 +163,7 @@ class UniswapV3(DexCommon):
     def _get_gas_price(self, request, priority_fee: PriorityFee):
         return self.__gas_price_tracker.get_gas_price(priority_fee=priority_fee)
 
-    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict):
+    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict, mined_tx_hash: str = None):
         request = self.get_request(client_request_id)
         if (request == None):
             return
@@ -171,7 +171,7 @@ class UniswapV3(DexCommon):
         if (request_status == RequestStatus.SUCCEEDED and request.request_type == RequestType.ORDER):
             await self.__compute_exec_price(request, tx_receipt)
 
-        await super().on_request_status_update(client_request_id, request_status, tx_receipt)
+        await super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
 
         if request.request_type == RequestType.ORDER:
             event = {
