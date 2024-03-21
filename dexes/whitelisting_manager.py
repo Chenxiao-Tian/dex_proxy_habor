@@ -13,6 +13,7 @@ from pyutils.exchange_connectors import ConnectorFactory, ConnectorType
 
 
 class WhitelistingManager:
+    base_ex_msg = f"Error in getting whitelisted withdrawal addresses and tokens from fireblocks: %r"
     def __init__(self, pantheon: Pantheon, dex, config: dict):
         self.__pantheon = pantheon
         self.__dex = dex
@@ -152,9 +153,12 @@ class WhitelistingManager:
                 self.__dex._on_fireblocks_withdrawal_whitelist_refresh(fireblocks_withdrawal_address_whitelist)
 
                 self.__first_value_fetched.set()
-            except Exception as ex:
-                self.__logger.exception(f"Error in getting whitelisted withdrawal addresses and tokens from fireblocks: %r", ex)
+            except TimeoutError as timeout_ex:
+                self.__logger.warning(WhitelistingManager.base_ex_msg, timeout_ex)
                 await self.__pantheon.sleep(30)
                 continue
-
+            except Exception as ex:
+                self.__logger.exception(WhitelistingManager.base_ex_msg, ex)
+                await self.__pantheon.sleep(30)
+                continue
             await self.__pantheon.sleep(120)
