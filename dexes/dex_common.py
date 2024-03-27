@@ -305,7 +305,7 @@ class DexCommon(ABC):
             if not ok:
                 return 400, {'error': {'message': reason}}
 
-            request = ApproveRequest(client_request_id, symbol, amount, gas_limit, received_at_ms)
+            request = ApproveRequest(client_request_id, symbol, amount, gas_limit, path, received_at_ms)
             self._logger.debug(f'Approving={request}, gas_price_wei={gas_price_wei}')
 
             self._request_cache.add(request)
