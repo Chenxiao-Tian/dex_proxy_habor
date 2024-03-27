@@ -406,7 +406,7 @@ class Lyra(DexCommon):
     async def __approve_deposit_to_subaccount(self, path: str, params: dict, received_at_ms: int) -> Tuple[int, dict]:
         client_request_id = ""
         try:
-            approve = self.__get_approve_request_obj(params, received_at_ms)
+            approve = self.__get_approve_request_obj(path, params, received_at_ms)
             self.__mark_as_l2_request(approve)
             self._logger.info(f"Approving={approve}, request_path={path}")
 
@@ -422,7 +422,7 @@ class Lyra(DexCommon):
     async def __approve_withdraw_from_subaccount(self, path: str, params: dict, received_at_ms: int) -> Tuple[int, dict]:
         client_request_id = ""
         try:
-            approve = self.__get_approve_request_obj(params, received_at_ms)
+            approve = self.__get_approve_request_obj(path, params, received_at_ms)
             self.__mark_as_l2_request(approve)
             self._logger.info(f"Approving={approve}, request_path={path}")
 
@@ -766,7 +766,7 @@ class Lyra(DexCommon):
     async def __approve_deposit_into_l2(self, path: str, params: dict, received_at_ms: int) -> Tuple[int, dict]:
         client_request_id = ""
         try:
-            approve = self.__get_approve_request_obj(params, received_at_ms)
+            approve = self.__get_approve_request_obj(path, params, received_at_ms)
 
             gas_limit = int(params["gas_limit"])
             gas_price_wei = int(params["gas_price_wei"])
@@ -794,7 +794,7 @@ class Lyra(DexCommon):
     async def __approve_withdraw_from_l2(self, path: str, params: dict, received_at_ms: int) -> Tuple[int, dict]:
         client_request_id = ""
         try:
-            approve = self.__get_approve_request_obj(params, received_at_ms)
+            approve = self.__get_approve_request_obj(path, params, received_at_ms)
             self.__mark_as_l2_request(approve)
             self._logger.info(f"Approving={approve}, request_path={path}")
 
@@ -1027,7 +1027,7 @@ class Lyra(DexCommon):
         except Exception as e:
             return 400, {"error": {"message": repr(e)}}
 
-    def __get_approve_request_obj(self, params: dict, received_at_ms: int) -> ApproveRequest:
+    def __get_approve_request_obj(self, request_path: str, params: dict, received_at_ms: int) -> ApproveRequest:
         client_request_id = params["client_request_id"]
         if self._request_cache.get(client_request_id) is not None:
             raise Exception(f"client_request_id={client_request_id} is already known")
@@ -1040,6 +1040,7 @@ class Lyra(DexCommon):
             symbol=symbol,
             amount=amount,
             gas_limit=0,
+            request_path=request_path,
             received_at_ms=received_at_ms,
         )
 
