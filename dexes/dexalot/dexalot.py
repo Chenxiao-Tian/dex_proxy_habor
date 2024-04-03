@@ -62,11 +62,9 @@ class Dexalot(DexCommon):
 
     async def _amend_transaction(self, request, params, gas_price_wei):
         if request.request_type == RequestType.TRANSFER:
-            return await self._transfer(request, request.request_path, request.symbol, request.address_to, request.amount,
-                                        request.gas_limit, gas_price_wei, request.nonce)
+            return await self._transfer(request, gas_price_wei, request.nonce)
         elif request.request_type == RequestType.APPROVE:
-            return await self._approve(request, request.symbol, request.amount, request.gas_limit, gas_price_wei,
-                                       nonce=request.nonce)
+            return await self._approve(request, gas_price_wei, nonce=request.nonce)
         else:
             raise RuntimeError(f'Unable to amend request type {request.request_type.name}')
 
@@ -83,11 +81,19 @@ class Dexalot(DexCommon):
         else:
             assert False
 
-    async def _approve(self, request, symbol, amount, gas_limit, gas_price_wei, nonce=None):
+    async def _approve(self, request, gas_price_wei, nonce=None):
+        symbol = request.symbol
+        amount = request.amount
+        gas_limit = request.gas_limit
         self._logger.debug(f'Approving deposit into subnet: symbol={symbol}, amount={amount}')
         return await self._api.mainnet.approve_deposit_into_subnet(symbol, amount, gas_limit, gas_price_wei, nonce)
 
-    async def _transfer(self, request, path, symbol, address_to, amount, gas_limit, gas_price_wei, nonce=None):
+    async def _transfer(self, request, gas_price_wei, nonce=None):
+        path = request.request_path
+        symbol = request.symbol
+        address_to = request.address_to
+        amount = request.amount
+        gas_limit = request.gas_limit
         if path == '/private/withdraw':
             self._logger.debug(
                 f'Withdrawing from mainnet: symbol={symbol}, amount={amount}, address_to={address_to}')

@@ -82,14 +82,14 @@ class DexCommon(ABC):
         pass
 
     @abstractmethod
-    async def _approve(self, request, symbol, amount, gas_limit, gas_price_wei, nonce=None):
+    async def _approve(self, request, gas_price_wei, nonce=None):
         """
         Initiates a transaction to allow a designated spender to use a certain amount of token.
         """
         pass
 
     @abstractmethod
-    async def _transfer(self, request, path, symbol, address_to, amount, gas_limit, gas_price_wei, nonce=None):
+    async def _transfer(self, request, gas_price_wei, nonce=None):
         """
         Initiates a transaction to transfer a certain amount of token to a designated address.
         """
@@ -310,7 +310,7 @@ class DexCommon(ABC):
 
             self._request_cache.add(request)
 
-            result = await self._approve(request, symbol, amount, gas_limit, gas_price_wei)
+            result = await self._approve(request=request, gas_price_wei=gas_price_wei)
             if result.error_type == ErrorType.NO_ERROR:
                 request.nonce = result.nonce
                 request.tx_hashes.append((result.tx_hash, RequestType.APPROVE.name))
@@ -358,7 +358,7 @@ class DexCommon(ABC):
 
             self._request_cache.add(transfer)
 
-            result = await self._transfer(transfer, path, symbol, address_to, amount, gas_limit, gas_price_wei)
+            result = await self._transfer(request=transfer, gas_price_wei=gas_price_wei)
 
             transfer.nonce = result.nonce
             if result.error_type == ErrorType.NO_ERROR:

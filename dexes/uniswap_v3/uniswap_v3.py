@@ -111,10 +111,15 @@ class UniswapV3(DexCommon):
     async def process_request(self, ws, request_id, method, params: dict):
         return False
 
-    async def _approve(self, request, symbol, amount, gas_limit, gas_price_wei, nonce=None):
-        return await self._api.approve(symbol, amount, gas_limit, gas_price_wei, nonce)
+    async def _approve(self, request, gas_price_wei, nonce=None):
+        return await self._api.approve(request.symbol, request.amount, request.gas_limit, gas_price_wei, nonce)
 
-    async def _transfer(self, request, path, symbol, address_to, amount, gas_limit, gas_price_wei, nonce=None):
+    async def _transfer(self, request,gas_price_wei, nonce=None):
+        path = request.request_path
+        symbol = request.symbol
+        address_to = request.address_to
+        amount = request.amount
+        gas_limit = request.gas_limit,
         if path == '/private/withdraw':
             assert address_to is not None
             return await self._api.withdraw(symbol, address_to, amount, gas_limit, gas_price_wei)

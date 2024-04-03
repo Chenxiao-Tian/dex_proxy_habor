@@ -633,15 +633,16 @@ class Lyra(DexCommon):
     def __is_l2_request(self, request: Request) -> bool:
         return request.dex_specific and (request.dex_specific.get("chain", "") == "L2")
 
-    async def _approve(self, request, symbol: str, amount: Decimal, gas_limit: int, gas_price_wei: int, nonce: int = None):
+    async def _approve(self, request, gas_price_wei: int, nonce: int = None):
         raise Exception(f"The endpoint is not supported in Lyra")
 
     async def _transfer(
-        self, request, path: str, symbol: str, address_to: str, amount: str, gas_limit: int, gas_price_wei: int, nonce: int = None
+        self, request, gas_price_wei: int, nonce: int = None,
     ):
-        if path == "/private/withdraw":
-            assert address_to is not None
-            return await self._api.withdraw(symbol, address_to, amount, gas_limit, gas_price_wei)
+        if request.request_path == "/private/withdraw":
+            assert request.address_to is not None
+            return await self._api.withdraw(request.symbol, request.address_to, request.amount,
+                                            request.gas_limit, gas_price_wei)
         else:
             assert False
 
