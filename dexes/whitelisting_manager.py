@@ -153,7 +153,7 @@ class WhitelistingManager:
                 self.__dex._on_fireblocks_withdrawal_whitelist_refresh(fireblocks_withdrawal_address_whitelist)
 
                 self.__first_value_fetched.set()
-            except TimeoutError as timeout_ex:
+            except asyncio.TimeoutError as timeout_ex:
                 self.__logger.warning(WhitelistingManager.base_ex_msg, timeout_ex)
                 await self.__pantheon.sleep(30)
                 continue
