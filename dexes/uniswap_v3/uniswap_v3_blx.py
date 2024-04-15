@@ -94,7 +94,7 @@ class UniswapV3Bloxroute(DexCommon):
                 built_tx = self._api.build_unwrap_tx(wrapped_token_symbol='WETH', amount=request.amount, gas_limit=request.gas_limit,
                     gas_price=gas_price_wei, nonce=request.nonce)
         elif transaction_type == RequestType.APPROVE:
-            built_tx = self._api.build_approve_tx(token_symbol=request.symbol, amount=request.amount, gas_limit=request.gas_limit,
+            built_tx = self._api.build_approve_tx(token_symbol=request.symbol, token_amount=request.amount, gas_limit=request.gas_limit,
                 gas_price=gas_price_wei, nonce=request.nonce)
         elif transaction_type == RequestType.TRANSFER:
             built_tx = self._api.build_withdraw_tx(
