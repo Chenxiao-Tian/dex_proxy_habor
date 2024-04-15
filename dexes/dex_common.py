@@ -124,7 +124,7 @@ class DexCommon(ABC):
         """
         request = self._request_cache.get(client_request_id)
         if request:
-            if mined_tx_hash and (request_status == RequestStatus.SUCCEEDED or request_status == RequestStatus.CANCELED):
+            if mined_tx_hash:
                 request.dex_specific["mined_tx_hash"] = mined_tx_hash
             self._request_cache.finalise_request(client_request_id, request_status)
 

@@ -31,6 +31,11 @@ class BlockInfo:
         self.bundles_sent_for_targeted_block = 0
         self.client_requ_id_vs_raw_txs = {}
 
+class OrderInfo:
+    def __init__(self, gas_price_wei: int, base_ccy_qty: Decimal, quote_ccy_qty: Decimal):
+        self.gas_price_wei = gas_price_wei
+        self.base_ccy_qty = base_ccy_qty
+        self.quote_ccy_qty = quote_ccy_qty
 
 class UniswapV3Bloxroute(DexCommon):
     CHANNELS = ['ORDER']
@@ -54,6 +59,7 @@ class UniswapV3Bloxroute(DexCommon):
         self.__native_token = config['native_token']
         self.__max_bundles_per_block = self._config['max_bundles_per_block']
         self.__targeted_block_info = BlockInfo()
+        self.__tx_hash_to_order_info: Dict[str, OrderInfo] = {}
 
     def __split_symbol_to_base_quote_ccy(self, symbol):
         instrument = self.__instruments.get_instrument(
@@ -166,6 +172,7 @@ class UniswapV3Bloxroute(DexCommon):
             order.used_gas_prices_wei.append(gas_price_wei)
             order.dex_specific = {'targeted_block_num': next_block_num, 'uuid': next_block_uuid}
             self._transactions_status_poller.add_for_polling(tx_hash, client_request_id, RequestType.ORDER)
+            self.__tx_hash_to_order_info[tx_hash] = OrderInfo(gas_price_wei, order.base_ccy_qty, order.quote_ccy_qty)
 
             await self._api.send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block, next_block_num,
                                         next_block_uuid)
@@ -176,6 +183,7 @@ class UniswapV3Bloxroute(DexCommon):
 
         except Exception as e:
             self._logger.exception(f'Failed to insert order: %r', e)
+            self.__orders_pre_finalisation_clean_up(order)
             self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': repr(e)}}
 
@@ -345,7 +353,6 @@ class UniswapV3Bloxroute(DexCommon):
                                     self.__targeted_block_info.next_block_num,
                                     self.__targeted_block_info.next_block_uuid)
 
-
         return ApiResult(nonce=to_cancel_request.nonce, tx_hash=to_cancel_request.tx_hashes[-1][0])
 
     async def _amend_transaction(self, request: Request, params, gas_price_wei):
@@ -387,14 +394,17 @@ class UniswapV3Bloxroute(DexCommon):
         self.__targeted_block_info.bundles_sent_for_targeted_block += 1
         base_ccy_symbol, quote_ccy_symbol, instrument = self.__split_symbol_to_base_quote_ccy(request.symbol)
 
-        timeout_s = int(time.time() + params['timeout_s'])
-        request.deadline_since_epoch_s = timeout_s
-
         if (not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol)):
             return ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message='unexpected instrument native code')
 
+        request.deadline_since_epoch_s = int(time.time() + params["timeout_s"])
+        request.base_ccy_qty = Decimal(params["base_ccy_qty"])
+        request.quote_ccy_qty = Decimal(params["quote_ccy_qty"])
+
         new_raw_tx, tx_hash = self.__get_signed_transaction_from_client_info(request, gas_price_wei)
         self.__targeted_block_info.raw_txs_in_targeted_block[raw_tx_idx] = new_raw_tx
+        self.__tx_hash_to_order_info[tx_hash] = OrderInfo(gas_price_wei, request.base_ccy_qty, request.quote_ccy_qty)
+
         await self._api.send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block, next_block_num,
                                     next_block_uuid)
 
@@ -417,7 +427,11 @@ class UniswapV3Bloxroute(DexCommon):
             return
 
         if (request_status == RequestStatus.SUCCEEDED and request.request_type == RequestType.ORDER):
+            self.__populate_orders_dex_specifics(request, mined_tx_hash)
             await self.__compute_exec_price(request, tx_receipt)
+
+        if (request.request_type == RequestType.ORDER):
+            self.__orders_pre_finalisation_clean_up(request)
 
         await super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
 
@@ -572,6 +586,7 @@ class UniswapV3Bloxroute(DexCommon):
                                 break
 
                         if (not request_mined):
+                            self.__orders_pre_finalisation_clean_up(request)
                             await self.on_request_status_update(request.client_request_id, RequestStatus.FAILED, None)
                         # else:
                         #     transaction_status_poller will handle finalising the request
@@ -697,3 +712,16 @@ class UniswapV3Bloxroute(DexCommon):
         base_ccy_address = self._api.get_erc20_contract(base_ccy).address
         quote_ccy_address = self._api.get_erc20_contract(quote_ccy).address
         return instr_native_code.upper().endswith("-" + base_ccy_address.upper() + "-" + quote_ccy_address.upper())
+
+    def __populate_orders_dex_specifics(self, order_request: OrderRequest, mined_tx_hash: str):
+        order_info = None
+        if mined_tx_hash:
+            order_info = self.__tx_hash_to_order_info.get(mined_tx_hash)
+        if order_info:
+            order_request.dex_specific["mined_tx_gas_price_wei"] = order_info.gas_price_wei
+            order_request.dex_specific["mined_tx_base_ccy_qty"] = str(order_info.base_ccy_qty)
+            order_request.dex_specific["mined_tx_quote_ccy_qty"] = str(order_info.quote_ccy_qty)
+
+    def __orders_pre_finalisation_clean_up(self, order_request: OrderRequest):
+        for tx_hash, _ in order_request.tx_hashes:
+            self.__tx_hash_to_order_info.pop(tx_hash, None)
