@@ -586,7 +586,6 @@ class UniswapV3Bloxroute(DexCommon):
                                 break
 
                         if (not request_mined):
-                            self.__orders_pre_finalisation_clean_up(request)
                             await self.on_request_status_update(request.client_request_id, RequestStatus.FAILED, None)
                         # else:
                         #     transaction_status_poller will handle finalising the request
