@@ -70,8 +70,6 @@ default:
     CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
   - PROCESS_NAME: dex_proxy-dexa-fuji
     CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-dev.git
-  - PROCESS_NAME: dex_proxy-uni3-goerli-4
-    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-dev.git
   - PROCESS_NAME: dex_proxy-uni3-goerli-5
     CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-dev.git
   - PROCESS_NAME: dex_proxy-chainEth-uni3-main-1
