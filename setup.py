@@ -22,7 +22,7 @@ setuptools.setup(
         "boto3==1.26.55",
         "eth-account==0.8.0",
         "ujson==5.7.0",
-        "pantheon @ git+ssh://git@bitbucket.org/kenetic/pytheon.git@pytheon-1.2.38",
-        "pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@pyutils-1.9.88",
+        "pantheon @ git+ssh://git@bitbucket.org/kenetic/pytheon.git@pytheon-1.2.39",
+        "pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@pyutils-1.9.94",
     ],
 )
