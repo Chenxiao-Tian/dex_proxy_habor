@@ -1058,11 +1058,11 @@ class Lyra(DexCommon):
             self._request_cache.finalise_request(approve.client_request_id, RequestStatus.FAILED)
             return 400, {"error": {"code": result.error_type.value, "message": result.error_message}}
 
-    def __get_native_amount(self, symbol: str, amount: int) -> int:
+    def __get_native_amount(self, symbol: str, amount: Decimal) -> int:
         if symbol == "ETH":
             return Web3.to_wei(amount, "ether")
         else:
-            return self._api.to_native_amount(symbol, int(amount))
+            return self._api.to_native_amount(symbol, amount)
 
     # async def __get_withdrawal_from_l2_status(self, path: str, params: dict, received_at_ms: int) -> ApiResult:
     #     tx_hash = params["tx_hash"]

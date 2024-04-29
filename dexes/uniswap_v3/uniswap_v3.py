@@ -246,8 +246,8 @@ class UniswapV3(DexCommon):
                     base_ccy_symbol = instrument.base_currency
                     quote_ccy_symbol = instrument.quote_currency
 
-                    token0_amount = Decimal(swap_log[0]['args']['amount0'])
-                    token1_amount = Decimal(swap_log[0]['args']['amount1'])
+                    token0_amount = int(swap_log[0]['args']['amount0'])
+                    token1_amount = int(swap_log[0]['args']['amount1'])
 
                     if (request.side == Side.BUY):
                         if (token0_amount > 0):
