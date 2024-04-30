@@ -6,6 +6,7 @@ from pyutils.exchange_connectors import ConnectorType
 from pyutils.gas_pricing.eth import GasPriceTracker, PriorityFee
 from pyutils.exchange_apis.lyra_api import *
 from pantheon import Pantheon
+from pantheon.pantheon_types import Side
 
 # For type annotations
 from decimal import Decimal
@@ -22,15 +23,16 @@ from web_server import WebServer
 class SigningData:
     def __init__(
         self,
-        address,
-        key,
-        trade_module_address,
-        withdraw_module_address,
-        deposit_module_address,
-        domain_separator,
-        action_typehash,
-        cash_address,
-        risk_manager_addresses,
+        address: str,
+        key: bytes,
+        trade_module_address: str,
+        withdraw_module_address: str,
+        deposit_module_address: str,
+        domain_separator: str,
+        action_typehash: str,
+        cash_address: str,
+        risk_manager_addresses: str,
+        rfq_module_address: str
     ):
         self.address = address
         self.key = key
@@ -41,6 +43,7 @@ class SigningData:
         self.action_typehash = action_typehash
         self.cash_address = cash_address
         self.risk_manager_addresses = risk_manager_addresses
+        self.rfq_module_address = rfq_module_address
 
 
 class Order:
@@ -57,6 +60,29 @@ class Order:
         self.asset_sub_id = asset_sub_id
 
 
+class QuoteLeg:
+    def __init__(self, quantity: Decimal, price: Decimal, side: Side,
+                 asset_address: str, asset_sub_id: int):
+        self.quantity = quantity
+        self.side = side
+        self.price = price
+        self.asset_address = asset_address
+        self.asset_sub_id = asset_sub_id
+
+
+class Quote:
+    def __init__(self, req_id: int, priced_legs: list[QuoteLeg], side: Side,
+                 max_fee: Decimal, subaccount_id: int, nonce: int,
+                 signature_expiry_sec: int):
+        self.req_id = req_id
+        self.priced_legs = priced_legs
+        self.side = side
+        self.max_fee = max_fee
+        self.subaccount_id = subaccount_id
+        self.nonce = nonce
+        self.signature_expiry_sec = signature_expiry_sec
+
+
 def encode_order_data(order: Order):
     encoded_data = encode(
         ["address", "uint", "int", "int", "uint", "uint", "bool"],
@@ -64,6 +90,32 @@ def encode_order_data(order: Order):
     )
 
     return Web3.keccak(encoded_data)
+
+
+def encode_priced_legs(quote: Quote) -> list[tuple[str, int, int, int]]:
+    encoded_legs = []
+
+    encoded_quote_direction = 1 if quote.side == Side.BUY else -1
+    for leg in quote.priced_legs:
+        encoded_leg_direction = 1 if leg.side == Side.BUY else -1
+        signed_price = leg.price
+        signed_amount = leg.quantity * encoded_leg_direction * encoded_quote_direction
+        encoded_legs.append((leg.asset_address,
+                             leg.asset_sub_id,
+                             signed_price,
+                             signed_amount))
+
+    return encoded_legs
+
+
+def encode_quote_data(quote: Quote) -> bytes:
+    encoded_legs = encode_priced_legs(quote)
+    quote_data = (quote.max_fee, encoded_legs)
+    quote_data_abi = ["(uint,(address,uint,uint,int)[])"]
+    encoded_data = encode(quote_data_abi, [quote_data])
+    hashed_data = w3.keccak(hexstr=w3.to_hex(encoded_data)[2:])
+
+    return hashed_data
 
 
 def encode_subaccount_withdraw_data(cash_address: str, native_amount: int):
@@ -92,6 +144,22 @@ def generate_order_signature(signing_data: SigningData, order: Order) -> str:
         subaccount_id=order.subaccount_id,
         signature_expiry_sec=order.signature_expiry_sec,
         module_address=signing_data.trade_module_address,
+    )
+
+
+def generate_quote_signature(signing_data: SigningData, quote: Quote) -> str:
+    start = time.time()
+    encoded_data_hashed = encode_quote_data(quote)
+
+    return generate_signature(
+        encoded_data_hashed=encoded_data_hashed,
+        signing_start_time=start,
+        signing_data=signing_data,
+        req_id=quote.req_id,
+        nonce=quote.nonce,
+        subaccount_id=quote.subaccount_id,
+        signature_expiry_sec=quote.signature_expiry_sec,
+        module_address=signing_data.rfq_module_address
     )
 
 
@@ -201,6 +269,7 @@ class Lyra(DexCommon):
 
         server.register("POST", "/private/login-signature", self.__sign_login_request)
         server.register("POST", "/private/order-signature", self.__sign_order_request)
+        server.register("POST", "/private/quote-signature", self.__sign_quote_request)
 
         server.register("POST", "/private/approve-deposit-to-subaccount", self.__approve_deposit_to_subaccount)
         server.register("POST", "/private/approve-withdraw-from-subaccount", self.__approve_withdraw_from_subaccount)
@@ -233,6 +302,20 @@ class Lyra(DexCommon):
         max_nonce_cached = self._request_cache.get_max_nonce()
         self._api.initialize_starting_nonce(max_nonce_cached + 1)
 
+        def __assert(field, field_name) -> None:
+            assert field is not None, f"{field_name} is None"
+
+        __assert(self._api.l2_api._wallet_address, "wallet_address")
+        __assert(self._api.l2_api._account.key, "account.key")
+        __assert(self._api.l2_api.trade_module_address, "trade_module_address")
+        __assert(self._api.l2_api.withdraw_module_address, "withdraw_module_address")
+        __assert(self._api.l2_api.deposit_module_address, "deposit_module_adress")
+        __assert(self._api.l2_api.domain_separator, "domain_separator")
+        __assert(self._api.l2_api.action_typehash, "action_typehash")
+        __assert(self._api.l2_api.cash_address, "cash_address")
+        __assert(self._api.l2_api.risk_manager_addresses, "risk_manager_addresses")
+        __assert(self._api.l2_api.rfq_module_address, "rfq_module_addresss")
+
         self.signing_data = SigningData(
             self._api.l2_api._wallet_address,
             self._api.l2_api._account.key,
@@ -243,6 +326,7 @@ class Lyra(DexCommon):
             self._api.l2_api.action_typehash,
             self._api.l2_api.cash_address,
             self._api.l2_api.risk_manager_addresses,
+            self._api.l2_api.rfq_module_address
         )
 
         self.started = True
@@ -292,6 +376,24 @@ class Lyra(DexCommon):
             "signature_expiry_sec",
             "asset_sub_id",
             "asset_address",
+        ]
+
+        assert len(received_keys) == len(
+            expected_keys
+        ), f"Request does not contain the correct set of fields. Expected [{', '.join(expected_keys)}]"
+        for key in expected_keys:
+            assert key in received_keys, f"Missing field({key}) in the request"
+
+    def __assert_quote_request_schema(self, received_keys: list) -> None:
+        expected_keys = [
+            "priced_legs",
+            "direction",
+            "max_fee",
+            "subaccount_id",
+            "nonce",
+            "signature_expiry_sec",
+            "asset_address",
+            "asset_sub_ids"
         ]
 
         assert len(received_keys) == len(
@@ -402,6 +504,51 @@ class Lyra(DexCommon):
         except Exception as e:
             self._logger.exception(e)
             return 400, {"error": str(e)}
+
+    async def __sign_quote_request(self, path: str, params: dict, received_at_ms: int) -> Tuple[int, dict]:
+        try:
+            req_id = self.order_req_id
+            self.order_req_id += 1
+
+            start = time.time()
+
+            self._logger.debug(f"sign quote request ({req_id}) received at {start}")
+
+            self.__assert_quote_request_schema(params.keys())
+
+            priced_legs: list[QuoteLeg] = []
+            for idx, leg in enumerate(params["priced_legs"]):
+                priced_legs.append(QuoteLeg(
+                    quantity=int(Decimal(leg["amount"]) * int(1e18)),
+                    side=Side.BUY if leg["direction"] == "buy" else Side.SELL,
+                    price=int(Decimal(leg["price"]) * int(1e18)),
+                    asset_address=params["asset_address"],
+                    asset_sub_id=params["asset_sub_ids"][idx]
+                ))
+
+            quote = Quote(
+                req_id=req_id,
+                priced_legs=priced_legs,
+                side=Side.BUY if params["direction"] == "buy" else Side.SELL,
+                max_fee=int(Decimal(params["max_fee"]) * int(1e18)),
+                subaccount_id=params["subaccount_id"],
+                nonce=params["nonce"],
+                signature_expiry_sec=params["signature_expiry_sec"]
+            )
+
+            msg_signature = await self.pantheon.loop.run_in_executor(
+                self.__process_pool, generate_quote_signature, self.signing_data, quote
+            )
+
+            end = time.time()
+            sign_time = (end - start) * 1000
+
+            self._logger.debug(f"quote request ({req_id}) signature => {msg_signature}, took {sign_time} ms")
+
+            return 200, {"signature": msg_signature}
+
+        except Exception as e:
+            self._logger.exception(e)
 
     async def __approve_deposit_to_subaccount(self, path: str, params: dict, received_at_ms: int) -> Tuple[int, dict]:
         client_request_id = ""
