@@ -88,6 +88,10 @@ default:
     CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
   - PROCESS_NAME: dex_proxy-lyra-4
     CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
+  - PROCESS_NAME: dex_proxy-lyra-5
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
+  - PROCESS_NAME: dex_proxy-lyra-6
+    CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-prod.git
   - PROCESS_NAME: dex_proxy-deep-1
     CONFIG_REPO_URI: git@bitbucket.org:kenetic/config-dev.git
     TS_DEX_PATH: dexes/deepbook
