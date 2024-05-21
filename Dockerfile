@@ -26,7 +26,7 @@ RUN apt-get update \
 
 
 # SHASUM pin of registry.gitlab.com/auros/baseimg/ubuntu:22.04-enclave
-FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:073bfff30e2d2fbbba93c73ba289597a00f364dd2d857e5b22e10764b635b6e3
+FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:7cc95e4bdb772e8f17bc52ebc73fa9af2054740b90a44e9e4a137a344b859e2b
 
 # Valet/authentication/enclave configuration
 # Context ID is unique to this enclave.
@@ -35,6 +35,7 @@ ARG PROCESS_NAME
 ARG VAULT_APPROLE_ID
 ARG VAULT_SECRET_ID
 ARG VAULT_WALLET_NAME
+ARG KMS_KEY_ID
 ARG CONFIG_PATH
 ARG SSH_PRIVATE_KEY_BASE64
 ARG CONFIG_REPO_URI
@@ -44,6 +45,7 @@ ENV PROCESS_NAME=${PROCESS_NAME}
 ENV VAULT_APPROLE_ID=${VAULT_APPROLE_ID}
 ENV VAULT_SECRET_ID=${VAULT_SECRET_ID}
 ENV VAULT_WALLET_NAME=${VAULT_WALLET_NAME}
+ENV KMS_KEY_ID=${KMS_KEY_ID}
 ENV CONFIG_REPO_URI=${CONFIG_REPO_URI}
 # Private key is required to pull down CONFIG_REPO_URI at enclave boot.
 ENV SSH_PRIVATE_KEY_BASE64=${SSH_PRIVATE_KEY_BASE64}
