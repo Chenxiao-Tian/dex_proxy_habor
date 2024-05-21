@@ -1,0 +1,4 @@
+# Only @team-infra can modify the .gitlab-ci.yml file. Please reach out to them for any changes.
+[team-infra][2] @ananda.das @jeremythomson @greg.markey @jim.mccoy1 @mark.hingston2
+CODEOWNERS
+.gitlab-ci.yml
