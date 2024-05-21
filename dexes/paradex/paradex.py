@@ -8,7 +8,7 @@ from .pdex_account import PdexAccount, PdexSystemConfig
 from .jwt import JWT
 from .starknet_messages import StarknetMessages
 
-from starknet_py.net.client_models import TransactionStatus, TransactionReceipt
+from starknet_py.net.client_models import TransactionFinalityStatus, TransactionExecutionStatus, TransactionReceipt
 
 from pyutils.exchange_connectors import ConnectorFactory, ConnectorType
 from pyutils.exchange_apis import ApiFactory
@@ -318,9 +318,9 @@ class Paradex(DexCommon):
             return await self._api.get_transaction_receipt(tx_hash)
         else:
             receipt = await self._api.get_l2_transaction_receipt(tx_hash)
-            if receipt.status in {TransactionStatus.ACCEPTED_ON_L2, TransactionStatus.ACCEPTED_ON_L1}:
+            if receipt.finality_status in {TransactionFinalityStatus.ACCEPTED_ON_L2, TransactionFinalityStatus.ACCEPTED_ON_L1}:
                 return {"status": 1}
-            elif receipt.status == TransactionStatus.REJECTED:
+            elif receipt.execution_status in {TransactionExecutionStatus.REVERTED}:
                 return {"status": 0}
             else:  # All other states map to "PENDING"
                 return None
