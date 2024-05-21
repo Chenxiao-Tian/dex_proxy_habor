@@ -14,11 +14,11 @@ from starknet_py.net.signer.stark_curve_signer import KeyPair
 from starknet_py.hash.selector import get_selector_from_name
 from starknet_py.hash.address import compute_address
 from starknet_py.common import int_from_bytes
-from starknet_py.net.networks import CustomGatewayUrls, Network
-from starknet_py.net.gateway_client import GatewayClient
-from starknet_py.net.account.account import Account as StarknetAccount
-from starknet_py.utils.typed_data import TypedData
+from starknet_py.net.networks import Network
+from starknet_py.net.full_node_client import FullNodeClient
 
+from .helpers.account import Account as StarknetAccount
+from .helpers.typed_data import TypedData
 
 class PdexSystemConfig(object):
     def __init__(
@@ -26,13 +26,13 @@ class PdexSystemConfig(object):
         l1_chain_id: int,
         paraclear_account_proxy_hash: str,
         paraclear_account_hash: str,
-        starknet_gateway_url: str,
+        starknet_fullnode_rpc_url: str,
         starknet_chain_id: int
     ):
         self.l1_chain_id = l1_chain_id
         self.paraclear_account_proxy_hash = paraclear_account_proxy_hash
         self.paraclear_account_hash = paraclear_account_hash
-        self.starknet_gateway_url = starknet_gateway_url
+        self.starknet_fullnode_rpc_url = starknet_fullnode_rpc_url
         self.starknet_chain_id = starknet_chain_id
 
 
@@ -42,7 +42,7 @@ class PdexSystemConfig(object):
             int(json["l1_chain_id"]),
             json["paraclear_account_proxy_hash"],
             json["paraclear_account_hash"],
-            json["starknet_gateway_url"],
+            json["starknet_fullnode_rpc_url"],
             int_from_bytes(json["starknet_chain_id"].encode()),
         )
 
@@ -95,13 +95,6 @@ class PdexAccount(object):
         )
 
 
-    def __network_from_base(self, base_url: str) -> Network:
-        return CustomGatewayUrls(
-            feeder_gateway_url=f'{base_url}/feeder_gateway',
-            gateway_url=f'{base_url}/gateway'
-        )
-
-
     def __get_account_client(
         self,
         pdex_config: PdexSystemConfig,
@@ -109,9 +102,7 @@ class PdexAccount(object):
         key_pair: KeyPair
     ):
         account_client = StarknetAccount(
-            client = GatewayClient(
-                self.__network_from_base(pdex_config.starknet_gateway_url)
-            ),
+            client = FullNodeClient(pdex_config.starknet_fullnode_rpc_url),
             address = account_address,
             key_pair = key_pair,
             chain = pdex_config.starknet_chain_id
