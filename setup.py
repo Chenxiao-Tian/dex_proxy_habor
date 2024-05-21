@@ -19,6 +19,6 @@ setuptools.setup(
     version=f"{tag}+{rev}",
     py_modules=[],
     install_requires=[
-        "pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@pyutils-1.11.2"
+        "pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@pyutils-1.11.3"
     ]
 )
