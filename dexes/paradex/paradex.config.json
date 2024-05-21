@@ -68,7 +68,7 @@
     "dex": {
         "name": "pdex",
         "chain_name": "Ethereum Sepolia Testnet",
-        "l2_bridge_version": 1,
+        "l2_bridge_version": 2,
         "connectors": {
             "paradex": {
                 "rest": {
