@@ -83,7 +83,8 @@ class Paradex(DexCommon):
         await self._api.initialize(
             private_key_or_mnemonic=eth_private_key,
             paradex_account_address=self.__pdex_account.address,
-            paradex_private_key=hex(self.__pdex_account.get_private_key())
+            paradex_private_key=hex(self.__pdex_account.get_private_key()),
+            l2_bridge_version=self._config.get("l2_bridge_version", 1)
         )
 
         await super().start(eth_private_key)
