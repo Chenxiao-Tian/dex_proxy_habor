@@ -19,10 +19,6 @@ setuptools.setup(
     version=f"{tag}+{rev}",
     py_modules=[],
     install_requires=[
-        "boto3==1.26.55",
-        "eth-account==0.8.0",
-        "ujson==5.7.0",
-        "pantheon @ git+ssh://git@bitbucket.org/kenetic/pytheon.git@pytheon-1.2.39",
-        "pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@pyutils-1.9.94"
+        "pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@pyutils-1.11.2"
     ]
 )

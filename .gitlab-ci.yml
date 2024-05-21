@@ -32,7 +32,6 @@ stages:
     USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-pdex-main
     ENVIRONMENT: prod
-    USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-pdex-testnet
     ENVIRONMENT: dev
   - PROCESS_NAME: dex_proxy-lyra-testnet

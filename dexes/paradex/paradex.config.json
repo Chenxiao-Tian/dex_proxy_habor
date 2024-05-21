@@ -67,7 +67,7 @@
     "key_store_file_path": "./dexes/paradex/test/wallet.json",
     "dex": {
         "name": "pdex",
-        "chain_name": "Ethereum Goerli Testnet",
+        "chain_name": "Ethereum Sepolia Testnet",
         "connectors": {
             "paradex": {
                 "rest": {
@@ -79,7 +79,7 @@
                     }
                 },
                 "web3": {
-                    "http": "https://goerli.infura.io/v3/12a345a0a065429f9aec1a06ba94373e"
+                    "http": "https://sepolia.infura.io/v3/12a345a0a065429f9aec1a06ba94373e"
                 }
             },
             "fireblocks": {
@@ -106,8 +106,8 @@
         "exchange_token_refresh_interval_s": 240,
         "max_signature_generators": 2,
         "gas_price_tracker": {
-            "http_url": "https://goerli.infura.io/v3/12a345a0a065429f9aec1a06ba94373e",
-            "ws_url": "wss://goerli.infura.io/ws/v3/12a345a0a065429f9aec1a06ba94373e",
+            "http_url": "https://sepolia.infura.io/v3/12a345a0a065429f9aec1a06ba94373e",
+            "ws_url": "wss://sepolia.infura.io/ws/v3/12a345a0a065429f9aec1a06ba94373e",
             "use_fee_history": true,
             "percentile_priority_fee_fast": 10,
             "percentile_priority_fee_med": 5,
