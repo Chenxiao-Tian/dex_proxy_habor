@@ -2,3 +2,7 @@
 [team-infra][1] @ananda.das @jeremythomson @greg.markey @jim.mccoy1 @mark.hingston2
 CODEOWNERS
 .gitlab-ci.yml
+Dockerfile
+Dockerfile.ts
+Dockerfile.deepbook
+container/run
