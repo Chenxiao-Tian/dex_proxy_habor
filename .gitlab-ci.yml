@@ -26,10 +26,8 @@ stages:
     ENVIRONMENT: dev
   - PROCESS_NAME: dex_proxy-uni3-goerli-5
     ENVIRONMENT: dev
-    USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-chainEth-uni3-main-1
     ENVIRONMENT: prod
-    USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-pdex-main
     ENVIRONMENT: prod
   - PROCESS_NAME: dex_proxy-pdex-testnet
@@ -41,19 +39,15 @@ stages:
     USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-lyra-2
     ENVIRONMENT: prod
-    USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-lyra-3
     ENVIRONMENT: prod
-    USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-lyra-4
     ENVIRONMENT: prod
     USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-lyra-5
     ENVIRONMENT: prod
-    USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-lyra-6
     ENVIRONMENT: prod
-    USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-deep-1
     ENVIRONMENT: dev
     USE_ATTESTATION: "false"
