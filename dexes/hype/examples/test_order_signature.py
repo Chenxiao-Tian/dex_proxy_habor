@@ -2,7 +2,8 @@ import aiohttp
 import asyncio
 import time
 
-host = 'localhost'
+_host = 'http://dev-sng-both1.kdev:11968'
+host = 'http://localhost:1958'
 
 
 async def order_sign(session):
@@ -19,7 +20,7 @@ async def order_sign(session):
             'cloid': None
         }]
     }
-    async with session.post(f'http://{host}:1958/private/order-signature', json=data) as response:
+    async with session.post(f'{host}/private/order-signature', json=data) as response:
         status = response.status
         print(f'Received status {status}')
         text = await response.text()
