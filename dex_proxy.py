@@ -9,7 +9,7 @@ import os
 from pantheon import Pantheon, StandardArgParser
 
 from web_server import WebServer
-from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex, Lyra
+from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex, Lyra, Hype
 
 from eth_account import Account
 
@@ -54,6 +54,9 @@ class DexProxy:
                 pantheon, dex_config, self.__server, self)
         elif name == 'lyra':
             self.__exchange = Lyra(
+                pantheon, dex_config, self.__server, self)
+        elif name == 'hype':
+            self.__exchange = Hype(
                 pantheon, dex_config, self.__server, self)
         else:
             raise Exception(f'Exchange {name} not supported')
