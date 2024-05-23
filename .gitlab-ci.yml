@@ -66,6 +66,8 @@ stages:
     TS_DEX_PATH: dexes/deepbook
   - PROCESS_NAME: dex_proxy-hype-testnet
     ENVIRONMENT: dev
+  - PROCESS_NAME: dex_proxy-hype-1
+    ENVIRONMENT: prod
 
 
 # Some applications are only containerised, and not enclaved. Supported keys:
