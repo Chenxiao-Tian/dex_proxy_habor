@@ -64,6 +64,8 @@ stages:
     ENVIRONMENT: prod
     USE_ATTESTATION: "false"
     TS_DEX_PATH: dexes/deepbook
+  - PROCESS_NAME: dex_proxy-hype-testnet
+    ENVIRONMENT: dev
 
 
 # Some applications are only containerised, and not enclaved. Supported keys:
@@ -243,3 +245,4 @@ audit container userlands:
     - job: build containers
       parallel:
         matrix: *containers
+
