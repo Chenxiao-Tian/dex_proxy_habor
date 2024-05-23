@@ -1,13 +1,14 @@
 import concurrent.futures
 import json
 import os
+import secrets
 import time
 
+import eth_account
 from pyutils.exchange_apis.dex_common import RequestType, RequestStatus, ErrorType, TransferRequest
 from pyutils.exchange_apis.erc20web3_api import ERC20Token
 from web3 import Web3
 
-from .types import Cloid
 from ..dex_common import DexCommon
 
 from pyutils.exchange_connectors import ConnectorType
@@ -23,7 +24,7 @@ from web_server import WebServer
 
 from .signing import (OrderWire, order_request_to_order_wire,
                       order_wires_to_order_action, sign_l1_action,
-                      sign_withdraw_from_bridge_action)
+                      sign_withdraw_from_bridge_action, sign_agent)
 
 
 class Hype(DexCommon):
@@ -31,8 +32,6 @@ class Hype(DexCommon):
         self, pantheon: Pantheon, config: dict, server: WebServer, event_sink
     ):
         super().__init__(pantheon, ConnectorType.Hype, config, server, event_sink)
-
-        c = Cloid.from_int(123)
 
         self.__register_endpoints(server)
 
@@ -64,6 +63,7 @@ class Hype(DexCommon):
         self.is_mainnet = 'testnet' not in base_uri
 
     def __register_endpoints(self, server: WebServer) -> None:
+        server.register("POST", "/private/approve-agent", self.__approve_agent)
         server.register("POST", "/private/order-signature", self.__sign_order_request)
         server.register("POST", "/private/cancel-signature", self.__sign_cancel_order_request)
         server.register("POST", "/private/withdraw-from-exchange", self.__withdraw_from_exchange)
@@ -289,6 +289,26 @@ class Hype(DexCommon):
 
         except Exception as e:
             return 400, {"error": str(e)}
+
+    async def __approve_agent(self, path: str, params: dict, received_at_ms: int):
+        agent_key = "0x" + secrets.token_hex(32)
+        account = eth_account.Account.from_key(agent_key)
+        timestamp = int(time.time() * 1000)
+        action = {
+            "type": "approveAgent",
+            "agentAddress": account.address,
+            "agentName": "Auros",
+            "nonce": timestamp,
+        }
+
+        signature = sign_agent(self._api._account, action, self.is_mainnet)
+
+        result = await self._api.send_action(action, signature, timestamp, self.vault_address)
+
+        if result['status'] == 'ok':
+            return 200, {'tx_hash': ''}
+        else:
+            return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
 
     async def __sign_order_request(
         self, path: str, params: dict, received_at_ms: int
