@@ -1,0 +1,69 @@
+{
+    "Arbitrum Mainnet": {
+        "tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65",
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x2A0CE75A67353Ad5E3DBD28C4cd5bd862CB6A82B",
+                    "0x7f030dded85c2672a84b3b33528f57babbdcf7e4",
+                    "0x714b5fe769fd80c20f1582b3a3988ced857e0ff6",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0xb5B2a3B109b837F2dd37A6ef8ACe7A696A41aB9A",
+                    "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0x5C2aB5dC71CED4d3A07F048dC9c068DfD4fC4D53",
+                    "0xc72f6cc407b39437723fd2f5e9168a79d158a499",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x5F64d9c81F5a30F4b29301401f96138792DC5f58",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0xf5213a6a2f0890321712520b8048D9886c1A9900"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+                "valid_withdrawal_addresses": [
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65",
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x7f030dded85c2672a84b3b33528f57babbdcf7e4",
+                    "0x714b5fe769fd80c20f1582b3a3988ced857e0ff6",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0xb5B2a3B109b837F2dd37A6ef8ACe7A696A41aB9A",
+                    "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0x5C2aB5dC71CED4d3A07F048dC9c068DfD4fC4D53",
+                    "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x5f64d9c81f5a30f4b29301401f96138792dc5f58",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0xf5213a6a2f0890321712520b8048D9886c1A9900"
+                ]
+            }
+        ],
+        "bridge_address": "0x2Df1c51E09aECF9cacB7bc98cB1742757f163dF7"
+    },
+    "Arbitrum Sepolia": {
+        "tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68",
+                    "0x194c851021ABc7f64B51D11b58e251A8370d54dc"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "address": "0x1870Dc7A474e045026F9ef053d5bB20a250Cc084",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68",
+                    "0x194c851021ABc7f64B51D11b58e251A8370d54dc"
+                ]
+            }
+        ],
+        "bridge_address": "0x279c9462fdba349550b49a23de27dd19d5891baa"
+    }
+}
