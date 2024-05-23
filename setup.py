@@ -19,6 +19,7 @@ setuptools.setup(
     version=f"{tag}+{rev}",
     py_modules=[],
     install_requires=[
+        'msgpack==1.0.8',
         "pyutils @ git+ssh://bitbucket.org/kenetic/pyutils.git@pyutils-1.11.3"
     ]
 )
