@@ -32,6 +32,11 @@ class Hype(DexCommon):
         self, pantheon: Pantheon, config: dict, server: WebServer, event_sink
     ):
         super().__init__(pantheon, ConnectorType.Hype, config, server, event_sink)
+        self.order_req_id = 0
+        self.bridge_address = None
+        self.vault_address = None
+        self.coin_to_asset = None
+        self.is_mainnet = False
 
         self.__register_endpoints(server)
 
@@ -48,13 +53,6 @@ class Hype(DexCommon):
         self.__process_pool = concurrent.futures.ProcessPoolExecutor(
             max_workers=config["max_signature_generators"]
         )
-
-        self.order_req_id = 0
-
-        self.bridge_address = None
-        self.vault_address = None
-        self.coin_to_asset = None
-        self.is_mainnet = False
 
     def __set_exchange_url_prefix(self, config):
         base_uri = config["connectors"]["hype"]["rest"]["base_uri"]
