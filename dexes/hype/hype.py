@@ -305,10 +305,12 @@ class Hype(DexCommon):
 
         result = await self._api.send_action(action, signature, timestamp, self.vault_address)
 
+        self._logger.debug(f"Response {str(result)}")
+
         if result['status'] == 'ok':
             return 200, {'tx_hash': ''}
         else:
-            return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
+            return 400, {'error': result['response']}
 
     async def __sign_order_request(
         self, path: str, params: dict, received_at_ms: int
@@ -397,7 +399,7 @@ class Hype(DexCommon):
                 return 200, {'tx_hash': ''}
             else:
                 self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
-                return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
+                return 400, {'error': result['response']}
 
         except Exception as e:
             self._logger.exception(f'Failed to transfer: %r', e)
