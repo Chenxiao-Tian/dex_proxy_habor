@@ -18,10 +18,8 @@ stages:
 .enclaves: &enclaves
   - PROCESS_NAME: dex_proxy-dexa-main
     ENVIRONMENT: prod
-    USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-dexa-fuji
     ENVIRONMENT: dev
-    USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-uni3-goerli-4
     ENVIRONMENT: dev
   - PROCESS_NAME: dex_proxy-uni3-goerli-5
