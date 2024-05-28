@@ -34,14 +34,12 @@ stages:
     ENVIRONMENT: dev
   - PROCESS_NAME: dex_proxy-lyra-1
     ENVIRONMENT: prod
-    USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-lyra-2
     ENVIRONMENT: prod
   - PROCESS_NAME: dex_proxy-lyra-3
     ENVIRONMENT: prod
   - PROCESS_NAME: dex_proxy-lyra-4
     ENVIRONMENT: prod
-    USE_ATTESTATION: "false"
   - PROCESS_NAME: dex_proxy-lyra-5
     ENVIRONMENT: prod
   - PROCESS_NAME: dex_proxy-lyra-6
