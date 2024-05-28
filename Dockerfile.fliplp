@@ -1,0 +1,50 @@
+# SHASUM pin of chainfliplabs/chainflip-lp-api:berghain:1.1.2
+FROM chainfliplabs/chainflip-lp-api@sha256:3c63d88bb4332370022d11595d93b7bc2e39b0e103089876837c7ebe6058d10a as flip
+
+ARG SSH_PRIVATE_KEY_BASE64
+
+RUN /bin/bash -c '[[ "${SSH_PRIVATE_KEY_BASE64}" ]] || { echo "SSH_PRIVATE_KEY_BASE64 build argument not set"; exit 1; }'
+
+# SHASUM pin of registry.gitlab.com/auros/baseimg/ubuntu:22.04-enclave
+FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:b7d05a2e1be8e4e4195247dc2faf1180656a18108f6425bb131ff2a074615420
+
+# Valet/authentication/enclave configuration
+# Context ID is unique to this enclave.
+ARG CONTEXT_ID
+ARG PROCESS_NAME
+ARG VAULT_APPROLE_ID
+ARG VAULT_SECRET_ID
+ARG VAULT_WALLET_NAME
+ARG KMS_KEY_ID
+ARG CONFIG_PATH
+ARG SSH_PRIVATE_KEY_BASE64
+ARG CONFIG_REPO_URI
+ARG VAULT_SECRET_FIELD
+
+ENV CONTEXT_ID=${CONTEXT_ID}
+ENV PROCESS_NAME=${PROCESS_NAME}
+ENV VAULT_APPROLE_ID=${VAULT_APPROLE_ID}
+ENV VAULT_SECRET_ID=${VAULT_SECRET_ID}
+ENV VAULT_WALLET_NAME=${VAULT_WALLET_NAME}
+ENV KMS_KEY_ID=${KMS_KEY_ID}
+ENV CONFIG_REPO_URI=${CONFIG_REPO_URI}
+ENV VAULT_SECRET_FIELD=${VAULT_SECRET_FIELD}
+# Private key is required to pull down CONFIG_REPO_URI at enclave boot.
+ENV SSH_PRIVATE_KEY_BASE64=${SSH_PRIVATE_KEY_BASE64}
+
+# Chainflip has weird wallet/key format so for now pass through valet raw
+ENV WALLET_FORMAT=raw
+
+# Chainflip runs its own app so needs pulse
+ENV WITH_PULSE=1
+
+# Application configuration
+ENV APPLICATION_LISTEN_PORT=8000
+
+COPY --from=flip /usr/local/bin/chainflip-lp-api /usr/local/bin/chainflip-lp-api
+COPY container/run.fliplp /app/auros/run
+
+# This is a custom egress listener. It's used to connect to the target flipnode WS endpoint.
+COPY container/egress-implicit-flipnode-10933.toml /etc/horust/services/
+
+ENTRYPOINT [ "/init" ]
