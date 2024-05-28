@@ -1,0 +1,30 @@
+#!/bin/bash
+
+
+set -o pipefail
+
+trap 'log_crash $?' ERR
+
+log_crash() {
+    DATE=$(date "+%Y-%m-%d %H:%M:%S.%3N")
+    echo "[${DATE}] [CRITICAL] ${PROCESS_NAME:=unknown process} exited with error code ${1} (CRASH)"
+    exit ${1}
+}
+
+log_error() {
+    DATE=$(date "+%Y-%m-%d %H:%M:%S.%3N")
+    echo "[${DATE}] [CRITICAL] $@"
+    log_crash 1
+}
+
+[[ "${PROCESS_NAME}" ]] || log_error "PROCESS_NAME environment variable not set"
+
+FLIPNODE_WS_URI=$(jq -r '.fliplp.flipnode_ws_uri | select(. != null)' /app/auros/config/${PROCESS_NAME}.json)
+PORT=$(jq -r '.server.port | select(. != null)' /app/auros/config/${PROCESS_NAME}.json)
+
+[[ "${FLIPNODE_WS_URI}" ]] || log_error ".fliplp.eth_uri is undefined in config.json"
+
+# /app/auros/config will be cloned by an enclave init process.
+/usr/local/bin/chainflip-lp-api --state_chain.signing_key_file="${KEY_STORE_FILE}" --state_chain.ws_endpoint="${FLIPNODE_WS_URI}" --port="${PORT:=8000}"
+
+exit $?
