@@ -198,7 +198,7 @@ authorise enclave:
     - chmod 600 ~/.ssh/id_rsa
     - git clone --depth 1 ${CONFIG_REPO_URI} _config
     - HOST_AFFINITY=$(jq -r '.app.host_affinity' _config/${PROCESS_NAME}.json)
-    - "[[ \"${HOST_AFFINITY}\" ]] || { echo \"Cannot determine host affinity for authorisation; check that 'app.host_affinity' is set in config.json\"; exit 1; }"
+    - "[[ \"${HOST_AFFINITY}\" == \"null\" ]] && { echo \"Cannot determine host affinity for authorisation; check that 'app.host_affinity' is set in config.json\"; exit 1; }"
     # Save the Gitlab job JWT token to file.
     - echo -En ${VAULT_ID_TOKEN} > jwt.json
     - enclave-authz --auth-mount ${VAULT_AUTH_PATH} -a legacy --jwt jwt.json -i ${HOST_AFFINITY} --pcr0 $(jq -r '.Measurements.PCR0' measurements-${PROCESS_NAME}.json) --pcr8 $(jq -r '.Measurements.PCR8' measurements-${PROCESS_NAME}.json) ${PROCESS_NAME}
