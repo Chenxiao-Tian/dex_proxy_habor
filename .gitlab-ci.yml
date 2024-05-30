@@ -123,6 +123,7 @@ build enclaves:
     - "[[ \"${VAULT_APPROLE_ID}\" ]] || { echo \"VAULT_APPROLE_ID is not defined\"; exit 1; }"
     - "[[ \"${VAULT_SECRET_ID}\" ]] || { echo \"VAULT_SECRET_ID is not defined\"; exit 1; }"
     - "[[ \"${VAULT_WALLET_NAME}\" ]] || { echo \"VAULT_WALLET_NAME is not defined\"; exit 1; }"
+    - "[[ \"${VAULT_SECRET_FIELD}\" ]] && { ADDITIONAL_BUILD_ARGS=\"${ADDITIONAL_BUILD_ARGS} --build-arg VAULT_SECRET_FIELD=${VAULT_SECRET_FIELD}\"; }"
     - "[[ \"${KMS_KEY_ID}\" ]] || { echo \"KMS_KEY_ID is not defined\"; exit 1; }"
     - "[[ -f _config/${PROCESS_NAME}.json ]] || { echo \"No config found for ${PROCESS_NAME}\"; exit 1; }"
     - export CONTEXT_ID=$(jq -r '.enclave.cid | select(. != null)' _config/${PROCESS_NAME}.json)
