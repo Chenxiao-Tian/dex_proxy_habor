@@ -66,6 +66,7 @@ class Hype(DexCommon):
         server.register("POST", "/private/cancel-signature", self.__sign_cancel_order_request)
         server.register("POST", "/private/withdraw-from-exchange", self.__withdraw_from_exchange)
         server.register("POST", "/private/deposit-into-exchange", self.__deposit_into_exchange)
+        server.register("POST", "/private/update-leverage", self.__update_leverage)
 
     async def start(self, eth_private_key: str):
         self.__load_whitelist()
@@ -232,6 +233,17 @@ class Hype(DexCommon):
         for key in expected_keys:
             assert key in received_keys, f"Missing field({key}) in the Sign Cancel request"
 
+    def __assert_update_leverage(self, received_keys: list) -> None:
+        expected_keys = [
+            "coin",
+            "is_cross",
+            "leverage"
+        ]
+
+        assert len(received_keys) == len(expected_keys), f"Update Leverge request does not contain the correct set of fields. Expected [{', '.join(expected_keys)}]"
+        for key in expected_keys:
+            assert key in received_keys, f"Missing field({key}) in the Update Leverge request"
+
     def __assert_order_schema(self, received_keys: list) -> None:
         expected_keys = [
             "coin",
@@ -300,6 +312,34 @@ class Hype(DexCommon):
         }
 
         signature = sign_agent(self._api._account, action, self.is_mainnet)
+
+        result = await self._api.send_action(action, signature, timestamp, self.vault_address)
+
+        self._logger.debug(f"Response {str(result)}")
+
+        if result['status'] == 'ok':
+            return 200, {'tx_hash': ''}
+        else:
+            return 400, {'error': result['response']}
+
+    async def __update_leverage(self, path: str, params: dict, received_at_ms: int):
+
+        self.__assert_update_leverage(list(params.keys()))
+
+        coin = params['coin']
+        asset_index = self.coin_to_asset[coin]
+        is_cross = params['is_cross']
+        leverage = int(params['leverage'])
+        timestamp = int(time.time() * 1000)
+
+        action = {
+            "type": "updateLeverage",
+            "asset": asset_index,
+            "isCross": is_cross,
+            "leverage": leverage
+        }
+
+        signature = sign_l1_action(self._api._account, action, self.vault_address, timestamp, self.is_mainnet)
 
         result = await self._api.send_action(action, signature, timestamp, self.vault_address)
 
