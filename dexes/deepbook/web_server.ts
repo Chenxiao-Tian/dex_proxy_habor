@@ -111,14 +111,15 @@ class WebServer {
                                {"Content-Type": "application/json"});
             response.end(JSON.stringify(result.payload));
         } catch (error) {
-            response.writeHead(400, {"Content-Type": "application/json"});
-
             if (error instanceof ParsedOrderError) {
+                let responseCode = (error.responseCode) ? error.responseCode : 400
+                response.writeHead(responseCode, {"Content-Type": "application/json"});
                 response.end(JSON.stringify({
                     type: error.type,
                     error: error.message
                 }));
             } else {
+                response.writeHead(500, {"Content-Type": "application/json"});
                 response.end(JSON.stringify({error: `${error}`}));
             }
         }

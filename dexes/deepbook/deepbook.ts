@@ -42,7 +42,8 @@ import {
     SuiEvent,
     SuiEventFilter,
     JsonRpcError,
-    EventId
+    EventId,
+    SuiHTTPStatusError
 } from "@mysten/sui.js/client";
 import {
   parseStructTag,
@@ -111,10 +112,12 @@ interface ParsedExchangeError {
 
 export class ParsedOrderError extends Error {
     type: string;
+    responseCode: number | null;
 
-    constructor(type: string, message: string) {
+    constructor(type: string, message: string, responseCode: number | null=null) {
         super(message);
         this.type = type;
+        this.responseCode = responseCode;
     }
 }
 
@@ -218,6 +221,9 @@ export class DeepBook {
             this.suiClient = new SuiClient({
                 transport: new SuiHTTPTransport({
                     url: connectors.rest.url,
+                    rpc: {
+                        headers: connectors.rest.headers
+                    },
                     WebSocketConstructor: WebSocket as never,
                     websocket: {
                         url: connectors.ws.url,
@@ -230,7 +236,12 @@ export class DeepBook {
         } else {
             this.logger.info("Not subscribing to events");
             this.suiClient = new SuiClient({
-                url: connectors.rest.url,
+                transport: new SuiHTTPTransport({
+                    url: connectors.rest.url,
+                    rpc: {
+                        headers: connectors.rest.headers
+                    }
+                })
             });
         }
 
@@ -326,9 +337,12 @@ export class DeepBook {
                               ? connectors.ws.max_reconnects
                               : 5;
 
+        const headers: Map<String, String> = (connectors.rest.headers) ? connectors.rest.headers : new Map<String, String>();
+
         let parsedConfig = {
             rest: {
-                url: connectors.rest.url
+                url: connectors.rest.url,
+                headers: headers
             },
             ws: {
                 url: connectors.ws.url,
@@ -1446,7 +1460,10 @@ export class DeepBook {
                 } else {
                     const errorStr = error.toString();
                     this.logger.error(`[${requestId}] ${errorStr}`);
-                    throw new ParsedOrderError("UNKNOWN", errorStr);
+                    if (error instanceof SuiHTTPStatusError) {
+                        throw new ParsedOrderError("UNKNOWN", errorStr, error.status);
+                    }
+                    throw new ParsedOrderError("UNKNOWN", errorStr, 500);
                 }
             }
             let error_ = error as any;
@@ -1630,13 +1647,16 @@ export class DeepBook {
                 } else {
                     const errorStr = error.toString();
                     this.logger.error(`[${requestId}] ${errorStr}`);
-                    throw new ParsedOrderError("UNKNOWN", errorStr);
+                    if (error instanceof SuiHTTPStatusError) {
+                        throw new ParsedOrderError("UNKNOWN", errorStr, error.status);
+                    }
+                    throw new ParsedOrderError("UNKNOWN", errorStr, 500);
                 }
             }
             let error_ = error as any;
             let errorStr = error_.toString();
             this.logger.error(`[${requestId}] ${errorStr}`);
-            throw new ParsedOrderError("UNKNOWN", errorStr);;
+            throw new ParsedOrderError("UNKNOWN", errorStr, 500);;
         }
 
         if (this.log_responses) {
