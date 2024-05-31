@@ -46,19 +46,15 @@ stages:
     ENVIRONMENT: prod
   - PROCESS_NAME: dex_proxy-deep-1
     ENVIRONMENT: dev
-    USE_ATTESTATION: "false"
     TS_DEX_PATH: dexes/deepbook
   - PROCESS_NAME: dex_proxy-deep-2
     ENVIRONMENT: dev
-    USE_ATTESTATION: "false"
     TS_DEX_PATH: dexes/deepbook
   - PROCESS_NAME: dex_proxy-deep-main
     ENVIRONMENT: prod
-    USE_ATTESTATION: "false"
     TS_DEX_PATH: dexes/deepbook
   - PROCESS_NAME: dex_proxy-deep-main-2
     ENVIRONMENT: prod
-    USE_ATTESTATION: "false"
     TS_DEX_PATH: dexes/deepbook
   - PROCESS_NAME: dex_proxy-hype-testnet
     ENVIRONMENT: dev
@@ -125,6 +121,7 @@ build enclaves:
     - "[[ \"${VAULT_WALLET_NAME}\" ]] || { echo \"VAULT_WALLET_NAME is not defined\"; exit 1; }"
     - "[[ \"${VAULT_SECRET_FIELD}\" ]] && { export ADDITIONAL_BUILD_ARGS=\"${ADDITIONAL_BUILD_ARGS} --build-arg VAULT_SECRET_FIELD=${VAULT_SECRET_FIELD}\"; }"
     - "[[ \"${KMS_KEY_ID}\" ]] || { echo \"KMS_KEY_ID is not defined\"; exit 1; }"
+    - "[[ \"${TS_DEX_PATH}\" ]] && { export DOCKERFILE=Dockerfile.ts; export ADDITIONAL_BUILD_ARGS=\"${ADDITIONAL_BUILD_ARGS} --build-arg TS_DEX_PATH=${TS_DEX_PATH}\"; }"
     - "[[ -f _config/${PROCESS_NAME}.json ]] || { echo \"No config found for ${PROCESS_NAME}\"; exit 1; }"
     - export CONTEXT_ID=$(jq -r '.enclave.cid | select(. != null)' _config/${PROCESS_NAME}.json)
     - rm -rf _config
