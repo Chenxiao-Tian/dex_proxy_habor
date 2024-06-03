@@ -51,6 +51,7 @@ class DexCommon(ABC):
         # symbol -> list of whitelisted withdrawal addresses
         # created a variable for this so that we don't have to read resources file again and again
         self._withdrawal_address_whitelists_from_res_file = defaultdict(set)
+        self._l2_withdrawal_address_whitelist_from_res_file = set()
 
         # from resources file + fireblocks
         # symbol -> list of whitelisted withdrawal addresses

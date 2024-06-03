@@ -72,6 +72,7 @@ class Paradex(DexCommon):
 
         server.register("POST", "/private/withdraw-from-l2", self.__withdraw_from_l2)
         server.register("POST", "/private/transfer-from-l1-bridge-to-wallet", self.__transfer_from_l1_bridge_to_wallet)
+        server.register("POST", "/private/transfer-to-target-l2", self.__transfer_to_target_l2);
 
     async def start(self, eth_private_key: str):
         self.__pdex_config = PdexSystemConfig.from_json(await self.__get_exchange_config())
@@ -116,6 +117,13 @@ class Paradex(DexCommon):
                     raise RuntimeError(f'Duplicate token : {symbol} in contracts_address file')
                 for withdrawal_address in token_json["valid_withdrawal_addresses"]:
                     self._withdrawal_address_whitelists_from_res_file[symbol].add(Web3.to_checksum_address(withdrawal_address))
+
+            l2_withdrawal_addresses = contracts_address_json.get("l2_withdrawal_addresses", None)
+            if l2_withdrawal_addresses:
+                for l2_withdrawal_address in l2_withdrawal_addresses:
+                    if l2_withdrawal_address in self._l2_withdrawal_address_whitelist_from_res_file:
+                        raise RuntimeError(f'Duplicate l2_withdrawal_address : {l2_withdrawal_address} in contracts_address file')
+                    self._l2_withdrawal_address_whitelist_from_res_file.add(l2_withdrawal_address)
 
     async def __get_jwt(self, *_) -> Tuple[int, dict]:
         # Periodicaly query the exchange for a new jwt token.
@@ -495,6 +503,59 @@ class Paradex(DexCommon):
             self._request_cache.add(transfer)
 
             result = await self._api.transfer_to_l2_trading(symbol, amount)
+
+            if result.error_type == ErrorType.NO_ERROR:
+                transfer.nonce = result.nonce
+                transfer.tx_hashes.append((result.tx_hash, RequestType.TRANSFER.name))
+                self._transactions_status_poller.add_for_polling(
+                    result.tx_hash, client_request_id, RequestType.TRANSFER)
+                self._request_cache.add_or_update_request_in_redis(client_request_id)
+                return 200, {'tx_hash': result.tx_hash}
+            else:
+                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+                return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
+        except Exception as e:
+            self._logger.exception(f'Failed to transfer: %r', e)
+            self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+            return 400, {'error': {'message': str(e)}}
+
+    async def __transfer_to_target_l2(
+        self,
+        path: str,
+        params: dict,
+        received_at_ms: int
+    ):
+        client_request_id = ''
+        try:
+            symbol = params['symbol']
+
+            client_request_id = params['client_request_id']
+            if self._request_cache.get(client_request_id) is not None:
+                return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
+
+            amount = Decimal(params['amount'])
+            address_to = params['address_to']
+
+            if address_to not in self._l2_withdrawal_address_whitelist_from_res_file:
+                return 400, {'error': {'message': f'L2 address_to={address_to} not in contracts addresses file'}}
+
+            transfer = TransferRequest(
+                client_request_id=client_request_id,
+                symbol=symbol,
+                amount=amount,
+                address_to=address_to,
+                # Unused
+                gas_limit=0,
+                request_path=path,
+                received_at_ms=received_at_ms)
+
+            self.__mark_as_l2_request(transfer)
+
+            self._logger.debug(f"Transferring={transfer}, request_path={path}")
+
+            self._request_cache.add(transfer)
+
+            result = await self._api.transfer_to_target_l2(symbol, amount, address_to)
 
             if result.error_type == ErrorType.NO_ERROR:
                 transfer.nonce = result.nonce
