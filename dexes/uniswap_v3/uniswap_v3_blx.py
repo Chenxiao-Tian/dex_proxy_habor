@@ -13,6 +13,7 @@ from pantheon import Pantheon
 from pantheon.instruments_source import InstrumentLifecycle, InstrumentsLiveSource, InstrumentUsageExchanges
 from pantheon.market_data_types import InstrumentId, Side
 
+from pyutils.dex_helper.eth_rpc import EthRPCDexHelper
 from pyutils.exchange_apis.uniswapV3_api import *
 from pyutils.exchange_connectors import ConnectorType
 
@@ -45,6 +46,7 @@ class UniswapV3Bloxroute(DexCommon):
         super().__init__(pantheon, ConnectorType.UniswapV3, config, server, event_sink)
 
         self.msg_queue = asyncio.Queue()
+        self.__dex_helper = EthRPCDexHelper(pantheon=pantheon, cfg=config["dex_helper"])
 
         self._server.register(
             'POST', '/private/insert-order', self.__insert_order)
@@ -146,7 +148,7 @@ class UniswapV3Bloxroute(DexCommon):
                     client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'message': 'unexpected instrument native code'}}
 
-            next_block_num, next_block_uuid = await self.__update_and_get_next_block_num()
+            next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
 
             targeted_block = params.get('targeted_block')
             if ((targeted_block is not None) and (int(targeted_block) != next_block_num)):
@@ -162,7 +164,7 @@ class UniswapV3Bloxroute(DexCommon):
 
             self.__targeted_block_info.bundles_sent_for_targeted_block += 1
 
-            nonce = await self._api.get_total_txs_so_far() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
+            nonce = self.__dex_helper.get_txs_count() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
 
             order.nonce = nonce
             raw_tx, tx_hash = self.__get_signed_transaction_from_client_info(order, gas_price_wei)
@@ -207,7 +209,7 @@ class UniswapV3Bloxroute(DexCommon):
                 f'{"Wrapping" if wrap_unwrap.request == "wrap" else "Unwrapping"}={wrap_unwrap}, gas_price_wei={gas_price_wei}')
             self._request_cache.add(wrap_unwrap)
 
-            next_block_num, next_block_uuid = await self.__update_and_get_next_block_num()
+            next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
 
             ok, reason = self.__validate_can_send_via_blx(gas_price_wei)
             if not ok:
@@ -217,7 +219,7 @@ class UniswapV3Bloxroute(DexCommon):
 
             self.__targeted_block_info.bundles_sent_for_targeted_block += 1
 
-            nonce = await self._api.get_total_txs_so_far() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
+            nonce = self.__dex_helper.get_txs_count() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
 
             wrap_unwrap.nonce = nonce
             raw_tx, tx_hash = self.__get_signed_transaction_from_client_info(wrap_unwrap, gas_price_wei)
@@ -255,9 +257,8 @@ class UniswapV3Bloxroute(DexCommon):
     async def process_request(self, ws, request_id, method, params: dict):
         return False
 
-    async def _approve(self, request, gas_price_wei, nonce=None):
-        client_request_id = request.client_request_id
-        next_block_num, next_block_uuid = await self.__update_and_get_next_block_num()
+    async def _approve(self, request: ApproveRequest, gas_price_wei, nonce=None):
+        next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
 
         ok, reason = self.__validate_can_send_via_blx(gas_price_wei)
         if not ok:
@@ -265,7 +266,7 @@ class UniswapV3Bloxroute(DexCommon):
 
         self.__targeted_block_info.bundles_sent_for_targeted_block += 1
 
-        nonce = await self._api.get_total_txs_so_far() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
+        nonce = self.__dex_helper.get_txs_count() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
         request.nonce = nonce
         raw_tx, tx_hash = self.__get_signed_transaction_from_client_info(request, gas_price_wei)
         self.__targeted_block_info.raw_txs_in_targeted_block.append(raw_tx)
@@ -276,14 +277,13 @@ class UniswapV3Bloxroute(DexCommon):
 
         return ApiResult(nonce, tx_hash)
 
-    async def _transfer(self, request,  gas_price_wei, nonce=None):
+    async def _transfer(self, request: TransferRequest,  gas_price_wei, nonce=None):
         path = request.request_path
         address_to = request.address_to
-        client_request_id = request.client_request_id
         if path == '/private/withdraw':
             assert address_to is not None
 
-            next_block_num, next_block_uuid = await self.__update_and_get_next_block_num()
+            next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
 
             ok, reason = self.__validate_can_send_via_blx(gas_price_wei)
             if not ok:
@@ -291,7 +291,7 @@ class UniswapV3Bloxroute(DexCommon):
 
             self.__targeted_block_info.bundles_sent_for_targeted_block += 1
 
-            nonce = await self._api.get_total_txs_so_far() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
+            nonce = self.__dex_helper.get_txs_count() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
             request.nonce = nonce
             raw_tx, tx_hash = self.__get_signed_transaction_from_client_info(request, gas_price_wei)
             self.__targeted_block_info.raw_txs_in_targeted_block.append(raw_tx)
@@ -361,7 +361,7 @@ class UniswapV3Bloxroute(DexCommon):
                       error_message=
                       'Amend request not supported for non-order request by uni3 dex-proxy with Bloxroute integrated')
 
-        next_block_num, next_block_uuid = await self.__update_and_get_next_block_num()
+        next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
 
         ok, reason = self.__validate_can_send_via_blx(gas_price_wei)
         if not ok:
@@ -548,7 +548,7 @@ class UniswapV3Bloxroute(DexCommon):
                 if len(open_requests) == 0:
                     continue
 
-                curr_block_num = await self._api.get_current_block_num()
+                curr_block_num = self.__dex_helper.get_block_num()
 
                 # Caching: so that we don't call rpc method self._api.get_block for same block_num
                 block_num_vs_block_data = {}
@@ -661,6 +661,7 @@ class UniswapV3Bloxroute(DexCommon):
         await self._api.initialise_and_maintain_blx_mev_ws(blx_authorisation_header)
 
         self.pantheon.spawn(self.__finalise_missed_requests())
+        await self.__dex_helper.start()
 
         self.started = True
 
@@ -681,8 +682,8 @@ class UniswapV3Bloxroute(DexCommon):
             except Exception as ex:
                 self._logger.exception(f'Error in adding or updating ERC20 token (symbol={symbol}, address={address}): %r', ex)
 
-    async def __update_and_get_next_block_num(self) -> tuple[int, str]:
-        next_block_num = (await self._api.get_current_block_num()) + 1
+    def __update_and_get_next_block_num(self) -> tuple[int, str]:
+        next_block_num = self.__dex_helper.get_block_num() + 1
 
         if next_block_num > self.__targeted_block_info.next_block_num:
             self.__targeted_block_info.next_block_num = next_block_num
@@ -691,11 +692,8 @@ class UniswapV3Bloxroute(DexCommon):
             self.__targeted_block_info.raw_txs_in_targeted_block = []
             self.__targeted_block_info.raw_txn_to_client_id = {}
             self.__targeted_block_info.client_requ_id_vs_raw_txs = {}
-        elif next_block_num < self.__targeted_block_info.next_block_num:
-            # Rare case but might happen when the node which served the call `self._api.get_current_block_num()` is lagging
-            next_block_num = self.__targeted_block_info.next_block_num
 
-        return next_block_num, self.__targeted_block_info.next_block_uuid
+        return self.__targeted_block_info.next_block_num, self.__targeted_block_info.next_block_uuid
 
     def __validate_can_send_via_blx(self, gas_price_wei: int) -> tuple[bool, str]:
         if not self._api.is_blx_mev_ws_ready():

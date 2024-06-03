@@ -19,6 +19,10 @@
                 "level": "critical"
             },
             {
+                "logger_name": "exchange_websocket",
+                "level": "warn"
+            },
+            {
                 "logger_name": "urllib3.connectionpool",
                 "level": "info"
             },
@@ -48,6 +52,18 @@
             },
             {
                 "logger_name": "gas_tracker",
+                "level": "warn"
+            },
+            {
+                "logger_name": "eth_rpc_dex_helper",
+                "level": "warn"
+            },
+            {
+                "logger_name": "ETH_RPC::mainnet.infura.io",
+                "level": "warn"
+            },
+            {
+                "logger_name": "ETH_RPC::eth-mainnet.g.alchemy.com",
                 "level": "warn"
             }
         ]
@@ -98,6 +114,13 @@
                     }
                 }
             }
+        },
+        "dex_helper": {
+            "wallet_address": "03cde1e0bc6c1e096505253b310cf454b0b462fb",
+            "ws_urls": [
+                "wss://mainnet.infura.io/ws/v3/d3bf8a4fe2744587bf47459446b7f170",
+                "wss://eth-mainnet.g.alchemy.com/v2/qYOcvHNenpMYrDCfgpS-sg75t2ouBmnY"
+            ]
         },
         "gas_price_tracker": {
             "http_url": "https://mainnet.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
