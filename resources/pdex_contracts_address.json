@@ -40,6 +40,9 @@
                     "0xf5213a6a2f0890321712520b8048D9886c1A9900"
                 ]
             }
+        ],
+        "l2_withdrawal_addresses": [
+            "0x03d614037ad2a00315e603abe633ca39dc41a6db67faf82062d558543b0aab12"
         ]
     },
     "Ethereum Sepolia Testnet": {
@@ -60,6 +63,9 @@
                     "0x194c851021ABc7f64B51D11b58e251A8370d54dc"
                 ]
             }
+        ],
+        "l2_withdrawal_addresses": [
+            "0x005e1488dd8aa5dab16cd4a7f5d04648d3a3817a4d68ba44867920b768c6e9ef"
         ]
     }
 }
