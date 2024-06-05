@@ -27,19 +27,35 @@ class WebServer:
 
         self.__connections = weakref.WeakSet()
 
+        self.__request_id: int = 0
+
+    def __get_next_request_id(self) -> int:
+        self.__request_id += 1
+        return self.__request_id
+
     def register(self, method, path, handler):
         def wrapper(wrapped_handler):
             async def inner(request):
                 received_at_ms = int(time.time() * 1000)
+                # TODO: Pass this to all handlers
+                request_id = self.__get_next_request_id()
 
-                if request.method == 'POST':
-                    params = await request.json()
-                else:
-                    params = request.query
-                _logger.debug(
-                    f'received_at_ms={received_at_ms}, method={request.method}, path={request.path}, params={params}')
+                try:
+                    if request.method == 'POST':
+                        params = await request.json()
+                    else:
+                        params = request.query
+                    _logger.debug(
+                        f'[{request_id}] received_at_ms={received_at_ms}, remote={request.remote}, method={request.method}, path={request.path}, params={params}')
+                except Exception as e:
+                    raw_request = await request.text()
+                    _logger.error(
+                        f'[{request_id}] error=Malformed JSON, received_at_ms={received_at_ms}, remote={request.remote}, method={request.method}, path={request.path}, raw_request={raw_request}')
+
+                    return web.json_response(data={"error": f"Unable to parse request payload as JSON. payload={raw_request}, parsing_error={e}"}, status=400)
+
                 status, data = await wrapped_handler(request.path, params, received_at_ms)
-                _logger.debug(f'status={status}, data={data}')
+                _logger.debug(f'[{request_id}] status={status}, data={data}')
                 return web.json_response(data=data, status=status)
 
             return inner
