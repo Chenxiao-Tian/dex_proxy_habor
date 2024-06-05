@@ -255,12 +255,3 @@
     ```
     [Request object]
     ```
-
-### Signature generation
-In order to bump the version of the signature generation library you should do the following:
-- update [library](https://gitlab.com/auros/starknet-signing-cpp/-/tree/build-lib-with-python-bindings?ref_type=heads) `build-lib-with-python-bindings` branch
-- on successful merge a package will appear in [package registry](https://gitlab.com/auros/starknet-signing-cpp/-/packages)
-- update the relevant sections in the [Dockerfile](https://gitlab.com/auros/dex-proxy/-/blame/master/Dockerfile?ref_type=heads#L30)
-  - `SHA1`/starknet-signing-cpp-x86_64.`SHA1`.tar.gz
-  - [sha256 hash](https://gitlab.com/auros/dex-proxy/-/blame/master/Dockerfile?ref_type=heads#L32) of the package
-    - calculate with `sha256sum package.tar.gz`
