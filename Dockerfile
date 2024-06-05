@@ -10,7 +10,7 @@ COPY . /app/auros
 WORKDIR /app/auros
 
 RUN apt-get update \
-  && apt-get install -y openssh-client python3-venv libgmp3-dev \
+  && apt-get install -y openssh-client python3-venv libgmp3-dev curl \
   && mkdir -p /build/private ~/.ssh \
   && chmod 700 /build/private \
   && echo ${SSH_PRIVATE_KEY_BASE64} | base64 -i -d > /build/private/key \
@@ -23,6 +23,15 @@ RUN apt-get update \
   && pip3 install . \
   && rm -f /build/private/key \
   && rm -rf /app/auros/.git
+
+# Add the high performance starknet signing library - be careful to ensure that the code from which this was built has
+# been through the protected branch review process.
+# https://gitlab.com/auros/starknet-signing-cpp
+RUN curl -L --fail-with-body -o /tmp/libsigner.tar.gz --user "gitlab-com-auros-starknet-signing-cpp-ro:gldt-JBMfUTUU6yEt6HKxymfH" https://gitlab.com/api/v4/projects/57964836/packages/generic/starknet-signing-cpp/15550579/starknet-signing-cpp-x86_64.15550579.tar.gz \
+  && cd /tmp \
+  && echo c6b852977db8c5627fb17670479d47dc364dcf99057123d6d739df26e7520c66  libsigner.tar.gz >> libsigner-shasums.txt \
+  && sha256sum -c libsigner-shasums.txt \
+  && tar xf libsigner.tar.gz
 
 
 # SHASUM pin of registry.gitlab.com/auros/baseimg/ubuntu:22.04-enclave
@@ -57,6 +66,7 @@ ENV WALLET_FORMAT=eth
 ENV APPLICATION_LISTEN_PORT=8000
 
 COPY --from=builder /app/auros/ /app/auros/
+COPY --from=builder /tmp/libsigner.so /app/auros/lib64/python3.10/site-packages/libsigner.so
 COPY container/run /app/auros/run
 
 ENTRYPOINT [ "/init" ]
