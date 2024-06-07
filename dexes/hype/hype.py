@@ -73,6 +73,8 @@ class Hype(DexCommon):
 
         await self._api.initialize(private_key_or_mnemonic=eth_private_key, bridge_address=self.bridge_address, tokens_list=self.__tokens_from_res_file.values())
 
+        self._logger.info(f"wallet_address={self._api._wallet_address}")
+
         meta_info = await self._api.get_swaps_meta_info()
         self.coin_to_asset = {asset_info["name"]: asset for (asset, asset_info) in enumerate(meta_info['universe'])}
 
@@ -223,7 +225,7 @@ class Hype(DexCommon):
             self._logger.exception(f'Failed to cancel all: %r', e)
             return 400, {'error': {'message': str(e)}}
 
-    def __assert_cancel_order_schema(self, received_keys: list) -> None:
+    def __assert_cancel_order_by_ex_oid_schema(self, received_keys: list) -> None:
         expected_keys = [
             "coin",
             "oid"
@@ -231,7 +233,17 @@ class Hype(DexCommon):
 
         assert len(received_keys) == len(expected_keys), f"Sign cancel Request does not contain the correct set of fields. Expected [{', '.join(expected_keys)}]"
         for key in expected_keys:
-            assert key in received_keys, f"Missing field({key}) in the Sign Cancel request"
+            assert key in received_keys, f"Missing field({key}) in the Sign Cancel by ExchangeOrderId request"
+
+    def __assert_cancel_order_by_cl_oid_schema(self, received_keys: list) -> None:
+        expected_keys = [
+            "coin",
+            "cloid"
+        ]
+
+        assert len(received_keys) == len(expected_keys), f"Sign cancel Request does not contain the correct set of fields. Expected [{', '.join(expected_keys)}]"
+        for key in expected_keys:
+            assert key in received_keys, f"Missing field({key}) in the Sign Cancel by ClientOrderId request"
 
     def __assert_update_leverage(self, received_keys: list) -> None:
         expected_keys = [
@@ -258,6 +270,31 @@ class Hype(DexCommon):
         assert len(received_keys) == len(expected_keys), f"Request does not contain the correct set of fields. Expected [{', '.join(expected_keys)}]"
         for key in expected_keys: assert key in received_keys, f"Missing field({key}) in the request"
 
+
+    def __create_cancel_by_ex_oid_action(self, orders: list[dict]) -> dict:
+        return {
+            "type": "cancel",
+            "cancels": [
+                {
+                    "a": self.coin_to_asset[order["coin"]],
+                    "o": order["oid"]
+                }
+                for order in orders
+            ]
+        }
+
+    def __create_cancel_by_cl_oid_action(self, orders: list[dict]) -> dict:
+        return {
+            "type": "cancelByCloid",
+            "cancels": [
+                {
+                    "asset": self.coin_to_asset[order["coin"]],
+                    "cloid": order["cloid"]
+                }
+                for order in orders
+            ]
+        }
+
     async def __sign_cancel_order_request(
         self, path: str, params: dict, received_at_ms: int
     ) -> Tuple[int, dict]:
@@ -271,19 +308,19 @@ class Hype(DexCommon):
 
             self._logger.debug(f"cancel order request ({req_id}) received at {start}")
 
-            for order in params['orders']:
-                self.__assert_cancel_order_schema(order.keys())
+            assert "orders" in params, "Missing field `orders`"
+            assert len(params["orders"]), "Empty `orders` array"
 
-            cancel_action = {
-                "type": "cancel",
-                "cancels": [
-                    {
-                        "a": self.coin_to_asset[cancel["coin"]],
-                        "o": cancel["oid"],
-                    }
-                    for cancel in params['orders']
-                ]
-            }
+            cancel_by_exchange_order_id = False
+            if "oid" in params["orders"][0]:
+                cancel_by_exchange_order_id = True
+                for order in params['orders']:
+                    self.__assert_cancel_order_by_ex_oid_schema(order.keys())
+            else:
+                for order in params['orders']:
+                    self.__assert_cancel_order_by_cl_oid_schema(order.keys())
+
+            cancel_action = self.__create_cancel_by_ex_oid_action(params["orders"]) if cancel_by_exchange_order_id else self.__create_cancel_by_cl_oid_action(params["orders"])
 
             signature = await self.pantheon.loop.run_in_executor(
                 self.__process_pool,
