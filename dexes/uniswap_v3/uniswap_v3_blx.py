@@ -660,8 +660,8 @@ class UniswapV3Bloxroute(DexCommon):
         blx_authorisation_header = self.__get_blx_authorisation_header()
         await self._api.initialise_and_maintain_blx_mev_ws(blx_authorisation_header)
 
-        self.pantheon.spawn(self.__finalise_missed_requests())
         await self.__dex_helper.start()
+        self.pantheon.spawn(self.__finalise_missed_requests())
 
         self.started = True
 
