@@ -302,11 +302,11 @@ class Hype(DexCommon):
             req_id = self.order_req_id
             self.order_req_id += 1
 
-            start = time.time()
-
             assert 'nonce' in params, 'Missing nonce field'
 
-            self._logger.debug(f"cancel order request ({req_id}) received at {start}")
+            processing_start_ts_ms = int(time.time() * 1_000)
+
+            self._logger.debug(f"[sign_cancel] reqId=({req_id}), dexRecvTs={received_at_ms}, processingStartTs={processing_start_ts_ms}")
 
             assert "orders" in params, "Missing field `orders`"
             assert len(params["orders"]), "Empty `orders` array"
@@ -331,6 +331,17 @@ class Hype(DexCommon):
                 params['nonce'],
                 self.is_mainnet,
             )
+
+            processing_end_ts_ms = int(time.time() * 1000)
+
+            dex_wait_ms = processing_start_ts_ms - received_at_ms
+            signature_latency_ms = processing_end_ts_ms - processing_start_ts_ms
+
+            # Only logging telemetry for a single order request
+            # TODO: Think about how to log telemetry for a batch of orders
+            if len(params["orders"]) == 1:
+                id_kv = f"exOId={params['orders'][0]['oid']}" if cancel_by_exchange_order_id else f"clOId={params['orders'][0]['cloid']}"
+                self._logger.info(f"stat=signTelem, op=C, {id_kv}, srvRcv={received_at_ms}, esSend=, delayFromESMs=, dexWaitMs={dex_wait_ms}, signLatencyMs={signature_latency_ms}")
 
             return 200, {"signature": signature}
 
@@ -394,12 +405,12 @@ class Hype(DexCommon):
             req_id = self.order_req_id
             self.order_req_id += 1
 
-            start = time.time()
-
             assert 'orders' in params, 'Missing orders field'
             assert 'order_creation_ts_ms' in params, 'Missing order_creation_ts_ms field'
 
-            self._logger.debug(f"order request ({req_id}) received at {start}")
+            processing_start_ts_ms = int(time.time() * 1_000)
+
+            self._logger.debug(f"[sign_insert] reqId=({req_id}), dexRecvTs={received_at_ms}, processingStartTs={processing_start_ts_ms}")
 
             for order in params['orders']:
                 self.__assert_order_schema(order.keys())
@@ -419,6 +430,13 @@ class Hype(DexCommon):
                 params['order_creation_ts_ms'],
                 self.is_mainnet,
             )
+
+            processing_end_ts_ms = int(time.time() * 1000)
+            delay_from_es_ms = received_at_ms - int(params["order_creation_ts_ms"])
+            dex_wait_ms = processing_start_ts_ms - received_at_ms
+            signature_latency_ms = processing_end_ts_ms - processing_start_ts_ms
+
+            self._logger.info(f"stat=signTelem, op=I, clOId={params['orders'][0]['cloid']}, srvRcv={received_at_ms}, esSend={params['order_creation_ts_ms']}, delayFromESMs={delay_from_es_ms}, dexWaitMs={dex_wait_ms}, signLatencyMs={signature_latency_ms}")
 
             return 200, {"signature": signature}
 
