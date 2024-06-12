@@ -1979,6 +1979,9 @@ export class DeepBook {
                 if (mainGasCoin === null) {
                     throw new Error("The mainGasCoin is being used in a concurrent transaction. Please retry");
                 }
+
+                await this.gasManager!.mergeUntrackedGasCoinsInto(mainGasCoin)
+
                 firstCoin = mainGasCoin.objectId;
             }
 
@@ -2146,6 +2149,9 @@ export class DeepBook {
             if (mainGasCoin === null) {
                 throw new Error("The mainGasCoin is being used in a concurrent transaction. Please retry");
             }
+
+            await this.gasManager!.mergeUntrackedGasCoinsInto(mainGasCoin)
+
             block.txBlock.setGasPayment([mainGasCoin]);
             const transaction = block.transferSui(recipient, BigInt(quantity * FLOAT_SCALING_FACTOR));
 
