@@ -405,6 +405,30 @@ export class GasManager {
         return response?.effects?.status.status === "success";
     }
 
+    // The caller is responsible for obtaining the gasCoin before calling this
+    // and freeing it afterwards
+    mergeUntrackedGasCoinsInto = async (gasCoin: GasCoin) => {
+        let untrackedCoinsToMerge = new Array<string>();
+
+        try {
+            untrackedCoinsToMerge = await this.#untrackedCoinsToMerge();
+
+            this.#logger.info(`mergeUntrackedGasCoinsInto: Found ${untrackedCoinsToMerge.length} untracked gas coin(s)`);
+            if (untrackedCoinsToMerge.length == 0) {
+                this.#logger.info(`mergeUntrackedGasCoinsInto: No untracked gasCoin to merge. Returning`);
+                return
+            }
+
+            await this.#mergeCoins(gasCoin,
+                                   untrackedCoinsToMerge);
+
+        } catch (error) {
+            this.#logger.error(`mergeUntrackedGasCoinsInto: Failed to merge untracked coins into gasCoin=${gasCoin.objectId}. Error=${error}`);
+        } finally {
+            await gasCoin.updateInstance(this.#suiClient);
+        }
+    }
+
     getFreeGasCoin = (): GasCoin => {
         if (this.#gasCoinKeys.length === 0) {
             throw new Error("No gas coins configured");
