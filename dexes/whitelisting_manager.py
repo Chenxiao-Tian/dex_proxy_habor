@@ -19,6 +19,8 @@ class WhitelistingManager:
         self.__dex = dex
         self.__config: dict = config["fireblocks"]
 
+        self.__poll_interval_s: int = int(self.__config.get("poll_interval_s", 600))
+
         self.__logger = logging.getLogger("whitelisting_manager")
         self.__first_value_fetched = asyncio.Event()
 
@@ -26,6 +28,7 @@ class WhitelistingManager:
         self.__fireblocks_api: FireblocksApi = api_factory.create(self.__pantheon, ConnectorType.Fireblocks)
 
     async def start(self):
+        self.__logger.info(f"Polling fireblocks every {self.__poll_interval_s}s")
         self.__pantheon.spawn(self.__get_whitelisted_withdrawal_addresses_and_tokens_from_fireblocks())
         await self.__first_value_fetched.wait()
 
@@ -154,11 +157,11 @@ class WhitelistingManager:
 
                 self.__first_value_fetched.set()
             except asyncio.TimeoutError as timeout_ex:
-                self.__logger.warning(WhitelistingManager.base_ex_msg, timeout_ex)
+                self.__logger.debug(WhitelistingManager.base_ex_msg, timeout_ex)
                 await self.__pantheon.sleep(30)
                 continue
             except Exception as ex:
                 self.__logger.exception(WhitelistingManager.base_ex_msg, ex)
                 await self.__pantheon.sleep(30)
                 continue
-            await self.__pantheon.sleep(120)
+            await self.__pantheon.sleep(self.__poll_interval_s)

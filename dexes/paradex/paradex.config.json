@@ -121,6 +121,7 @@
             "poll_interval_s": 15
         },
         "fireblocks": {
+            "poll_interval_s": 300,
             "native_asset": "ETH",
             "token_types": [
                 "ERC20",
