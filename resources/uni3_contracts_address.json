@@ -630,6 +630,11 @@
                 "symbol": "FORTH",
                 "address": "0x77FbA179C79De5B7653F68b5039Af940AdA60ce0",
                 "valid_withdrawal_addresses": []
+            },
+            {
+                "symbol": "FLOKI",
+                "address": "0xcf0c122c6b73ff809c693db761e7baebe62b6a2e",
+                "valid_withdrawal_addresses": []
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
