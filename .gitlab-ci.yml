@@ -77,7 +77,7 @@ stages:
 
 
 variables:
-  ENCLAVE_BUILD_IMAGE: registry.gitlab.com/auros/enclave-builder@sha256:cb1455947d0ce9c5ae527715e80bb83b200ad82dfe266dc11ff6ce0f8e8f85be
+  ENCLAVE_BUILD_IMAGE: registry.gitlab.com/auros/enclave-builder@sha256:39f517e1297d3d9a41e0ccb4e3f4ec26f289ca88cf1ba58ca3766815761d349e
   DOCKER_HOST: tcp://docker:2375
   DOCKER_TLS_CERTDIR: ""
   # The following must actually be defined in the project CI/CD variables. They are explicitly included here, to
