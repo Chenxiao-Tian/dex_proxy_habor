@@ -181,6 +181,7 @@ def sign_agent(wallet, action, is_mainnet):
 def sign_user_signed_action(wallet, action, payload_types, primary_type, is_mainnet):
     action["signatureChainId"] = "0x66eee"
     action["hyperliquidChain"] = "Mainnet" if is_mainnet else "Testnet"
+    
     data = {
         "domain": {
             "name": "HyperliquidSignTransaction",
@@ -202,31 +203,19 @@ def sign_user_signed_action(wallet, action, payload_types, primary_type, is_main
     }
     return sign_inner(wallet, data)
 
-def sign_withdraw_from_bridge_action(wallet, message, is_mainnet):
-    data = {
-        "domain": {
-            "name": "Exchange",
-            "version": "1",
-            "chainId": 42161 if is_mainnet else 421614,
-            "verifyingContract": "0x0000000000000000000000000000000000000000",
-        },
-        "types": {
-            "WithdrawFromBridge2SignPayload": [
-                {"name": "destination", "type": "string"},
-                {"name": "usd", "type": "string"},
-                {"name": "time", "type": "uint64"},
-            ],
-            "EIP712Domain": [
-                {"name": "name", "type": "string"},
-                {"name": "version", "type": "string"},
-                {"name": "chainId", "type": "uint256"},
-                {"name": "verifyingContract", "type": "address"},
-            ],
-        },
-        "primaryType": "WithdrawFromBridge2SignPayload",
-        "message": message,
-    }
-    return sign_inner(wallet, data)
+def sign_withdraw_from_bridge_action(wallet, action, is_mainnet):
+    return sign_user_signed_action(
+        wallet,
+        action,
+        [
+            {"name": "hyperliquidChain", "type": "string"},
+            {"name": "destination", "type": "string"},
+            {"name": "amount", "type": "string"},
+            {"name": "time", "type": "uint64"},
+        ],
+        "HyperliquidTransaction:Withdraw",
+        is_mainnet,
+    )
 
 
 def sign_inner(wallet, data):

@@ -472,19 +472,16 @@ class Hype(DexCommon):
             self._request_cache.add(transfer)
 
             timestamp = int(time.time() * 1000)
-            payload = {
-                "destination": self._api._wallet_address,
-                "usd": amount,
-                "time": timestamp
-            }
+            
+            action = {"destination": self._api._wallet_address, "amount": str(amount), "time": timestamp, "type": "withdraw3"}
 
-            signature = sign_withdraw_from_bridge_action(self._api._account, payload, self.is_mainnet)
+            signature = sign_withdraw_from_bridge_action(self._api._account, action, self.is_mainnet)
 
             result = await self._api.withdraw_from_exchange(amount,
                                                               self._api._wallet_address,
                                                               timestamp,
-                                                              "Arbitrum" if self.is_mainnet else "ArbitrumTestnet",
-                                                              self.vault_address,
+                                                              "Mainnet" if self.is_mainnet else "Testnet",
+                                                              "0x66eee",
                                                               signature)
 
             if result['status'] == 'ok':
