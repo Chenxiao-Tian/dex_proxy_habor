@@ -100,16 +100,20 @@ default:
   retry: 1
 
 
-.build on all commits and merge requests:
+.build on all commits:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+
+
+.build on merge requests:
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    - if: $CI_COMMIT_BRANCH
 
 
 build enclaves:
   stage: build
   extends:
-    - .build on all commits and merge requests
+    - .build on all commits
   parallel:
     matrix: *enclaves
   script:
@@ -126,6 +130,7 @@ build enclaves:
     - "[[ \"${TS_DEX_PATH}\" ]] && { export DOCKERFILE=Dockerfile.ts; export ADDITIONAL_BUILD_ARGS=\"${ADDITIONAL_BUILD_ARGS} --build-arg TS_DEX_PATH=${TS_DEX_PATH}\"; }"
     - "[[ -f _config/${PROCESS_NAME}.json ]] || { echo \"No config found for ${PROCESS_NAME}\"; exit 1; }"
     - export CONTEXT_ID=$(jq -r '.enclave.cid | select(. != null)' _config/${PROCESS_NAME}.json)
+    - "[[ \"${CONTEXT_ID}\" ]] || { echo \"Cannot read .enclave.cid from config.json\"; exit 1; }"
     - rm -rf _config
     # Save the Gitlab job JWT token to file.
     - echo -En ${VAULT_ID_TOKEN} > jwt.json
@@ -166,7 +171,7 @@ build enclaves:
 build containers:
   stage: build
   extends:
-    - .build on all commits and merge requests
+    - .build on all commits
   parallel:
     matrix: *containers
   script:
@@ -186,10 +191,14 @@ authorise enclave:
   environment:
     name: ${ENVIRONMENT}
   rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      when: never
     - if: '$ENVIRONMENT == "dev"'
       when: manual
+      allow_failure: true
     - if: '$ENVIRONMENT == "prod" && $CI_COMMIT_REF_PROTECTED == "true"'
       when: manual
+      allow_failure: true
   script:
     - "[[ \"${USE_ATTESTATION}\" =~ [Ff]alse ]] && { echo \"Attestation is not enabled for this build\"; exit 0; }"
     - "[[ \"${ENVIRONMENT}\" == \"prod\" && \"${CI_COMMIT_REF_PROTECTED}\" == \"false\" ]] && { echo \"This job is running for a production enclave in an unprotected branch; Vault will refuse your authorisation request. How did you even get here?\"; exit 1; }"
@@ -220,7 +229,7 @@ container_scanning:
 .container scanning:
   extends:
     - container_scanning
-    - .build on all commits and merge requests
+    - .build on all commits
   before_script: []
   variables:
     CS_IMAGE: ${CI_REGISTRY_IMAGE}/${PROCESS_NAME}${CONTAINER_NAME}:${CI_COMMIT_SHA}
