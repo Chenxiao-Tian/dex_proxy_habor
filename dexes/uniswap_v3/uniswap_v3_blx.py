@@ -8,6 +8,7 @@ import uuid
 
 from decimal import Decimal
 from hexbytes import HexBytes
+from web3.exceptions import BlockNotFound
 
 from pantheon import Pantheon
 from pantheon.instruments_source import InstrumentLifecycle, InstrumentsLiveSource, InstrumentUsageExchanges
@@ -590,8 +591,10 @@ class UniswapV3Bloxroute(DexCommon):
                         # else:
                         #     transaction_status_poller will handle finalising the request
 
+                    # retry after 1 sec
+                    except BlockNotFound:
+                        self._logger.debug(f"Got BlockNotFound while polling tx_hashes of request={request}")
                     except Exception as ex:
-                        # retry after 1 sec
                         self._logger.exception(
                             f'Error in polling tx_hashes of request={request} for finalising requests \
                                 missing targeted block: %r', ex)
