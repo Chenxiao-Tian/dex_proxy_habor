@@ -1,0 +1,14 @@
+command = "/etc/horust/scripts/service-wrapper /usr/bin/socat -T 3600 TCP4-LISTEN:10934,reuseaddr,fork VSOCK-CONNECT:3:${CONTEXT_ID}934"
+start-after = ["enclave-init.toml"]
+start-delay = "0s"
+user = "root"
+stdout = "STDOUT"
+stderr = "STDERR"
+[environment]
+keep-env = false
+re-export = [ "TZ" ]
+[restart]
+strategy = "never"
+[failure]
+successful-exit-code = []
+strategy = "kill-dependents"
