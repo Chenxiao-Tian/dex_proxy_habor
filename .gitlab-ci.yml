@@ -46,16 +46,19 @@ stages:
     ENVIRONMENT: prod
   - PROCESS_NAME: dex_proxy-lyra-6
     ENVIRONMENT: prod
-  - PROCESS_NAME: dex_proxy-deep-1
+  - PROCESS_NAME: dex_proxy-deep-test-1
     ENVIRONMENT: dev
     TS_DEX_PATH: dexes/deepbook
-  - PROCESS_NAME: dex_proxy-deep-2
+  - PROCESS_NAME: dex_proxy-deep-test-2
     ENVIRONMENT: dev
     TS_DEX_PATH: dexes/deepbook
   - PROCESS_NAME: dex_proxy-deep-main
     ENVIRONMENT: prod
     TS_DEX_PATH: dexes/deepbook
   - PROCESS_NAME: dex_proxy-deep-main-2
+    ENVIRONMENT: prod
+    TS_DEX_PATH: dexes/deepbook
+  - PROCESS_NAME: dex_proxy-deep-3
     ENVIRONMENT: prod
     TS_DEX_PATH: dexes/deepbook
   - PROCESS_NAME: dex_proxy-hype-testnet
