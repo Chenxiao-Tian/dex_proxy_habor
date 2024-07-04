@@ -46,5 +46,6 @@ COPY container/run.fliplp /app/auros/run
 
 # This is a custom egress listener. It's used to connect to the target flipnode WS endpoint.
 COPY container/egress-implicit-flipnode-10933.toml /etc/horust/services/
+COPY container/egress-implicit-flipnode-10934.toml /etc/horust/services/
 
 ENTRYPOINT [ "/init" ]
