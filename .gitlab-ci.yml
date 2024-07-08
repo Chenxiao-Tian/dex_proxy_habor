@@ -69,6 +69,10 @@ stages:
     ENVIRONMENT: prod
     DOCKERFILE: Dockerfile.fliplp
     VAULT_SECRET_FIELD: signing_key0
+  - PROCESS_NAME: dex_proxy-per-testnet
+    ENVIRONMENT:  dev
+  - PROCESS_NAME: dex_proxy-per-main
+    ENVIRONMENT:  prod
 
 
 # Some applications are only containerised, and not enclaved. Supported keys:
