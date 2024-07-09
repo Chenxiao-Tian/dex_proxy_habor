@@ -73,6 +73,10 @@ stages:
     ENVIRONMENT:  dev
   - PROCESS_NAME: dex_proxy-per-main
     ENVIRONMENT:  prod
+  - PROCESS_NAME: dex_proxy-per-mode
+    ENVIRONMENT:  prod
+  - PROCESS_NAME: dex_proxy-per-eth
+    ENVIRONMENT:  prod
 
 
 # Some applications are only containerised, and not enclaved. Supported keys:
