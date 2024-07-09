@@ -1,4 +1,29 @@
 {
+    "Mode": {
+        "tokens": [
+            {
+                "symbol": "WETH",
+                "address": "0x4200000000000000000000000000000000000006",
+                "valid_withdrawal_addresses": []
+            },
+            {
+                "symbol": "USDC",
+                "address": "0xd988097fb8612cc24eeC14542bC03424c656005f",
+                "valid_withdrawal_addresses": []
+            },
+            {
+                "symbol": "USDT",
+                "address": "0xf0F161fDA2712DB8b566946122a5af183995e2eD",
+                "valid_withdrawal_addresses": []
+            },
+            {
+                "symbol": "WBTC",
+                "address": "0xcDd475325D6F564d27247D1DddBb0DAc6fA0a5CF",
+                "valid_withdrawal_addresses": []
+            }
+        ],
+        "per_contract_address": "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+    },
     "Optimism Sepolia": {
         "tokens": [
             {
