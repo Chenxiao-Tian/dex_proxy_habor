@@ -37,6 +37,7 @@ class Per(DexCommon):
 
     def __register_endpoints(self, server: WebServer) -> None:
         server.register("POST", "/private/order-signature", self.__sign_order_request)
+        server.register('POST', '/private/wrap-unwrap-eth', self.__wrap_unwrap_eth)
         server.register("POST", "/private/bridge", self.__bridge)
 
     async def start(self, eth_private_key: str):
@@ -168,6 +169,57 @@ class Per(DexCommon):
             return await self._api.withdraw(symbol, address_to, amount, gas_limit, gas_price_wei)
         else:
             assert False
+
+    async def __wrap_unwrap_eth(self, path, params: dict, received_at_ms):
+        client_request_id = ''
+        try:
+            client_request_id = params['client_request_id']
+
+            if self._request_cache.get(client_request_id) is not None:
+                return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
+
+            request = params['request']
+            assert request == 'wrap' or request == 'unwrap', 'Unknown request, should be either wrap or unwrap'
+            amount = Decimal(params['amount'])
+            gas_price_wei = int(params['gas_price_wei'])
+            gas_limit = int(params['gas_limit'])
+
+            wrap_unwrap = WrapUnwrapRequest(client_request_id, request, amount, gas_limit, received_at_ms)
+
+            self._logger.debug(
+                f'{"Wrapping" if wrap_unwrap.request == "wrap" else "Unwrapping"}={wrap_unwrap}, gas_price_wei={gas_price_wei}')
+            self._request_cache.add(wrap_unwrap)
+
+            self._request_cache.add_or_update_request_in_redis(client_request_id)
+
+            if wrap_unwrap.request == "wrap":
+                result = await self._api.wrap(wrapped_token_symbol='WETH', amount=wrap_unwrap.amount,
+                                              gas_limit=wrap_unwrap.gas_limit,
+                                              gas_price=gas_price_wei, nonce=wrap_unwrap.nonce)
+            else:
+                result = await self._api.unwrap(wrapped_token_symbol='WETH', amount=wrap_unwrap.amount,
+                                                gas_limit=wrap_unwrap.gas_limit,
+                                                gas_price=gas_price_wei, nonce=wrap_unwrap.nonce)
+
+            wrap_unwrap.nonce = result.nonce
+            if result.error_type == ErrorType.NO_ERROR:
+                wrap_unwrap.tx_hashes.append((result.tx_hash, RequestType.TRANSFER.name))
+                wrap_unwrap.used_gas_prices_wei.append(gas_price_wei)
+
+                self._transactions_status_poller.add_for_polling(
+                    result.tx_hash, client_request_id, RequestType.TRANSFER)
+                self._request_cache.add_or_update_request_in_redis(client_request_id)
+
+                return 200, {'tx_hash': result.tx_hash}
+            else:
+                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+                return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
+
+        except Exception as e:
+            self._logger.exception(f'Failed to handle wrap_unwrap request: %r', e)
+            self._request_cache.finalise_request(
+                client_request_id, RequestStatus.FAILED)
+            return 400, {'error': {'message': repr(e)}}
 
     async def __bridge(self, path: str, params: dict, received_at_ms: int):
         try:
