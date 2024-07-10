@@ -276,7 +276,7 @@ class Paradex(DexCommon):
     def __is_l2_request(self, request: Request) -> bool:
         return request.dex_specific and (request.dex_specific.get("chain", "") == "L2")
 
-    async def _approve(self,request, gas_price_wei: int, nonce=None):
+    async def _approve(self, request, gas_price_wei: int, nonce=None):
         return await self._api.approve_deposit_into_l1_bridge(
             request.symbol, request.amount, request.gas_limit, gas_price_wei, nonce
         )

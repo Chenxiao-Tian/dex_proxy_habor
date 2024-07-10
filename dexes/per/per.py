@@ -1,5 +1,4 @@
 import os
-from web3 import Web3
 from ..dex_common import DexCommon
 
 import concurrent.futures
@@ -8,11 +7,10 @@ from pyutils.exchange_connectors import ConnectorType
 from pyutils.gas_pricing.eth import GasPriceTracker, PriorityFee
 from pyutils.exchange_apis.paradex_api import *
 from pantheon import Pantheon
-from decimal import Decimal
 from typing import Tuple
 from web_server import WebServer
 from .utils import sign_bid
-
+import json
 from eth_account.account import Account
 
 
@@ -39,6 +37,7 @@ class Per(DexCommon):
 
     def __register_endpoints(self, server: WebServer) -> None:
         server.register("POST", "/private/order-signature", self.__sign_order_request)
+        server.register("POST", "/private/bridge", self.__bridge)
 
     async def start(self, eth_private_key: str):
         self.__eth_private_key = eth_private_key
@@ -149,33 +148,97 @@ class Per(DexCommon):
         except Exception as e:
             return 400, {"error": str(e)}
 
-    async def _approve(
-        self,
-        request,
-        symbol: str,
-        amount: Decimal,
-        gas_limit: int,
-        gas_price_wei: int,
-        nonce=None
-    ):
-        return await self._api.approve(symbol, amount, gas_limit, gas_price_wei, nonce)
+    async def _approve(self, request, gas_price_wei: int, nonce=None):
+        return await self._api.approve(request.symbol, request.amount, request.gas_limit, gas_price_wei, nonce)
 
     async def _transfer(
-         self,
-         request,
-         path: str,
-         symbol: str,
-         address_to: str,
-         amount: str,
-         gas_limit: int,
-         gas_price_wei: int,
-         nonce: int=None
+            self,
+            request,
+            gas_price_wei: int,
+            nonce: int = None,
     ):
+        path = request.request_path
+        symbol = request.symbol
+        address_to = request.address_to
+        amount = request.amount
+        gas_limit = request.gas_limit
+
         if path == '/private/withdraw':
             assert address_to is not None
             return await self._api.withdraw(symbol, address_to, amount, gas_limit, gas_price_wei)
         else:
             assert False
+
+    async def __bridge(self, path: str, params: dict, received_at_ms: int):
+        try:
+            symbol = params['symbol']
+            bridge_address = params['bridge_address']
+            native_amount = int(params['native_amount'])
+
+            l1_token_address = params.get('l1_token_address')
+            l2_token_address = params.get('l2_token_address')
+            nonce = params.get('nonce')
+
+            if path == '/private/bridge':
+                with open(os.path.join(self.pantheon.config["abi_path"], 'bridge.json')) as f:
+                    abi = json.load(f)
+
+                if symbol == 'ETH':
+                    tx_params = {
+                        'nonce': nonce,
+                        'value': native_amount
+                    }
+
+                    bridge_contract = self._api._w3.eth.contract(address=bridge_address, abi=abi)
+                    build_func = lambda tx: bridge_contract.functions.depositETH(5000, b'').build_transaction(tx)
+
+                    api_result = await self._api.send_transaction(tx_params, build_func)
+
+                    if api_result.error_type == ErrorType.NO_ERROR:
+                        return 200, {"tx_hash": api_result.tx_hash}
+                    else:
+                        return 400, {"error": api_result.error_message}
+                else:
+                    assert l1_token_address is not None, 'l1_token_address required'
+                    assert l2_token_address is not None, 'l2_token_address required'
+
+                    approve_api_result = await self.__approve_send_to(l1_token_address, bridge_address, native_amount, nonce)
+
+                    if approve_api_result.error_type != ErrorType.NO_ERROR:
+                        return 400, {"error": approve_api_result.error_message}
+
+                    tx_params = {
+                        'nonce': nonce
+                    }
+
+                    bridge_contract = self._api._w3.eth.contract(address=bridge_address, abi=abi)
+                    build_func = lambda tx: bridge_contract.functions.depositERC20(l1_token_address, l2_token_address, native_amount, 5000, b'').build_transaction(tx)
+
+                    api_result = await self._api.send_transaction(tx_params, build_func)
+
+                    if api_result.error_type == ErrorType.NO_ERROR:
+                        return 200, {"tx_hash": api_result.tx_hash, 'approve_tx_hash': approve_api_result.tx_hash}
+                    else:
+                        return 400, {"error": api_result.error_message}
+            else:
+                assert False
+        except Exception as e:
+            return 400, {"error": str(e)}
+
+    async def __approve_send_to(self, from_token_address: str, contract_address: str, native_amount: int, nonce: int):
+        with open(os.path.join(self.pantheon.config["abi_path"], 'erc20.json')) as f:
+            erc20_abi = json.load(f)
+
+        tx_params = {
+            'nonce': nonce,
+            'from': self._api._wallet_address
+        }
+
+        token_contract = self._api._w3.eth.contract(address=from_token_address, abi=erc20_abi)
+
+        build_func = lambda tx: token_contract.functions.approve(contract_address, native_amount).build_transaction(tx_params)
+
+        return await self._api.send_transaction(tx_params, build_func, timeout_s=60)
 
     async def _amend_transaction(self, request, params, gas_price_wei):
         if request.request_type == RequestType.TRANSFER:
@@ -185,6 +248,8 @@ class Per(DexCommon):
         elif request.request_type == RequestType.APPROVE:
             return await self._api.approve(request.symbol, request.amount,
                                            request.gas_limit, gas_price_wei, nonce=request.nonce)
+        elif request.request_type == RequestType.BRIDGE:
+            raise Exception('Unsupported request type for amending')
         else:
             raise Exception('Unsupported request type for amending')
 
