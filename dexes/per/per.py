@@ -180,7 +180,10 @@ class Per(DexCommon):
             nonce = params.get('nonce')
 
             if path == '/private/bridge':
-                with open(os.path.join(self.pantheon.config["abi_path"], 'bridge.json')) as f:
+                file_prefix = os.path.dirname(os.path.realpath(__file__))
+                file_path = f'{file_prefix}/abi/bridge.json'
+
+                with open(file_path) as f:
                     abi = json.load(f)
 
                 if symbol == 'ETH':
@@ -226,7 +229,10 @@ class Per(DexCommon):
             return 400, {"error": str(e)}
 
     async def __approve_send_to(self, from_token_address: str, contract_address: str, native_amount: int, nonce: int):
-        with open(os.path.join(self.pantheon.config["abi_path"], 'erc20.json')) as f:
+        file_prefix = os.path.dirname(os.path.realpath(__file__))
+        file_path = f'{file_prefix}/abi/erc20.json'
+
+        with open(file_path) as f:
             erc20_abi = json.load(f)
 
         tx_params = {

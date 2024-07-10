@@ -65,7 +65,6 @@
     "_comment_0": "change following to ./dexes/uniswap_v3/test/wallet.json to run dex-proxy locally",
     "_key_store_file_path": "/app/auros/secret/wallet.json",
     "key_store_file_path": "./dexes/per/test/wallet.json",
-    "abi_path": "./dexes/per/abi",
     "_dex": {
         "name": "per",
         "_chain_name": "Optimism Sepolia",
