@@ -661,9 +661,7 @@
                 "address": "0xcf0c122c6b73ff809c693db761e7baebe62b6a2e",
                 "valid_withdrawal_addresses": []
             }
-        ],
-        "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
-        "uniswap_router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564"
+        ]
     },
     "Optimism Sepolia": {
         "tokens": [

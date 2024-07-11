@@ -257,6 +257,14 @@ class Per(DexCommon):
                     assert l1_token_address is not None, 'l1_token_address required'
                     assert l2_token_address is not None, 'l2_token_address required'
 
+                    if symbol == 'USDT':
+                        # For the USDT token you need to reset the allowance to 0 each time. Why you ask? No idea
+                        approve_zero_api_result = await self.__approve_send_to(l1_token_address, bridge_address,
+                                                                               0, nonce)
+
+                        if approve_zero_api_result.error_type != ErrorType.NO_ERROR:
+                            return 400, {"error": approve_zero_api_result.error_message}
+
                     approve_api_result = await self.__approve_send_to(l1_token_address, bridge_address, native_amount, nonce)
 
                     if approve_api_result.error_type != ErrorType.NO_ERROR:
