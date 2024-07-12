@@ -1,4 +1,4 @@
-import { LoggerFactory } from "./logger.js";
+import { LoggerFactory } from "../../logger";
 import {
     GasManager,
     GasCoin,

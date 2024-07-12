@@ -2,11 +2,12 @@
   "logging": {
     "level": "debug"
   },
-  "key_store_file_path": "./test/wallet_1.txt",
+  "key_store_file_path": "./dexes/deepbook/test/wallet_1.txt",
   "server": {
     "port": 3001
   },
   "dex": {
+    "name": "deepbook",
     "log_responses": true,
     "chain_name": "Sui Mainnet for Test",
     "wallet_address": "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c",

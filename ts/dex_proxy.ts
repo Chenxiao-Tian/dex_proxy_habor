@@ -1,7 +1,9 @@
 import { LoggerFactory } from "./logger.js";
 import { WebServer } from "./web_server.js";
-import { DeepBook, Mode } from "./deepbook.js";
+import { DeepBook } from "./dexes/deepbook/deepbook.js";
+import { Synfutures } from "./dexes/synfutures/synfutures.js";
 import { parseConfig } from "./config.js";
+import { DexInterface, Mode} from "./types";
 import { WebSocket } from "ws";
 import { parseArgs } from "node:util";
 import http from "http";
@@ -11,7 +13,7 @@ export class DexProxy {
     private config: any;
     private logger: winston.Logger;
     private webServer: WebServer;
-    private deepbook: DeepBook;
+    private dexImpl: DexInterface;
     private subscriptions: Map<string, Set<WebSocket>>;
 
     constructor(config: any, mode: Mode) {
@@ -19,12 +21,23 @@ export class DexProxy {
         let lf = new LoggerFactory(config);
         this.logger = lf.createLogger("dex_proxy");
         this.webServer = new WebServer(lf, config, this);
-        this.deepbook = new DeepBook(lf, this.webServer, config, mode, this);
+
+        if (config.dex.name == "deepbook") {
+            this.dexImpl = new DeepBook(lf, this.webServer, config, mode, this);
+        }
+        else if (config.dex.name == "synfutures") {
+            this.dexImpl = new Synfutures(lf, this.webServer, config, mode, this);
+        }
+        else {
+            const error = `${config.dex.name} is not supported`;
+            throw new Error(error);
+        }
+
         this.subscriptions = new Map<string, Set<WebSocket>>();
     }
 
     start = async () => {
-        await this.deepbook.start();
+        await this.dexImpl.start();
     }
 
     onWsMessage = async (ws: WebSocket, json: any) => {
@@ -53,7 +66,7 @@ export class DexProxy {
 
         let nonExistentChannels = new Array<string>();
         for (const channel of channels) {
-            if (! this.deepbook.channels.includes(channel)) {
+            if (! this.dexImpl.channels.includes(channel)) {
                 nonExistentChannels.push(channel);
             }
         }

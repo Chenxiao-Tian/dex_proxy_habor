@@ -10,7 +10,6 @@
         "rootDir": "./"
     },
     "exclude": [
-        "deepbook-server",
-        "examples"
+        "/dexes/deepbook/examples"
     ]
 }

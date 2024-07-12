@@ -1,4 +1,4 @@
-import { LoggerFactory } from "../logger.js";
+import { LoggerFactory } from "../../../logger";
 import { GasManager, GasCoin, GasCoinStatus } from "../gas_manager.js";
 import { SuiClient } from "@mysten/sui.js/client";
 import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";

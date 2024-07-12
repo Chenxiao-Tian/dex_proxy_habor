@@ -1,4 +1,4 @@
-import { LoggerFactory } from "./logger.js";
+import { LoggerFactory } from "../../logger";
 
 import { Logger } from "winston";
 import { SuiClient } from "@mysten/sui.js/client";
