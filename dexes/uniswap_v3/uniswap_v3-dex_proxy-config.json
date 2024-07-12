@@ -69,7 +69,7 @@
         ]
     },
     "RabbitMQ": {
-        "url": "amqp://dev-sng-rmq.kdev"
+        "url": "amqp://dev-ore-rmq.kdev"
     },
     "Redis": {
         "host": "localhost",
@@ -144,6 +144,18 @@
                 "ERC20",
                 "BASE_ASSET"
             ]
-        }
+        },
+        "builders_rpc": [
+            "https://rpc.titanbuilder.xyz",
+            "https://rsync-builder.xyz",
+            "https://rpc.lokibuilder.xyz",
+            "https://builder0x69.io",
+            "https://rpc.jetbldr.xyz",
+            "https://rpc.penguinbuild.org",
+            "https://blockbeelder.com/rpc",
+            "https://rpc.bobthebuilder.xyz"
+        ],
+        "flashbot_rpc": "https://relay.flashbots.net/",
+        "flashbot_signing_key": "0xac0a088608778e99bdaa10d10dd159d9522775b91b100c2b83da0d392c8416f5"
     }
 }
