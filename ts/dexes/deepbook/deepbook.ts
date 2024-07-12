@@ -1,16 +1,16 @@
-import { LoggerFactory } from "./logger.js";
+import { LoggerFactory } from "../../logger.js";
 import {
     WebServer,
     RestResult,
     RestRequestHandler
-} from "./web_server.js";
+} from "../../web_server.js";
 import {
     GasManager,
     GasCoin,
     GasCoinStatus
 } from "./gas_manager.js";
 import { Executor, TransactionBlockGenerator, AccountCap } from "./executor.js";
-import { DexProxy } from "./dex_proxy.js";
+import { DexProxy } from "../../dex_proxy.js";
 import type { PoolInfo } from "./types.js";
 import {
     OrderCache,
@@ -29,7 +29,7 @@ import {
     OrderPlacedEvent,
     OrderCancelledEvent,
     OrderFilledEvent
-} from "./order_cache.js";
+} from "../../order_cache.js";
 import { DeepBookClient } from '@mysten/deepbook';
 import {
     SuiClient,
@@ -59,10 +59,15 @@ import { dirname } from "path";
 import { Logger } from "winston";
 import { SuiTxBlock }  from "./sui_tx_block.js";
 import { WebSocket } from "ws";
+import {ParsedOrderError, DexInterface, Mode} from "../../types.js";
+import { assertFields } from "../../utils.js";
 
 const FLOAT_SCALING_FACTOR: number = 1_000_000_000;
 
-export type Mode = "read-only" | "read-write";
+interface ParsedExchangeError {
+    type: string | null;
+    txNumber: number | null;
+}
 
 class MandatoryFields {
     static InsertRequest           = ["client_order_id", "pool_id",
@@ -84,49 +89,9 @@ class MandatoryFields {
     static UserPositionRequest     = ["id"];
     static TradesByTimeRequest     = ["start_ts", "max_pages"];
     static TradesByDigestRequest   = ["tx_digests"];
-};
-
-let assertFields = (request: any, fields: Array<string>) => {
-    let fieldAbsent = null;
-    if (request.get) {
-        fieldAbsent = (field: string) => {
-            return request.get(field) === null;
-        };
-    } else {
-        fieldAbsent = (field: string) => {
-            return request[field] === undefined;
-        };
-    }
-    for (let field of fields) {
-        if (fieldAbsent(field)) {
-            const error = `${field} is a mandatory field.`;
-            throw new Error(error);
-        }
-    }
-};
-
-interface ParsedExchangeError {
-    type: string | null;
-    txNumber: number | null;
 }
 
-export class ParsedOrderError extends Error {
-    type: string;
-    responseCode: number | null;
-
-    constructor(type: string, message: string, responseCode: number | null=null) {
-        super(message);
-        this.type = type;
-        this.responseCode = responseCode;
-    }
-}
-
-enum AccountCapStatus {
-    Free,
-    InUse
-};
-
-export class DeepBook {
+export class DeepBook implements DexInterface {
     private logger: Logger;
     private config: any;
     private server: WebServer;
@@ -297,7 +262,7 @@ export class DeepBook {
 
     fetchWithdrawalAddresses = (): void => {
         const filePrefix = dirname(process.argv[1]);
-        const filename = `${filePrefix}/../../../resources/deep_withdrawal_addresses.json`;
+        const filename = `${filePrefix}/../../resources/deep_withdrawal_addresses.json`;
         try {
             let contents = JSON.parse(readFileSync(filename, "utf8"));
             this.logger.info(`Looking up configured withdrawal addresses for chainName=${this.chainName} from ${filename}`);

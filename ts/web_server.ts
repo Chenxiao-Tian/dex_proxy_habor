@@ -3,11 +3,10 @@ import url from "url";
 import winston from "winston";
 import { WebSocketServer, WebSocket } from "ws";
 import { v4 as uuidV4 } from "uuid";
-import util from "util";
 
-import { LoggerFactory } from "./logger.js";
+import { LoggerFactory } from "./logger";
 import { DexProxy } from "./dex_proxy.js";
-import { ParsedOrderError } from "./deepbook.js";
+import { ParsedOrderError } from "./types.js";
 
 export interface RestResult {
     statusCode: number;

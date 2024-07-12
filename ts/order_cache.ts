@@ -1,5 +1,5 @@
 import winston from "winston";
-import { LoggerFactory } from "./logger.js";
+import { LoggerFactory } from "./logger";
 
 
 export type OrderState         = "Unknown" |

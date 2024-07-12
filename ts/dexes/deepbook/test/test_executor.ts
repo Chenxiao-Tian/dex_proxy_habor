@@ -1,4 +1,4 @@
-import { LoggerFactory } from "../logger.js";
+import { LoggerFactory } from "../../../logger";
 import { GasManager } from "../gas_manager.js";
 import { Executor } from "../executor.js";
 

@@ -18,10 +18,9 @@ log_error() {
 }
 
 [[ "${PROCESS_NAME}" ]] || log_error "PROCESS_NAME environment variable not set"
-[[ "${TS_DEX_PATH}" ]] || log_error "TS_DEX_PATH environment variable not set"
 
 # /app/auros/config will be cloned by an enclave init process.
 
-node ${TS_DEX_PATH}/dist/dex_proxy.js -c /app/auros/config/${PROCESS_NAME}.json
+node ts/dist/dex_proxy.js -c /app/auros/config/${PROCESS_NAME}.json
 
 exit $?

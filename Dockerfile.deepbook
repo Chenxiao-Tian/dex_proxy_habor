@@ -5,14 +5,14 @@ COPY . /app/auros
 
 WORKDIR /app/auros
 
-RUN cd /app/auros/dexes/deepbook \
+RUN cd /app/auros/ts \
   && npm i \
   && tsc
 
 # SHASUM pin of registry.gitlab.com/auros/baseimg/ubuntu:22.04-nodejs20
 FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:6da738f1d2ed8749c785751003c5daaf9cbe27abebed150556e32f7ea8bf0e3a
 
-COPY --from=builder /app/auros/dexes/deepbook /app/auros/
+COPY --from=builder /app/auros/ts /app/auros/
 #COPY container/run.deepbook_reader /init
 
 WORKDIR /app/auros

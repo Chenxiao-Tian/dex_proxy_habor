@@ -1,0 +1,85 @@
+{
+    "Production": {
+        "L1": {
+            "tokens": [
+                {
+                    "symbol": "ETH",
+                    "valid_withdrawal_addresses": [
+
+                    ]
+                },
+                {
+                    "symbol": "WETH",
+                    "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+                    "valid_withdrawal_addresses": [
+
+                    ]
+                },
+                {
+                    "symbol": "USDC",
+                    "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+                    "valid_withdrawal_addresses": [
+
+                    ]
+                }
+            ],
+            "bridge_address": "0x3a05E5d33d7Ab3864D53aaEc93c8301C1Fa49115"
+        },
+        "L2": {
+            "tokens": [
+                {
+                    "symbol": "ETH",
+                    "valid_withdrawal_addresses": []
+                },
+                {
+                    "symbol": "USDC",
+                    "address": "0xD87Ba7A50B2E7E660f678A895E4B72E7CB4CCd9C",
+                    "valid_withdrawal_addresses": []
+                }
+            ],
+            "bridge_address": "0x4300000000000000000000000000000000000005"
+        }
+    },
+    "Testing": {
+        "L1": {
+            "tokens": [
+                {
+                    "symbol": "ETH",
+                    "valid_withdrawal_addresses": [
+                        "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                        "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                    ]
+                },
+                {
+                    "symbol": "USDC",
+                    "address": "0xD87Ba7A50B2E7E660f678A895E4B72E7CB4CCd9C",
+                    "valid_withdrawal_addresses": [
+                        "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                        "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                    ]
+                }
+            ],
+            "bridge_address": "0xc644cc19d2A9388b71dd1dEde07cFFC73237Dca8"
+        },
+        "L2": {
+            "tokens": [
+                {
+                    "symbol": "ETH",
+                    "valid_withdrawal_addresses": [
+                        "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                        "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                    ]
+                },
+                {
+                    "symbol": "USDC",
+                    "address": "0xD87Ba7A50B2E7E660f678A895E4B72E7CB4CCd9C",
+                    "valid_withdrawal_addresses": [
+                        "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                        "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                    ]
+                }
+            ],
+            "bridge_address": "0x4200000000000000000000000000000000000024"
+        }
+    }
+}
