@@ -3,7 +3,6 @@ import os
 import uuid
 
 import aiohttp
-import orjson
 from eth_account.signers.local import LocalAccount
 from hexbytes import HexBytes
 from pyutils.dex_helper.eth_rpc import EthRPCDexHelper
@@ -28,7 +27,6 @@ class BlockInfo:
         self.next_block_uuid: str = ""
         self.raw_txn_to_client_id = {}
         self.raw_txs_in_targeted_block = []
-        self.bundles_sent_for_targeted_block = 0
         self.client_requ_id_vs_raw_txs = {}
 
 
@@ -60,21 +58,20 @@ class UniswapV3Bloxroute(DexCommon):
         self.__exchange_name = config['exchange_name']
         self.__chain_name = config['chain_name']
         self.__native_token = config['native_token']
-        self.__max_bundles_per_block = self._config['max_bundles_per_block']
         self.__targeted_block_info = BlockInfo()
         self.__tx_hash_to_order_info: Dict[str, OrderInfo] = {}
 
         # For RPC to builders
         self.__builders_rpc: list[str] = config['builders_rpc']
-        self.__flashbot_rpc: str = config['flashbot_rpc']
         self.__flashbot_signing_account: LocalAccount = Account.from_key(config['flashbot_signing_key'])
         self.__builders_session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ttl_dns_cache=600, limit=100,
                                                                                        keepalive_timeout=120.0),
                                                         timeout=aiohttp.ClientTimeout(total=3))
-        self.__request_header = {
+        self.__builders_request_header = {
             'Content-type': 'application/json',
             'Accept': 'application/json'
         }
+        self.__bundle_id: int = 1
 
     def __split_symbol_to_base_quote_ccy(self, symbol):
         instrument = self.__instruments.get_instrument(
@@ -177,8 +174,6 @@ class UniswapV3Bloxroute(DexCommon):
                     client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'message': f'targeted_block={targeted_block} != next_block={next_block_num}'}}
 
-            self.__targeted_block_info.bundles_sent_for_targeted_block += 1
-
             nonce = self.__dex_helper.get_txs_count() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
 
             order.nonce = nonce
@@ -226,8 +221,6 @@ class UniswapV3Bloxroute(DexCommon):
 
             next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
 
-            self.__targeted_block_info.bundles_sent_for_targeted_block += 1
-
             nonce = self.__dex_helper.get_txs_count() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
 
             wrap_unwrap.nonce = nonce
@@ -269,8 +262,6 @@ class UniswapV3Bloxroute(DexCommon):
     async def _approve(self, request: ApproveRequest, gas_price_wei, nonce=None):
         next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
 
-        self.__targeted_block_info.bundles_sent_for_targeted_block += 1
-
         nonce = self.__dex_helper.get_txs_count() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
         request.nonce = nonce
         raw_tx, tx_hash = self.__get_signed_transaction_from_client_info(request, gas_price_wei)
@@ -289,8 +280,6 @@ class UniswapV3Bloxroute(DexCommon):
             assert address_to is not None
 
             next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
-
-            self.__targeted_block_info.bundles_sent_for_targeted_block += 1
 
             nonce = self.__dex_helper.get_txs_count() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
             request.nonce = nonce
@@ -349,7 +338,6 @@ class UniswapV3Bloxroute(DexCommon):
 
         to_cancel_request.request_status = RequestStatus.CANCEL_REQUESTED
         self.__targeted_block_info.raw_txs_in_targeted_block = new_raw_txns_in_block
-        self.__targeted_block_info.bundles_sent_for_targeted_block += 1
         await self.__send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block,
                                  self.__targeted_block_info.next_block_num,
                                  self.__targeted_block_info.next_block_uuid)
@@ -390,7 +378,6 @@ class UniswapV3Bloxroute(DexCommon):
             # Should not happen ever. If somehow happens then investigate and fix.
             raise Exception('Internal Error: Failed to Amend. Reach out to Dev.')
 
-        self.__targeted_block_info.bundles_sent_for_targeted_block += 1
         base_ccy_symbol, quote_ccy_symbol, instrument = self.__split_symbol_to_base_quote_ccy(request.symbol)
 
         if (not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol)):
@@ -671,7 +658,6 @@ class UniswapV3Bloxroute(DexCommon):
         if next_block_num > self.__targeted_block_info.next_block_num:
             self.__targeted_block_info.next_block_num = next_block_num
             self.__targeted_block_info.next_block_uuid = str(uuid.uuid4())
-            self.__targeted_block_info.bundles_sent_for_targeted_block = 0
             self.__targeted_block_info.raw_txs_in_targeted_block = []
             self.__targeted_block_info.raw_txn_to_client_id = {}
             self.__targeted_block_info.client_requ_id_vs_raw_txs = {}
@@ -700,9 +686,11 @@ class UniswapV3Bloxroute(DexCommon):
             self.__tx_hash_to_order_info.pop(tx_hash, None)
 
     async def __send_bundle(self, txs_list, targeted_block: int, targeted_block_uuid: str):
+        bundle_id = self.__bundle_id
+        self.__bundle_id += 1
         body = {
             "jsonrpc": "2.0",
-            "id": 1,
+            "id": bundle_id,
             "method": "eth_sendBundle",
             "params": [
                 {
@@ -713,33 +701,40 @@ class UniswapV3Bloxroute(DexCommon):
             ]
         }
 
-        json_str = orjson.dumps(body)
+        json_str = json.dumps(body)
         self._logger.info(f'Sending {json_str} to builders')
 
         bundle_jobs = [self.__shoot_bundle(builder_rpc_url, json_str) for builder_rpc_url in self.__builders_rpc]
-        bundle_jobs.append(self.__shoot_flashbot_bundle(json_str))
         await asyncio.gather(*bundle_jobs)
 
-    async def __shoot_bundle(self, builder_url: str, json_str: bytes):
+    async def __shoot_bundle(self, builder_url: str, json_str: str):
         try:
-            result = await self.__builders_session.post(builder_url, data=json_str, headers=self.__request_header)
-            response = await result.content.read()
-            self._logger.info(f'Post to {builder_url}, response {response}')
+            if "flashbots" in builder_url:
+                sign_begin_at_ms = int(time.time() * 1_000)
+                message = messages.encode_defunct(text=Web3.keccak(text=json_str).hex())
+                public_key_address = self.__flashbot_signing_account.address
+                signature = Account.sign_message(message, self.__flashbot_signing_account.key).signature.hex()
+                flashbot_signature = f"{public_key_address}:{signature}"
+                header = self.__builders_request_header.copy()
+                header["X-Flashbots-Signature"] = flashbot_signature
+                signed_at_ms = int(time.time() * 1_000)
+                self._logger.info(f"stat=signBundleTelem, builder={builder_url}, responseDelayMs={signed_at_ms - sign_begin_at_ms}")
+            else:
+                header = self.__builders_request_header
+
+            send_at_ms = int(time.time() * 1_000)
+            result = await self.__builders_session.post(builder_url, data=json_str, headers=header)
+            response = await result.json()
+            resp_rece_at_ms = int(time.time() * 1_000)
+
+            if ("result" in response) and (
+                (response["result"] is None)
+                or (response["result"] == "nil")
+                or (isinstance(response["result"], dict) and "bundleHash" in response["result"])
+            ):
+                self._logger.info(f"Success: Post to {builder_url}, response {response}")
+            else:
+                self._logger.error(f"Error: Post to {builder_url}, response {response}")
+            self._logger.info(f"stat=bundleTelem, builder={builder_url}, responseDelayMs={resp_rece_at_ms - send_at_ms}")
         except Exception as e:
-            self._logger.error(f'Error posting bundle to {builder_url}: {e}')
-
-    async def __shoot_flashbot_bundle(self, json_str: bytes):
-        try:
-            message = messages.encode_defunct(text=Web3.keccak(text=json_str.decode()).hex())
-
-            public_key_address = self.__flashbot_signing_account.address
-            signature = Account.sign_message(message, self.__flashbot_signing_account.key).signature.hex()
-            flashbot_signature = f'{public_key_address}:{signature}'
-            header = self.__request_header.copy()
-            header.update({'X-Flashbots-Signature': flashbot_signature})
-
-            result = await self.__builders_session.post(self.__flashbot_rpc, data=json_str, headers=header)
-            response = await result.content.read()
-            self._logger.info(f'Post to {self.__flashbot_rpc}, response {response}')
-        except Exception as e:
-            self._logger.error(f'Error posting bundle to {self.__flashbot_rpc}: {e}')
+            self._logger.error(f"Error posting bundle to {builder_url}: {e}")

@@ -131,7 +131,6 @@
             "percentile_priority_fee_slow": 2
         },
         "max_allowed_gas_price_gwei": 500,
-        "max_bundles_per_block": 4,
         "request_cache": {
             "finalised_requests_cleanup_after_s": 600
         },
@@ -148,6 +147,7 @@
         "builders_rpc": [
             "https://rpc.titanbuilder.xyz",
             "https://rsync-builder.xyz",
+            "https://relay.flashbots.net/",
             "https://rpc.lokibuilder.xyz",
             "https://builder0x69.io",
             "https://rpc.jetbldr.xyz",
@@ -155,7 +155,6 @@
             "https://blockbeelder.com/rpc",
             "https://rpc.bobthebuilder.xyz"
         ],
-        "flashbot_rpc": "https://relay.flashbots.net/",
-        "flashbot_signing_key": "0xac0a088608778e99bdaa10d10dd159d9522775b91b100c2b83da0d392c8416f5"
+        "flashbot_signing_key": "0xe81e556a84ffe1a2ca012ecd639e221e27321ee5aeaafc312c056aaf44f280c5"
     }
 }
