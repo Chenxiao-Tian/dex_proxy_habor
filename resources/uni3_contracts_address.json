@@ -640,6 +640,48 @@
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
         "uniswap_router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564"
     },
+    "Ethereum Mainnet 2": {
+        "tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0x3c7d66f7faafba9b6521024a56309db2e375af9b",
+                    "0x0933A87572E1AD93fDeBee865fc1c96C47a0dd46",
+                    "0xaa9c353a00e0efa2a24e2dead8b9e4f520dc2df5",
+                    "0x9d07dd295726ade4680fe5249fd7b9bdc15af480"
+                ]
+            },
+            {
+                "symbol": "WETH",
+                "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+                "valid_withdrawal_addresses": [
+
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+                "valid_withdrawal_addresses": [
+                    "0x3c7d66f7faafba9b6521024a56309db2e375af9b",
+                    "0x0933A87572E1AD93fDeBee865fc1c96C47a0dd46",
+                    "0xaa9c353a00e0efa2a24e2dead8b9e4f520dc2df5",
+                    "0xf30e0f7e10fc45874cfe63dffab06fdd19463798"
+                ]
+            },
+            {
+                "symbol": "ATH",
+                "address": "0xbe0Ed4138121EcFC5c0E56B40517da27E6c5226B",
+                "valid_withdrawal_addresses": [
+                    "0x3c7d66f7faafba9b6521024a56309db2e375af9b",
+                    "0x0933A87572E1AD93fDeBee865fc1c96C47a0dd46",
+                    "0xaa9c353a00e0efa2a24e2dead8b9e4f520dc2df5",
+                    "0x9d07dd295726ade4680fe5249fd7b9bdc15af480"
+                ]
+            }
+        ],
+        "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
+        "uniswap_router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564"
+    },
     "Ethereum Mainnet For Testing": {
         "_comment_1": "Ethereum Mainnet For Testing: it has valid ethereum mainnet tokens address but the withdrawal_addresses are of our internal test wallets, it is created for testing purposes as bloxroute do not support any testnet",
         "tokens": [
