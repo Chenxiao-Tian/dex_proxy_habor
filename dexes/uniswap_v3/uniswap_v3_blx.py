@@ -518,7 +518,7 @@ class UniswapV3Bloxroute(DexCommon):
                                 self._api.from_native_amount(quote_ccy_symbol, abs(token0_amount)))
 
                     request.exec_price = round(
-                        quote_ccy_amount / base_ccy_amount, 8).normalize()
+                        quote_ccy_amount / base_ccy_amount, 10).normalize()
         except Exception as ex:
             self._logger.exception(
                 f'Error occurred while computing execution price of request={request}: %r', ex)
