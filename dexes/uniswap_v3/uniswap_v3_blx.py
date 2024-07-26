@@ -39,7 +39,6 @@ class OrderInfo:
 
 class UniswapV3Bloxroute(DexCommon):
     CHANNELS = ['ORDER']
-    GAS_WEI_FOR_CANCEL = 100_00_00_00  # 0.1 GWEI
 
     def __init__(self, pantheon: Pantheon, config, server, event_sink):
         super().__init__(pantheon, ConnectorType.UniswapV3, config, server, event_sink)
@@ -342,7 +341,7 @@ class UniswapV3Bloxroute(DexCommon):
                                  self.__targeted_block_info.next_block_num,
                                  self.__targeted_block_info.next_block_uuid)
 
-        return ApiResult(nonce=to_cancel_request.nonce, tx_hash=to_cancel_request.tx_hashes[-1][0])
+        return ApiResult(nonce=to_cancel_request.nonce, tx_hash=None)
 
     async def _amend_transaction(self, request: Request, params, gas_price_wei):
         if request.request_type != RequestType.ORDER:
@@ -363,9 +362,6 @@ class UniswapV3Bloxroute(DexCommon):
                 return ApiResult(error_type=ErrorType.TRANSACTION_FAILED,
                                  error_message='Cannot Amend: missed targeted block')
 
-        if gas_price_wei == UniswapV3Bloxroute.GAS_WEI_FOR_CANCEL:
-            cancellation_response = await self.__cancel_tx_in_a_block(request.client_request_id)
-            return cancellation_response
         old_raw_tx = self.__targeted_block_info.client_requ_id_vs_raw_txs[request.client_request_id]
 
         raw_tx_idx = 0
@@ -397,28 +393,37 @@ class UniswapV3Bloxroute(DexCommon):
         return ApiResult(nonce=request.nonce, tx_hash=tx_hash)
 
     async def _cancel_transaction(self, request, gas_price_wei):
-        raise Exception(
-            'Cancel request not supported by uni3 dex-proxy with Bloxroute integrated')
+        if request.request_status == RequestStatus.CANCEL_REQUESTED:
+            raise Exception(f"Cancellation already in progress for Client Request Id: {request.client_request_id}")
+        cancellation_response = await self.__cancel_tx_in_a_block(request.client_request_id)
+        return cancellation_response
 
     async def get_transaction_receipt(self, request, tx_hash):
         return await self._api.get_transaction_receipt(tx_hash)
 
     def _get_gas_price(self, request, priority_fee):
-        raise Exception(
-            'Gas Price Tracker not supported by uni3 dex-proxy with Bloxroute integrated')
+        return None
 
     async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict,
                                        mined_tx_hash: str = None):
         request = self.get_request(client_request_id)
-        if (request == None):
+        if request is None:
             return
 
-        if (request_status == RequestStatus.SUCCEEDED and request.request_type == RequestType.ORDER):
+        if request_status == RequestStatus.SUCCEEDED and request.request_type == RequestType.ORDER:
             self.__populate_orders_dex_specifics(request, mined_tx_hash)
             await self.__compute_exec_price(request, tx_receipt)
 
-        if (request.request_type == RequestType.ORDER):
+        if request.request_type == RequestType.ORDER:
             self.__orders_pre_finalisation_clean_up(request)
+
+        if request.request_status == RequestStatus.CANCEL_REQUESTED:
+            if request_status == RequestStatus.FAILED:
+                if tx_receipt is None:
+                    # Txn got successfully cancelled
+                    request_status = RequestStatus.CANCELED
+                # if tx_receipt not None
+                # Txn got mined in Failed State, Cancellation Failed
 
         await super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
 

@@ -196,7 +196,7 @@ class DexCommon(ABC):
                 gas_price_set_on_request = False
                 gas_price_wei = self._get_gas_price(request, priority_fee=PriorityFee.Fast)
 
-            if not gas_price_set_on_request:
+            if not gas_price_set_on_request and gas_price_wei is not None:
                 if request.request_status == RequestStatus.CANCEL_REQUESTED and \
                         request.used_gas_prices_wei[-1] >= gas_price_wei:
                     return 400, {'error': {'message': f'Cancel with greater than or equal to the '
@@ -216,10 +216,10 @@ class DexCommon(ABC):
             result = await self._cancel_transaction(request, gas_price_wei)
             if result.error_type == ErrorType.NO_ERROR:
                 request.request_status = RequestStatus.CANCEL_REQUESTED
-                request.tx_hashes.append((result.tx_hash, RequestType.CANCEL.name))
-                request.used_gas_prices_wei.append(gas_price_wei)
-
-                self._transactions_status_poller.add_for_polling(result.tx_hash, client_request_id, RequestType.CANCEL)
+                if result.tx_hash is not None:
+                    request.tx_hashes.append((result.tx_hash, RequestType.CANCEL.name))
+                    request.used_gas_prices_wei.append(gas_price_wei)
+                    self._transactions_status_poller.add_for_polling(result.tx_hash, client_request_id, RequestType.CANCEL)
                 self._request_cache.add_or_update_request_in_redis(client_request_id)
 
                 return 200, {'result': {'tx_hash': result.tx_hash}}
@@ -247,15 +247,22 @@ class DexCommon(ABC):
                 try:
                     gas_price_wei = self._get_gas_price(request, priority_fee=PriorityFee.Fast)
 
-                    if request.request_status == RequestStatus.CANCEL_REQUESTED and \
-                            request.used_gas_prices_wei[-1] >= gas_price_wei:
-                        self._logger.info(
-                            f'Not sending cancel request for client_request_id={request.client_request_id} as cancel with '
-                            f'greater than or equal to the gas_price_wei={gas_price_wei} already in progress')
-                        cancel_requested.append(request.client_request_id)
-                        continue
+                    if request.request_status == RequestStatus.CANCEL_REQUESTED:
+                        if gas_price_wei is None:
+                            self._logger.info(
+                                f'Not sending cancel request for client_request_id={request.client_request_id}'
+                                f' as cancel already in progress')
+                            cancel_requested.append(request.client_request_id)
+                            continue
+                        elif request.used_gas_prices_wei[-1] >= gas_price_wei:
+                            self._logger.info(
+                                f'Not sending cancel request for client_request_id={request.client_request_id} '
+                                f'as cancel with greater than or equal to the gas_price_wei={gas_price_wei} already in progress')
+                            cancel_requested.append(request.client_request_id)
+                            continue
 
-                    if (len(request.used_gas_prices_wei) > 0):
+
+                    if gas_price_wei and len(request.used_gas_prices_wei) > 0:
                         gas_price_wei = max(gas_price_wei, int(1.1 * request.used_gas_prices_wei[-1]))
 
                     ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
@@ -270,13 +277,13 @@ class DexCommon(ABC):
 
                     if result.error_type == ErrorType.NO_ERROR:
                         request.request_status = RequestStatus.CANCEL_REQUESTED
-                        request.tx_hashes.append((result.tx_hash, RequestType.CANCEL.name))
-                        request.used_gas_prices_wei.append(gas_price_wei)
+                        if result.tx_hash:
+                            request.tx_hashes.append((result.tx_hash, RequestType.CANCEL.name))
+                            request.used_gas_prices_wei.append(gas_price_wei)
+                            self._transactions_status_poller.add_for_polling(
+                                result.tx_hash, request.client_request_id, RequestType.CANCEL)
 
                         cancel_requested.append(request.client_request_id)
-
-                        self._transactions_status_poller.add_for_polling(
-                            result.tx_hash, request.client_request_id, RequestType.CANCEL)
                         self._request_cache.add_or_update_request_in_redis(request.client_request_id)
                     else:
                         failed_cancels.append(request.client_request_id)
@@ -431,6 +438,8 @@ class DexCommon(ABC):
         return True, ''
 
     def _check_max_allowed_gas_price(self, gas_price_wei):
+        if gas_price_wei is None:
+            return True, ''
         if self.__max_allowed_gas_price_wei is not None and gas_price_wei > self.__max_allowed_gas_price_wei:
             return False, f'gas_price_wei={gas_price_wei} is greater than max_allowed_gas_price_wei' \
                           f'={self.__max_allowed_gas_price_wei}'
