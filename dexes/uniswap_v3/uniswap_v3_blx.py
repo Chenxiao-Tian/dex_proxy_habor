@@ -300,6 +300,16 @@ class UniswapV3Bloxroute(DexCommon):
            Sends new bundle via BloxRutes API
         """
         to_cancel_request = self._request_cache.get(client_request_id)
+        if client_request_id not in self.__targeted_block_info.client_requ_id_vs_raw_txs:
+            if to_cancel_request.nonce is None:
+                # Can happen if cancel is too soon after insert
+                # Insert processing might be stuck at some `await` and the cancel is processed before the insert
+                return ApiResult(error_type=ErrorType.TRANSACTION_FAILED,
+                                 error_message='RETRY. Cannot Cancel: not inserted yet.')
+            else:
+                return ApiResult(error_type=ErrorType.TRANSACTION_FAILED,
+                                 error_message='Cannot Cancel: missed targeted block')
+
         to_cancel_raw_tx = self.__targeted_block_info.client_requ_id_vs_raw_txs[client_request_id]
         assert to_cancel_raw_tx in self.__targeted_block_info.raw_txs_in_targeted_block, \
             "Transaction hash not present in current block!"
