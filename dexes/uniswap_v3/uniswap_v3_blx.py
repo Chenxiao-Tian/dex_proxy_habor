@@ -267,10 +267,10 @@ class UniswapV3Bloxroute(DexCommon):
         self.__targeted_block_info.raw_txs_in_targeted_block.append(raw_tx)
         request.dex_specific = {'targeted_block_num': next_block_num, 'uuid': next_block_uuid}
 
-        await self.__send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block, next_block_num,
-                                 next_block_uuid)
+        send_bundle_coroutine = self.__send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block,
+                                                   next_block_num, next_block_uuid)
 
-        return ApiResult(nonce, tx_hash)
+        return ApiResult(nonce, tx_hash, pending_task=send_bundle_coroutine)
 
     async def _transfer(self, request: TransferRequest, gas_price_wei, nonce=None):
         path = request.request_path
@@ -286,14 +286,14 @@ class UniswapV3Bloxroute(DexCommon):
             self.__targeted_block_info.raw_txs_in_targeted_block.append(raw_tx)
             request.dex_specific = {'targeted_block_num': next_block_num, 'uuid': next_block_uuid}
 
-            await self.__send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block, next_block_num,
-                                     next_block_uuid)
+            send_bundle_coroutine = self.__send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block,
+                                                       next_block_num, next_block_uuid)
 
-            return ApiResult(nonce, tx_hash)
+            return ApiResult(nonce, tx_hash, pending_task=send_bundle_coroutine)
         else:
             assert False
 
-    async def __cancel_tx_in_a_block(self, client_request_id: str):
+    def __cancel_tx_in_a_block(self, client_request_id: str):
         """
            Removes target transaction from raw_txns_bundle,
            Updates nonces of following txns in the bundle
@@ -347,11 +347,11 @@ class UniswapV3Bloxroute(DexCommon):
 
         to_cancel_request.request_status = RequestStatus.CANCEL_REQUESTED
         self.__targeted_block_info.raw_txs_in_targeted_block = new_raw_txns_in_block
-        await self.__send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block,
-                                 self.__targeted_block_info.next_block_num,
-                                 self.__targeted_block_info.next_block_uuid)
+        send_bundle_coroutine = self.__send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block,
+                                                   self.__targeted_block_info.next_block_num,
+                                                   self.__targeted_block_info.next_block_uuid)
 
-        return ApiResult(nonce=to_cancel_request.nonce, tx_hash=None)
+        return ApiResult(nonce=to_cancel_request.nonce, tx_hash=None, pending_task=send_bundle_coroutine)
 
     async def _amend_transaction(self, request: Request, params, gas_price_wei):
         if request.request_type != RequestType.ORDER:
@@ -397,15 +397,15 @@ class UniswapV3Bloxroute(DexCommon):
         self.__targeted_block_info.raw_txs_in_targeted_block[raw_tx_idx] = new_raw_tx
         self.__tx_hash_to_order_info[tx_hash] = OrderInfo(gas_price_wei, request.base_ccy_qty, request.quote_ccy_qty)
 
-        await self.__send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block, next_block_num,
-                                 next_block_uuid)
+        send_bundle_coroutine = self.__send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block, next_block_num,
+                                                  next_block_uuid)
 
-        return ApiResult(nonce=request.nonce, tx_hash=tx_hash)
+        return ApiResult(nonce=request.nonce, tx_hash=tx_hash, pending_task=send_bundle_coroutine)
 
     async def _cancel_transaction(self, request, gas_price_wei):
         if request.request_status == RequestStatus.CANCEL_REQUESTED:
             raise Exception(f"Cancellation already in progress for Client Request Id: {request.client_request_id}")
-        cancellation_response = await self.__cancel_tx_in_a_block(request.client_request_id)
+        cancellation_response = self.__cancel_tx_in_a_block(request.client_request_id)
         return cancellation_response
 
     async def get_transaction_receipt(self, request, tx_hash):

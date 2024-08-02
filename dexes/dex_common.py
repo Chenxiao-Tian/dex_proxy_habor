@@ -221,7 +221,8 @@ class DexCommon(ABC):
                     request.used_gas_prices_wei.append(gas_price_wei)
                     self._transactions_status_poller.add_for_polling(result.tx_hash, client_request_id, RequestType.CANCEL)
                 self._request_cache.add_or_update_request_in_redis(client_request_id)
-
+                if result.pending_task:
+                    await result.pending_task
                 return 200, {'result': {'tx_hash': result.tx_hash}}
             else:
                 return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
@@ -282,6 +283,8 @@ class DexCommon(ABC):
                             request.used_gas_prices_wei.append(gas_price_wei)
                             self._transactions_status_poller.add_for_polling(
                                 result.tx_hash, request.client_request_id, RequestType.CANCEL)
+                        if result.pending_task:
+                            await result.pending_task
 
                         cancel_requested.append(request.client_request_id)
                         self._request_cache.add_or_update_request_in_redis(request.client_request_id)
@@ -327,7 +330,8 @@ class DexCommon(ABC):
                 self._transactions_status_poller.add_for_polling(
                     result.tx_hash, client_request_id, RequestType.APPROVE)
                 self._request_cache.add_or_update_request_in_redis(client_request_id)
-
+                if result.pending_task:
+                    await result.pending_task
                 return 200, {'tx_hash': result.tx_hash}
             else:
                 self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
@@ -376,7 +380,8 @@ class DexCommon(ABC):
                 self._transactions_status_poller.add_for_polling(
                     result.tx_hash, client_request_id, RequestType.TRANSFER)
                 self._request_cache.add_or_update_request_in_redis(client_request_id)
-
+                if result.pending_task:
+                    await result.pending_task
                 return 200, {'tx_hash': result.tx_hash}
             else:
                 self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
@@ -411,7 +416,8 @@ class DexCommon(ABC):
                     self._transactions_status_poller.add_for_polling(
                         result.tx_hash, client_request_id, request.request_type)
                     self._request_cache.add_or_update_request_in_redis(client_request_id)
-
+                    if result.pending_task:
+                        await result.pending_task
                     return 200, {'result': {'tx_hash': result.tx_hash}}
                 else:
                     return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
