@@ -196,9 +196,9 @@ class Paradex(DexCommon):
             req_id = self.order_req_id
             self.order_req_id += 1
 
-            start = time.time()
+            processing_start_ts_ms = int(time.time() * 1_000)
 
-            self._logger.debug(f"order request ({req_id}) received at {start}")
+            self._logger.debug(f"[sign_insert] reqId=({req_id}), dexRecvTs={received_at_ms}, processingStartTs={processing_start_ts_ms}")
 
             self.__assert_order_request_schema(params.keys())
 
@@ -221,10 +221,12 @@ class Paradex(DexCommon):
                 msg
             )
 
-            end = time.time()
-            sign_time = (end - start)*1000
+            processing_end_ts_ms = int(time.time() * 1000)
+            delay_from_es_ms = received_at_ms - int(params["order_creation_ts_ms"])
+            dex_wait_ms = processing_start_ts_ms - received_at_ms
+            signature_latency_ms = processing_end_ts_ms - processing_start_ts_ms
+            self._logger.info(f"stat=signTelem, op=I, rId={req_id}, srvRcv={received_at_ms}, esSend={params['order_creation_ts_ms']}, delayFromESMs={delay_from_es_ms}, dexWaitMs={dex_wait_ms}, signLatencyMs={signature_latency_ms}")
 
-            self._logger.debug(f"order request ({req_id}) signature => {msg_signature}, at {end}, took {sign_time} ms")
 
             return 200, {"signature": msg_signature}
 
