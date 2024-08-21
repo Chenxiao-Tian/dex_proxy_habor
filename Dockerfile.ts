@@ -61,5 +61,6 @@ ENV APPLICATION_LISTEN_PORT=8000
 COPY --from=builder /app/auros/ /app/auros/
 COPY container/run.ts /app/auros/run
 COPY container/egress-implicit-postgres-5432.toml /etc/horust/services/
+COPY container/egress-implicit-suinode-9000.toml /etc/horust/services/
 
 ENTRYPOINT [ "/init" ]
