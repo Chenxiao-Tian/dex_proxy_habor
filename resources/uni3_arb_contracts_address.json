@@ -1,0 +1,42 @@
+{
+    "Arbitrum Mainnet For Testing": {
+        "tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+                ]
+            },
+            {
+                "symbol": "SUSHI",
+                "address": "0xd4d42f0b6def4ce0383636770ef773390d85c61a",
+                "valid_withdrawal_addresses": [
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+                ]
+            },
+            {
+                "symbol": "WETH",
+                "address": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+                "valid_withdrawal_addresses": [
+                    "0x27BFfB0f09C18539f9a47a39958Bb149Fe42A155"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+                "valid_withdrawal_addresses": [
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+                ]
+            },
+            {
+                "symbol": "USDT",
+                "address": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+                "valid_withdrawal_addresses": [
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+                ]
+            }
+        ],
+        "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
+        "uniswap_router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564"
+    }
+}

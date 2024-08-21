@@ -7,7 +7,7 @@ from collections import defaultdict
 from pantheon import Pantheon, StandardArgParser
 
 from web_server import WebServer
-from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex, Lyra, Per, Hype
+from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex, UniswapV3Arb, Lyra, Per, Hype
 
 from eth_account import Account
 
@@ -44,7 +44,10 @@ class DexProxy:
         elif name == 'chainEth-uni3-blx':
             self.__exchange = UniswapV3Bloxroute(
                 pantheon, dex_config, self.__server, self)
-        elif name == 'chainEth-uni3' or name == 'chainGoerli-uni3':
+        elif name == 'chainArb-uni3':
+            self.__exchange = UniswapV3Arb(
+                pantheon, dex_config, self.__server, self)
+        elif name in ['chainEth-uni3', 'chainGoerli-uni3']:
             self.__exchange = UniswapV3(
                 pantheon, dex_config, self.__server, self)
         elif name == 'pdex':

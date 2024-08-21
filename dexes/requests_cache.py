@@ -132,12 +132,13 @@ class RequestsCache:
                 else:
                     assert False
 
-                self.__requests[request.client_request_id] = request
-
-                for tx_hash, request_type in request.tx_hashes:
-                    transactions_status_poller.add_for_polling(tx_hash,
-                                                               request.client_request_id,
-                                                               RequestType[request_type])
+                if request.nonce:
+                    self.__requests[request.client_request_id] = request
+                    for tx_hash, request_type in request.tx_hashes:
+                        if tx_hash is not None:
+                            transactions_status_poller.add_for_polling(tx_hash,
+                                                                       request.client_request_id,
+                                                                       RequestType[request_type])
 
             except Exception as e:
                 self.__logger.error(
