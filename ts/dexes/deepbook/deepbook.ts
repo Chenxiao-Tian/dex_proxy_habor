@@ -43,7 +43,8 @@ import {
     SuiEventFilter,
     JsonRpcError,
     EventId,
-    SuiHTTPStatusError
+    SuiHTTPStatusError,
+    SuiTransactionBlockResponseOptions
 } from "@mysten/sui.js/client";
 import {
   parseStructTag,
@@ -91,6 +92,8 @@ class MandatoryFields {
     static TradesByDigestRequest   = ["tx_digests"];
 }
 
+type TxBlockGenerator = () => Promise<TransactionBlock>;
+
 export class DeepBook implements DexInterface {
     private logger: Logger;
     private config: any;
@@ -114,6 +117,8 @@ export class DeepBook implements DexInterface {
 
     private chainName: string;
     private withdrawalAddresses: Map<string, Set<string>>;
+
+    private currentEpoch: string | undefined;
 
     private static exchangeErrors = new Map<string, Map<string, string>> ([
         ["clob_v2", new Map<string, string>([
@@ -395,6 +400,17 @@ export class DeepBook implements DexInterface {
             }
         }
 
+        this.currentEpoch = await this.queryEpoch();
+        if (this.currentEpoch === undefined) {
+            throw new Error("Unable to fetch current epoch on startup. Exiting");
+        } else {
+            this.logger.info(`Setting currentEpoch=${this.currentEpoch}`);
+        }
+
+        // 5 minutes
+        const trackEpochIntervalMs = 5 * 60 * 1000;
+        setInterval(this.trackEpoch, trackEpochIntervalMs);
+
         await this.server.start();
     }
 
@@ -501,6 +517,68 @@ export class DeepBook implements DexInterface {
         return parsedError;
     }
 
+    queryEpoch = async (): Promise<string | undefined> => {
+        const retryIntervalMs: number = 5_000;
+        let delay = () => {
+            return new Promise(resolve => setTimeout(resolve, retryIntervalMs));
+        };
+
+        let queryFunc = async (retryCount: number = 0): Promise<string | undefined> => {
+            this.logger.info(`Querying current epoch`);
+            let attemptFailed = false;
+
+            try {
+                let state = await this.suiClient.getLatestSuiSystemState();
+                this.logger.debug(`epoch from chain=${state.epoch}`);
+                return state.epoch;
+
+            } catch(error: unknown) {
+                if (error instanceof SuiHTTPStatusError) {
+                    this.logger.error(`Unexpected HTTP status code returned. code=${error.status}, details=${error.statusText}`);
+                } else if ( error instanceof JsonRpcError) {
+                    this.logger.error(`JSON RPC error. code=${error.code}, msg=${error.message}`);
+                } else {
+                    this.logger.error(`Unknown error. msg=${error}`);
+                }
+
+                attemptFailed = true;
+
+            } finally {
+                if (attemptFailed) {
+                    if (retryCount < 3) {
+                        this.logger.info(`Retrying query for current epoch in ${retryIntervalMs} ms`);
+                        await delay();
+                        return await queryFunc(retryCount + 1);
+                    } else {
+                        this.logger.error("Exhausted max retries to get current epoch");
+                        return undefined;
+                    }
+                }
+            }
+        }
+
+        return await queryFunc();
+    }
+
+    trackEpoch = async () => {
+        const epoch = await this.queryEpoch();
+
+        if (epoch === undefined) {
+            this.logger.error("Unable to check for epoch change. Will try again in next scheduled iteration");
+        } else {
+            if (epoch != this.currentEpoch) {
+                this.logger.info(`Detected epoch update from ${this.currentEpoch} to ${epoch}`);
+                this.currentEpoch = epoch;
+                this.logger.info(`Updated currentEpoch to ${this.currentEpoch}`);
+                await this.executor!.onEpochChange();
+                await this.gasManager!.onEpochChange();
+            } else {
+                this.executor!.logSkippedObjects();
+                this.gasManager!.logSkippedObjects();
+            }
+        }
+    }
+
     getStatus = async (requestId: bigint,
                        path: string,
                        params: any,
@@ -591,7 +669,7 @@ export class DeepBook implements DexInterface {
                               path: string,
                               params: any,
                               receivedAtMs: number): Promise<RestResult> => {
-        this.logger.debug(`${requestId} Fetching wallet address`);
+        this.logger.debug(`[${requestId}] Fetching wallet address`);
 
         return {
             statusCode: 200,
@@ -667,6 +745,50 @@ export class DeepBook implements DexInterface {
         };
     }
 
+    executeWithObjectTimeoutCheck =
+        async (requestId: bigint,
+               txBlockGenerator: TxBlockGenerator,
+               txBlockResponseOptions: SuiTransactionBlockResponseOptions,
+               gasCoin: GasCoin): Promise<SuiTransactionBlockResponse> => {
+
+        let transactionTimedOutBeforeReachingFinality: boolean = false;
+
+        try {
+            let txBlock = await txBlockGenerator();
+
+            this.logger.debug(`[${requestId}] gasCoin=${gasCoin.objectId}`);
+
+            txBlock.setGasPayment([gasCoin]);
+
+            return await this.suiClient.signAndExecuteTransactionBlock({
+                signer: this.keyPair!,
+                transactionBlock: txBlock,
+                options: txBlockResponseOptions
+            });
+
+        } catch (error) {
+            let error_ = error as any;
+            let errorStr = error_.toString();
+
+            if (errorStr.includes("Transaction timed out before reaching finality")) {
+                transactionTimedOutBeforeReachingFinality = true;
+            }
+
+            throw error;
+
+        } finally {
+            if (gasCoin) {
+                if (transactionTimedOutBeforeReachingFinality) {
+                    this.logger.warn(`[${requestId}] Transaction timed out. Will skip using gasCoin=${gasCoin.objectId} for remainder of current epoch`);
+                    gasCoin.status = GasCoinStatus.SkipForRemainderOfEpoch;
+                } else {
+                    await gasCoin.updateInstance(this.suiClient);
+                    gasCoin.status = GasCoinStatus.Free;
+                }
+            }
+        }
+    }
+
     createAccountCap = async (requestId: bigint,
                               path: string,
                               params: any,
@@ -674,29 +796,26 @@ export class DeepBook implements DexInterface {
         this.logger.debug(`[${requestId}] Creating account-cap: ${JSON.stringify(params)}`);
 
         let response: SuiTransactionBlockResponse | null = null;
-        let gasCoin: GasCoin | null = null;
+
         try {
-            gasCoin = this.gasManager!.getFreeGasCoin();
+            let gasCoin = this.gasManager!.getFreeGasCoin();
 
-            let transaction = this.mainDeepbookClient.createAccount(
-                this.walletAddress
+            let txBlockGenerator = async () => {
+                return this.mainDeepbookClient.createAccount(
+                   this.walletAddress
+                );
+            };
+
+            response = await this.executeWithObjectTimeoutCheck(
+                requestId,
+                txBlockGenerator,
+                { showEffects: true },
+                gasCoin
             );
-            this.logger.debug(`[${requestId}] gasCoin=${gasCoin.objectId}`);
-            transaction.setGasPayment([gasCoin]);
 
-            response = await this.suiClient.signAndExecuteTransactionBlock({
-                signer: this.keyPair!,
-                transactionBlock: transaction,
-                options: { showEffects: true }
-            });
         } catch (error) {
             this.logger.error(`[${requestId}] ${error}`);
-            throw error;
-        } finally {
-            if (gasCoin) {
-                await gasCoin.updateInstance(this.suiClient);
-                gasCoin.status = GasCoinStatus.Free;
-            }
+            throw(error);
         }
 
         let statusCode: number = 200;
@@ -731,29 +850,26 @@ export class DeepBook implements DexInterface {
         this.logger.debug(`[${requestId}] Creating child account-cap: ${JSON.stringify(params)}`);
 
         let response: SuiTransactionBlockResponse | null = null;
-        let gasCoin: GasCoin | null = null;
+
         try {
-            gasCoin = this.gasManager!.getFreeGasCoin();
+            let gasCoin = this.gasManager!.getFreeGasCoin();
 
-            let transaction = this.mainDeepbookClient.createChildAccountCap(
-                this.walletAddress
-            );
-            this.logger.debug(`[${requestId}] gasCoin=${gasCoin.objectId}`);
-            transaction.setGasPayment([gasCoin]);
-
-            response = await this.suiClient.signAndExecuteTransactionBlock({
-                signer: this.keyPair!,
-                transactionBlock: transaction,
-                options: { showEffects: true }
-            });
-        } catch (error) {
-            this.logger.error(`[${requestId}]: ${error}`);
-            throw error;
-        } finally {
-            if (gasCoin) {
-                await gasCoin.updateInstance(this.suiClient);
-                gasCoin.status = GasCoinStatus.Free;
+            let txBlockGenerator = async() => {
+                return await this.mainDeepbookClient.createChildAccountCap(
+                    this.walletAddress
+                );
             }
+
+            response = await this.executeWithObjectTimeoutCheck(
+                requestId,
+                txBlockGenerator,
+                { showEffects: true },
+                gasCoin
+            );
+
+        } catch (error) {
+            this.logger.error(`[${requestId}] ${error}`);
+            throw(error);
         }
 
         let statusCode: number = 200;
@@ -1097,8 +1213,8 @@ export class DeepBook implements DexInterface {
 
         let response = null;
         try {
-            let txBlockGenerator = async (accountCap: AccountCap) => {
-                this.logger.debug(`[${requestId}] Inserting order. accCapId=${accountCap.id}`);
+            let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
+                this.logger.debug(`[${requestId}] Inserting order. accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
 
                 return await accountCap.client.placeLimitOrder(
                     order.poolId,
@@ -1251,8 +1367,8 @@ export class DeepBook implements DexInterface {
         let response = null;
 
         try {
-            let txBlockGenerator = async (accountCap: AccountCap) => {
-                this.logger.debug(`[${requestId}] Inserting orders. params=${JSON.stringify(params)} accCapId=${accountCap.id}`);
+            let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
+                this.logger.debug(`[${requestId}] Inserting orders. params=${JSON.stringify(params)} accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
 
                 const selfMatchingPrevention: number = 0; // CANCEL_OLDEST
                 let txBlock = new TransactionBlock();
@@ -1399,8 +1515,8 @@ export class DeepBook implements DexInterface {
 
         let response = null;
         try {
-            let txBlockGenerator = async (accountCap: AccountCap) => {
-                this.logger.debug(`[${requestId}] Cancelling order. accCapId=${accountCap.id}`);
+            let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
+                this.logger.debug(`[${requestId}] Cancelling order. accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
 
                 return await accountCap.client.cancelOrder(
                     poolId,
@@ -1514,8 +1630,8 @@ export class DeepBook implements DexInterface {
 
         let response = null;
         try {
-            let txBlockGenerator = async (accountCap: AccountCap) => {
-                this.logger.debug(`[${requestId}] Cancelling all orders. poolId=${poolId} accCapId=${accountCap.id}`);
+            let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
+                this.logger.debug(`[${requestId}] Cancelling all orders. poolId=${poolId} accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
 
                 return await accountCap.client.cancelAllOrders(poolId);
             };
@@ -1590,8 +1706,8 @@ export class DeepBook implements DexInterface {
 
         let response = null;
         try {
-            let txBlockGenerator = async (accountCap: AccountCap) => {
-                this.logger.debug(`[${requestId}] Cancelling orders. poolId=${poolId} clientOrderIds=${clientOrderIds} accCapId=${accountCap.id}`);
+            let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
+                this.logger.debug(`[${requestId}] Cancelling orders. poolId=${poolId} clientOrderIds=${clientOrderIds} accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
 
                 return await accountCap.client.batchCancelOrder(
                     poolId, exchangeOrderIds
@@ -1908,6 +2024,7 @@ export class DeepBook implements DexInterface {
         let response = null;
         let mainGasCoin = null;
         let status: string | undefined = undefined;
+
         try {
             let firstCoin: string | undefined = undefined;
             if (!coinTypeId.includes('SUI')) {
@@ -1918,25 +2035,25 @@ export class DeepBook implements DexInterface {
                 if (coinInstances.length > 1) {
                     this.logger.info(`Merging coin instances ${coinInstances} into ${firstCoin}...`);
 
-                    let gasCoin: GasCoin | null = null;
                     try {
-                        gasCoin = this.gasManager!.getFreeGasCoin();
-                        const block = new SuiTxBlock();
-                        const mergeTransaction = block.mergeCoinsIntoFirstCoin(coinInstances);
-                        this.logger.debug(`[${requestId}] gasCoin=${gasCoin.objectId}`);
-                        mergeTransaction.setGasPayment([gasCoin]);
+                        let gasCoin = this.gasManager!.getFreeGasCoin();
+                        let txBlockGenerator = async () => {
+                            const block = new SuiTxBlock();
+                            return await block.mergeCoinsIntoFirstCoin(coinInstances);
+                        };
 
-                        const mergeResponse = await this.suiClient.signAndExecuteTransactionBlock({
-                            signer: this.keyPair!,
-                            transactionBlock: mergeTransaction
-                        });
+                        let response = await this.executeWithObjectTimeoutCheck(
+                            requestId,
+                            txBlockGenerator,
+                            { showEffects: true },
+                            gasCoin
+                        );
 
-                        this.logger.info(`Merged coin instances ${coinInstances} into ${firstCoin}. Digest=${mergeResponse["digest"]}`);
-                    } finally {
-                        if (gasCoin) {
-                            await gasCoin.updateInstance(this.suiClient);
-                            gasCoin.status = GasCoinStatus.Free;
-                        }
+                        this.logger.info(`Merged coin instances ${coinInstances} into ${firstCoin}. Digest=${response["digest"]}`);
+                    } catch (error) {
+                        this.logger.error(`[${requestId}]: ${error}`);
+                        throw error;
+
                     }
                 }
             } else {
@@ -1956,9 +2073,8 @@ export class DeepBook implements DexInterface {
 
             this.logger.info(`Depositing coin ${firstCoin} into pool ${poolId}. Amount: ${nativeAmount} (${quantity})`);
 
-
-            let txBlockGenerator = async (accountCap: AccountCap) => {
-                this.logger.info(`[${requestId}] accCapId=${accountCap.id}`);
+            let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
+                this.logger.info(`[${requestId}] accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
 
                 return await await accountCap.client.deposit(
                     poolId,
@@ -2038,8 +2154,8 @@ export class DeepBook implements DexInterface {
 
             this.logger.info(`Withdrawing coin ${coinTypeId} from pool ${poolId}. Amount: ${nativeAmount} (${quantity})`);
 
-            let txBlockGenerator = async (accountCap: AccountCap) => {
-                this.logger.info(`[${requestId}] accCapId=${accountCap.id}`);
+            let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
+                this.logger.info(`[${requestId}] accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
                 return await accountCap.client.withdraw(
                     poolId,
                     nativeAmount,
@@ -2183,25 +2299,26 @@ export class DeepBook implements DexInterface {
         const block = new SuiTxBlock();
 
         let response = null;
-        let gasCoin: GasCoin | null = null;
         let status: string | undefined = undefined;
+
         try {
-            gasCoin = this.gasManager!.getFreeGasCoin();
+            let gasCoin = this.gasManager!.getFreeGasCoin();
 
-            const transaction = block.transferCoin(coinInstances, this.walletAddress, recipient, nativeAmount);
+            let txBlockGenerator = async () => {
+                return await block.transferCoin(coinInstances, this.walletAddress, recipient, nativeAmount);
+            }
 
-            transaction.setGasPayment([gasCoin]);
-
-            response = await this.suiClient.signAndExecuteTransactionBlock({
-                signer: this.keyPair!,
-                transactionBlock: transaction,
-                options: {
+            response = await this.executeWithObjectTimeoutCheck(
+                requestId,
+                txBlockGenerator,
+                {
                     showEffects: true,
                     showEvents: true,
                     showBalanceChanges: true,
                     showObjectChanges: true
-                }
-            });
+                },
+                gasCoin
+            );
 
             const digest = response["digest"];
 
@@ -2212,11 +2329,9 @@ export class DeepBook implements DexInterface {
             } else {
                 this.logger.info(`Failed to withdraw ${quantity}. Digest ${digest}`);
             }
-        } finally {
-            if (gasCoin) {
-                await gasCoin.updateInstance(this.suiClient);
-                gasCoin.status = GasCoinStatus.Free;
-            }
+        } catch (error) {
+            this.logger.error(`[${requestId}] ${error}`);
+            throw error;
         }
 
         return {

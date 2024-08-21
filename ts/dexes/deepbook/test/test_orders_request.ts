@@ -6,8 +6,8 @@ const main = async () => {
     const nonExistentPoolId = "0x538091bde22b3e38aae569ed1fb8621714c8193bc6819ea2e5ebb9ae700a4211";
 
     Promise.all([
-        get("object-info", { "id": poolId }),
-        get("object-info", { "id": nonExistentPoolId })
+        get("orders", { "pool_id": poolId }),
+        get("orders", { "pool_id": nonExistentPoolId })
     ]);
 }
 
