@@ -201,10 +201,10 @@ class DexCommon(ABC):
                         request.used_gas_prices_wei[-1] >= gas_price_wei:
                     return 400, {'error': {'message': f'Cancel with greater than or equal to the '
                                                       f'gas_price_wei={gas_price_wei} already in progress'}}
-
+                # TODO -> For other EVM based chains it might differ
                 # replacement transaction should have gas_price at least greater than 10% of the last gas_price used otherwise
                 # 'replacement transaction underpriced' error will occur. https://ethereum.stackexchange.com/a/44875
-                if (len(request.used_gas_prices_wei) > 0):
+                if len(request.used_gas_prices_wei) > 0:
                     gas_price_wei = max(gas_price_wei, int(1.1 * request.used_gas_prices_wei[-1]))
 
             ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
@@ -225,7 +225,12 @@ class DexCommon(ABC):
                     await result.pending_task
                 return 200, {'result': {'tx_hash': result.tx_hash}}
             else:
-                return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
+                cancel_error_response = {'error': {'code': result.error_type.value, 'message': result.error_message}}
+                if result.error_type == ErrorType.TRANSACTION_FAILED and 'already mined' in result.error_message:
+                    # Chance to cancellation doesn't exist, ES will not reTry cancellations.
+                    return 408, cancel_error_response
+                else:
+                    return 400, cancel_error_response
 
         except Exception as e:
             self._logger.exception(f'Failed to cancel request: %r', e)
