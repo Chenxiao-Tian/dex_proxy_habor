@@ -7,7 +7,8 @@ import { TransactionBlock } from "@mysten/sui.js/transactions";
 
 export enum GasCoinStatus {
     Free,
-    InUse
+    InUse,
+    SkipForRemainderOfEpoch
 };
 
 export class GasCoin {
@@ -38,12 +39,12 @@ export class GasCoin {
                 let fields = data.content.fields as any;
                 const updatedVersion = BigInt(data.version);
                 if (this.version < updatedVersion) {
-                    this.#logger.debug(`prevVersion=${this.version} newVersion=${data.version}`);
+                    this.#logger.debug(`oldVer=${this.version} newVer=${data.version}`);
                     this.digest = data.digest;
                     this.version = BigInt(data.version);
                     this.balanceMist = BigInt(fields.balance);
                 } else {
-                    this.#logger.debug(`prevVersion=${this.version} >= newVersion=${data.version}`);
+                    this.#logger.debug(`oldVer=${this.version} >= newVer=${data.version}`);
                 }
             }
         } catch (error) {
@@ -437,8 +438,9 @@ export class GasManager {
         const startingIdx = this.#nextCoinIdx;
         let idx = startingIdx;
         do {
-            let coin = this.#gasCoins.get(this.#gasCoinKeys[this.#nextCoinIdx]);
-            if (coin === undefined) { throw new Error("Fatal"); }
+            const coinId = this.#gasCoinKeys[this.#nextCoinIdx];
+            let coin = this.#gasCoins.get(coinId);
+            if (coin === undefined) { throw new Error(`No gas coin found with id=${coinId}`); }
             this.#nextCoinIdx = (this.#nextCoinIdx + 1) % this.#gasCoinKeys.length;
 
             if (coin.status === GasCoinStatus.Free) {
@@ -463,5 +465,26 @@ export class GasManager {
         this.#mainGasCoin.status = GasCoinStatus.InUse;
 
         return this.#mainGasCoin;
+    }
+
+    onEpochChange = async () => {
+        for (let [_, gasCoin] of this.#gasCoins) {
+            if (gasCoin.status == GasCoinStatus.SkipForRemainderOfEpoch) {
+                this.#logger.info(`Freeing gasCoin=${gasCoin.objectId} skipped for last epoch`);
+                gasCoin.status = GasCoinStatus.Free;
+                await gasCoin.updateInstance(this.#suiClient);
+            }
+        }
+    }
+
+    logSkippedObjects = () => {
+        let count: number = 0;
+        for (let [_, gasCoin] of this.#gasCoins) {
+            if (gasCoin.status == GasCoinStatus.SkipForRemainderOfEpoch) {
+                this.#logger.debug(`gasCoin=${gasCoin.objectId} will be skipped for the remainder of the current epoch`);
+                ++count;
+            }
+        }
+        this.#logger.info(`Skipping ${count} gas coins for the remainder of the current epoch`);
     }
 };

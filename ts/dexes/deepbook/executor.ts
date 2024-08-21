@@ -17,7 +17,8 @@ import { DeepBookClient } from "@mysten/deepbook";
 
 export enum AccountCapStatus {
     Free,
-    InUse
+    InUse,
+    SkipForRemainderOfEpoch
 };
 
 export class AccountCap {
@@ -32,7 +33,7 @@ export class AccountCap {
 };
 
 export type TransactionBlockGenerator =
-    (accountCap: AccountCap) => Promise<TransactionBlock>;
+    (accountCap: AccountCap, gasCoin: GasCoin) => Promise<TransactionBlock>;
 
 export class Executor {
     #logger: Logger;
@@ -75,7 +76,7 @@ export class Executor {
             }
         } while (idx != startingIdx);
 
-        throw new Error("All child account caps in use");
+        throw new Error("All child account caps in use or skipped for the current epoch");
     }
 
     execute = async (requestId: BigInt,
@@ -85,13 +86,13 @@ export class Executor {
 
         let accountCap: AccountCap | null = null;
         let gasCoin: GasCoin | null = null;
+        let transactionTimedOutBeforeReachingFinality: boolean = false;
 
         try {
             accountCap = this.getFreeAccountCap();
             gasCoin = this.#gasManager.getFreeGasCoin();
 
-            let txBlock = await txBlockGenerator(accountCap);
-            this.#logger.debug(`[${requestId}] gasCoin=${gasCoin.objectId}`);
+            let txBlock = await txBlockGenerator(accountCap, gasCoin);
             txBlock.setGasPayment([gasCoin]);
             txBlock.setGasBudget(this.#gasBudgetMist);
 
@@ -101,14 +102,54 @@ export class Executor {
                 options: txBlockResponseOptions
             });
 
+        } catch (error) {
+            let error_ = error as any;
+            let errorStr = error_.toString();
+
+            if (errorStr.includes("Transaction timed out before reaching finality")) {
+                transactionTimedOutBeforeReachingFinality = true;
+            }
+
+            throw error;
+
         } finally {
             if (accountCap) {
-                accountCap.status = AccountCapStatus.Free;
+                if (transactionTimedOutBeforeReachingFinality) {
+                    this.#logger.warn(`[${requestId}] Transaction timed out. Will skip using accountCap=${accountCap.id} for remainder of current epoch`);
+                    accountCap.status = AccountCapStatus.SkipForRemainderOfEpoch;
+                } else {
+                    accountCap.status = AccountCapStatus.Free;
+                }
             }
             if (gasCoin) {
-                await gasCoin.updateInstance(this.#suiClient);
-                gasCoin.status = GasCoinStatus.Free;
+                if (transactionTimedOutBeforeReachingFinality) {
+                    this.#logger.warn(`[${requestId}] Transaction timed out. Will skip using gasCoin=${gasCoin.objectId} for remainder of current epoch`);
+                    gasCoin.status = GasCoinStatus.SkipForRemainderOfEpoch;
+                } else {
+                    await gasCoin.updateInstance(this.#suiClient);
+                    gasCoin.status = GasCoinStatus.Free;
+                }
             }
         }
+    }
+
+    onEpochChange = () => {
+        for (let accountCap of this.#accountCaps) {
+            if (accountCap.status == AccountCapStatus.SkipForRemainderOfEpoch) {
+                this.#logger.info(`Freeing accountCap=${accountCap.id} skipped for last epoch`);
+                accountCap.status = AccountCapStatus.Free;
+            }
+        }
+    }
+
+    logSkippedObjects = () => {
+        let count: number = 0;
+        for (let accountCap of this.#accountCaps) {
+            if (accountCap.status == AccountCapStatus.SkipForRemainderOfEpoch) {
+                this.#logger.debug(`accountCap=${accountCap.id} will be skipped for the remainder of the current epoch`);
+                ++count;
+            }
+        }
+        this.#logger.info(`Skipping ${count} accountCaps for the remainder of the current epoch`);
     }
 };
