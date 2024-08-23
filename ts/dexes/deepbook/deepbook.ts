@@ -931,10 +931,19 @@ export class DeepBook implements DexInterface {
         }
 
         if (exchangeStatus) {
+            if (this.log_responses) {
+                const dump = JSON.stringify(exchangeStatus);
+                this.logger.debug(`[${requestId}] Query response: ${dump}`);
+            }
+
+            if (order.status === "Unknown") {
+                order.status = "Open";
+            }
             const remQty = BigInt(exchangeStatus.quantity) as Quantity;
             order.remQty = remQty
             order.execQty = (order.qty - order.remQty) as Quantity;
         } else {
+            this.logger.debug(`getOrderStatus did not have an update for ${clientOrderId}`);
             order.remQty = 0n as Quantity;
             order.execQty = 0n as Quantity;
             if (order.status !== "PendingInsert") {
