@@ -79,6 +79,31 @@ export class Executor {
         throw new Error("All child account caps in use or skipped for the current epoch");
     }
 
+    tryUpdateGasCoinVersion = (requestId: BigInt,
+                               response: SuiTransactionBlockResponse,
+                               gasCoin: GasCoin): boolean => {
+        if (response.effects?.gasObject && response.effects?.gasUsed) {
+            const versionFromTx = BigInt(response.effects!.gasObject.reference.version);
+            const digestFromTx =response.effects!.gasObject.reference.digest;
+
+            const gasUsed = BigInt(response.effects!.gasUsed.computationCost) + BigInt(response.effects!.gasUsed.storageCost) - BigInt(response.effects!.gasUsed.storageRebate);
+
+            this.#logger.info(`[${requestId}] gasCoin=${gasCoin.objectId} attempting to update version using tx response. oldVer=${gasCoin.version} newVer=${versionFromTx}`);
+
+            if (gasCoin.version < versionFromTx) {
+                const oldVersion = gasCoin.version;
+                gasCoin.version = versionFromTx;
+                gasCoin.digest = digestFromTx;
+                gasCoin.balanceMist -= gasUsed;
+
+                this.#logger.info(`[${requestId}] gasCoin=${gasCoin.objectId} updated version from tx response oldVer=${oldVersion} newVer=${gasCoin.version}, digest=${gasCoin.digest} balanceMist=${gasCoin.balanceMist}`);
+
+                return true;
+            }
+        }
+        return false;
+    }
+
     execute = async (requestId: BigInt,
                      txBlockGenerator: TransactionBlockGenerator,
                      txBlockResponseOptions: SuiTransactionBlockResponseOptions):
@@ -87,6 +112,7 @@ export class Executor {
         let accountCap: AccountCap | null = null;
         let gasCoin: GasCoin | null = null;
         let transactionTimedOutBeforeReachingFinality: boolean = false;
+        let response: SuiTransactionBlockResponse | null = null;
 
         try {
             accountCap = this.getFreeAccountCap();
@@ -96,11 +122,13 @@ export class Executor {
             txBlock.setGasPayment([gasCoin]);
             txBlock.setGasBudget(this.#gasBudgetMist);
 
-            return await this.#suiClient.signAndExecuteTransactionBlock({
+            response = await this.#suiClient.signAndExecuteTransactionBlock({
                 signer: this.#keyPair,
                 transactionBlock: txBlock,
                 options: txBlockResponseOptions
             });
+
+            return response;
 
         } catch (error) {
             let error_ = error as any;
@@ -126,7 +154,10 @@ export class Executor {
                     this.#logger.warn(`[${requestId}] Transaction timed out. Will skip using gasCoin=${gasCoin.objectId} for remainder of current epoch`);
                     gasCoin.status = GasCoinStatus.SkipForRemainderOfEpoch;
                 } else {
-                    await gasCoin.updateInstance(this.#suiClient);
+                    if (response && ! this.tryUpdateGasCoinVersion(requestId, response, gasCoin)) {
+
+                        await gasCoin.updateInstance(this.#suiClient);
+                    }
                     gasCoin.status = GasCoinStatus.Free;
                 }
             }
