@@ -751,20 +751,23 @@ export class DeepBook implements DexInterface {
                txBlockResponseOptions: SuiTransactionBlockResponseOptions,
                gasCoin: GasCoin): Promise<SuiTransactionBlockResponse> => {
 
+        let response: SuiTransactionBlockResponse | null = null;
         let transactionTimedOutBeforeReachingFinality: boolean = false;
 
         try {
             let txBlock = await txBlockGenerator();
 
-            this.logger.debug(`[${requestId}] gasCoin=${gasCoin.objectId}`);
+            this.logger.debug(`[${requestId}] gasCoin=(${gasCoin.repr()})`);
 
             txBlock.setGasPayment([gasCoin]);
 
-            return await this.suiClient.signAndExecuteTransactionBlock({
+            response = await this.suiClient.signAndExecuteTransactionBlock({
                 signer: this.keyPair!,
                 transactionBlock: txBlock,
                 options: txBlockResponseOptions
             });
+
+            return response;
 
         } catch (error) {
             let error_ = error as any;
@@ -782,7 +785,10 @@ export class DeepBook implements DexInterface {
                     this.logger.warn(`[${requestId}] Transaction timed out. Will skip using gasCoin=${gasCoin.objectId} for remainder of current epoch`);
                     gasCoin.status = GasCoinStatus.SkipForRemainderOfEpoch;
                 } else {
-                    await gasCoin.updateInstance(this.suiClient);
+                    if (response && ! this.executor!.tryUpdateGasCoinVersion(requestId, response, gasCoin)) {
+
+                        await gasCoin.updateInstance(this.suiClient);
+                    }
                     gasCoin.status = GasCoinStatus.Free;
                 }
             }
@@ -1223,7 +1229,7 @@ export class DeepBook implements DexInterface {
         let response = null;
         try {
             let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
-                this.logger.debug(`[${requestId}] Inserting order. accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
+                this.logger.debug(`[${requestId}] Inserting order. accCapId=${accountCap.id} gasCoin=(${gasCoin.repr()})`);
 
                 return await accountCap.client.placeLimitOrder(
                     order.poolId,
@@ -1377,7 +1383,7 @@ export class DeepBook implements DexInterface {
 
         try {
             let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
-                this.logger.debug(`[${requestId}] Inserting orders. params=${JSON.stringify(params)} accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
+                this.logger.debug(`[${requestId}] Inserting orders. params=${JSON.stringify(params)} accCapId=${accountCap.id} gasCoin=(${gasCoin.repr()})`);
 
                 const selfMatchingPrevention: number = 0; // CANCEL_OLDEST
                 let txBlock = new TransactionBlock();
@@ -1525,7 +1531,7 @@ export class DeepBook implements DexInterface {
         let response = null;
         try {
             let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
-                this.logger.debug(`[${requestId}] Cancelling order. accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
+                this.logger.debug(`[${requestId}] Cancelling order. accCapId=${accountCap.id} gasCoin=(${gasCoin.repr()})`);
 
                 return await accountCap.client.cancelOrder(
                     poolId,
@@ -1533,7 +1539,10 @@ export class DeepBook implements DexInterface {
                 );
             };
 
-            let txBlockResponseOptions = { showEffects: true, showEvents: true };
+            let txBlockResponseOptions = {
+                showEffects: true,
+                showEvents: true
+            };
 
             response = await this.executor!.execute(requestId,
                                                     txBlockGenerator,
@@ -1640,12 +1649,16 @@ export class DeepBook implements DexInterface {
         let response = null;
         try {
             let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
-                this.logger.debug(`[${requestId}] Cancelling all orders. poolId=${poolId} accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
+                this.logger.debug(`[${requestId}] Cancelling all orders. poolId=${poolId} accCapId=${accountCap.id} gasCoin=(${gasCoin.repr()})`);
 
                 return await accountCap.client.cancelAllOrders(poolId);
             };
 
-            let txBlockResponseOptions = { showEffects: true, showEvents: true };
+            let txBlockResponseOptions = {
+                showEffects: true,
+                showEvents: true,
+                showObjectChanges: true
+            };
 
             response = await this.executor!.execute(requestId,
                                                     txBlockGenerator,
@@ -1716,7 +1729,7 @@ export class DeepBook implements DexInterface {
         let response = null;
         try {
             let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
-                this.logger.debug(`[${requestId}] Cancelling orders. poolId=${poolId} clientOrderIds=${clientOrderIds} accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
+                this.logger.debug(`[${requestId}] Cancelling orders. poolId=${poolId} clientOrderIds=${clientOrderIds} accCapId=${accountCap.id} gasCoin=(${gasCoin.repr()})`);
 
                 return await accountCap.client.batchCancelOrder(
                     poolId, exchangeOrderIds
@@ -2164,7 +2177,7 @@ export class DeepBook implements DexInterface {
             this.logger.info(`Withdrawing coin ${coinTypeId} from pool ${poolId}. Amount: ${nativeAmount} (${quantity})`);
 
             let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
-                this.logger.info(`[${requestId}] accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
+                this.logger.info(`[${requestId}] accCapId=${accountCap.id} gasCoin=(${gasCoin.repr()})`);
                 return await accountCap.client.withdraw(
                     poolId,
                     nativeAmount,

@@ -51,6 +51,10 @@ export class GasCoin {
             this.#logger.error(`Failed to update gasCoin=${this.objectId}`);
         }
     }
+
+    repr = (): string => {
+        return `objectId=${this.objectId} version=${this.version} digest=${this.digest} balanceMist=${this.balanceMist}`;
+    }
 };
 
 export class GasManager {
@@ -238,7 +242,7 @@ export class GasManager {
                 return;
             }
 
-            this.#logger.debug(`onSyncTimer: mainGasCoin=${this.#mainGasCoin.objectId} balanceMist=${this.#mainGasCoin.balanceMist}`);
+            this.#logger.debug(`onSyncTimer: mainGasCoin=${this.#mainGasCoin.repr()}`);
 
             this.#mainGasCoin.status = GasCoinStatus.InUse;
 
