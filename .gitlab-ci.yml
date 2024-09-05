@@ -48,6 +48,9 @@ stages:
     ENVIRONMENT: prod
   - PROCESS_NAME: dex_proxy-lyra-6
     ENVIRONMENT: prod
+  - PROCESS_NAME: dex_proxy-dbv3-test-1
+    ENVIRONMENT: dev
+    TS_DEX_PROXY: "true"
   - PROCESS_NAME: dex_proxy-deep-test-1
     ENVIRONMENT: dev
     TS_DEX_PROXY: "true"
