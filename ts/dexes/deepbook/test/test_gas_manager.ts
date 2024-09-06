@@ -60,7 +60,7 @@ let main = async () => {
     }
 
     logger.info("Splitting the mainGasCoin for testing");
-    let mainGasCoin = gasMgr.getMainGasCoin();
+    let mainGasCoin = await gasMgr.getMainGasCoin();
     if (mainGasCoin !== null) {
         logger.info(`mainGasCoin=${mainGasCoin.objectId} version=${mainGasCoin.version}`);
         try {
