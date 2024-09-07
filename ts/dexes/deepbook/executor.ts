@@ -150,15 +150,24 @@ export class Executor {
                 }
             }
             if (gasCoin) {
+                let gasCoinVersionUpdated = false;
                 if (transactionTimedOutBeforeReachingFinality) {
                     this.#logger.warn(`[${requestId}] Transaction timed out. Will skip using gasCoin=${gasCoin.objectId} for remainder of current epoch`);
                     gasCoin.status = GasCoinStatus.SkipForRemainderOfEpoch;
                 } else {
-                    if (response && ! this.tryUpdateGasCoinVersion(requestId, response, gasCoin)) {
-
-                        await gasCoin.updateInstance(this.#suiClient);
+                    if (response) {
+                        gasCoinVersionUpdated = this.tryUpdateGasCoinVersion(requestId, response, gasCoin);
+                        if (! gasCoinVersionUpdated) {
+                            gasCoinVersionUpdated = await gasCoin.updateInstance(this.#suiClient);
+                        }
+                    } else {
+                        gasCoinVersionUpdated = await gasCoin.updateInstance(this.#suiClient);
                     }
-                    gasCoin.status = GasCoinStatus.Free;
+                    if (gasCoinVersionUpdated) {
+                        gasCoin.status = GasCoinStatus.Free;
+                    } else {
+                        gasCoin.status = GasCoinStatus.NeedsVersionUpdate;
+                    }
                 }
             }
         }

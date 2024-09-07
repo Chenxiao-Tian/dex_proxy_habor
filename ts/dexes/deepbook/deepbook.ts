@@ -781,15 +781,24 @@ export class DeepBook implements DexInterface {
 
         } finally {
             if (gasCoin) {
+                let gasCoinVersionUpdated = false;
                 if (transactionTimedOutBeforeReachingFinality) {
                     this.logger.warn(`[${requestId}] Transaction timed out. Will skip using gasCoin=${gasCoin.objectId} for remainder of current epoch`);
                     gasCoin.status = GasCoinStatus.SkipForRemainderOfEpoch;
                 } else {
-                    if (response && ! this.executor!.tryUpdateGasCoinVersion(requestId, response, gasCoin)) {
-
-                        await gasCoin.updateInstance(this.suiClient);
+                    if (response) {
+                        gasCoinVersionUpdated = this.executor!.tryUpdateGasCoinVersion(requestId, response, gasCoin);
+                        if (! gasCoinVersionUpdated) {
+                            gasCoinVersionUpdated = await gasCoin.updateInstance(this.suiClient);
+                        }
+                    } else {
+                        gasCoinVersionUpdated = await gasCoin.updateInstance(this.suiClient);
                     }
-                    gasCoin.status = GasCoinStatus.Free;
+                    if (gasCoinVersionUpdated) {
+                        gasCoin.status = GasCoinStatus.Free;
+                    } else {
+                        gasCoin.status = GasCoinStatus.NeedsVersionUpdate;
+                    }
                 }
             }
         }
@@ -2079,7 +2088,7 @@ export class DeepBook implements DexInterface {
                     }
                 }
             } else {
-                mainGasCoin = this.gasManager!.getMainGasCoin();
+                mainGasCoin = await this.gasManager!.getMainGasCoin();
                 if (mainGasCoin === null) {
                     throw new Error("The mainGasCoin is being used in a concurrent transaction. Please retry");
                 }
@@ -2120,8 +2129,11 @@ export class DeepBook implements DexInterface {
             throw error;
         } finally {
             if (mainGasCoin) {
-                await mainGasCoin.updateInstance(this.suiClient);
-                mainGasCoin.status = GasCoinStatus.Free;
+                if (await mainGasCoin.updateInstance(this.suiClient)) {
+                    mainGasCoin.status = GasCoinStatus.Free;
+                } else {
+                    mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
+                }
             }
         }
 
@@ -2248,7 +2260,7 @@ export class DeepBook implements DexInterface {
         let mainGasCoin = null;
         try {
             const block = new SuiTxBlock();
-            mainGasCoin = this.gasManager!.getMainGasCoin();
+            mainGasCoin = await this.gasManager!.getMainGasCoin();
             if (mainGasCoin === null) {
                 throw new Error("The mainGasCoin is being used in a concurrent transaction. Please retry");
             }
@@ -2280,8 +2292,11 @@ export class DeepBook implements DexInterface {
             }
         } finally {
             if (mainGasCoin) {
-                await mainGasCoin.updateInstance(this.suiClient);
-                mainGasCoin.status = GasCoinStatus.Free;
+                if (await mainGasCoin.updateInstance(this.suiClient)) {
+                    mainGasCoin.status = GasCoinStatus.Free;
+                } else {
+                    mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
+                }
             }
         }
 
