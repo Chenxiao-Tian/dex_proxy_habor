@@ -51,7 +51,7 @@ export class GasCoin {
                     // coin should not be updated.
                     // TODO: revisit this at some point.
                     this.#logger.debug(`oldVer=${this.version} >= newVer=${data.version}`);
-                    return true;
+                    return false;
                 }
             }
             return false;
