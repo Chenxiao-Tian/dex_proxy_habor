@@ -34,9 +34,10 @@ let main = async () => {
     const minBalancePerInstance = BigInt(100_000_000); // 0.1 SUI
     const gasBudget = BigInt(1_000_000); // 0.01 SUI
     const topupIntervalMs = 30_000; // 30 seconds
+    const logResponses = true;
     let gasMgr = new GasManager(lf, suiClient, wallet, keyPair, expectedCount,
                                 balancePerInstance, minBalancePerInstance,
-                                topupIntervalMs);
+                                topupIntervalMs, logResponses);
     await gasMgr.start();
 
     let serializer = (_: any, value: any) => {

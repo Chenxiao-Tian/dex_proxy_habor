@@ -241,7 +241,7 @@ export class DeepBook implements DexInterface {
                                              childAccountCapIds.length,
                                              balancePerInstanceMist,
                                              minBalancePerInstanceMist,
-                                             syncIntervalMs);
+                                             syncIntervalMs, this.log_responses);
 
             const gasBudgetMist = BigInt(config.dex.gas_manager.gas_budget_mist.replace(/,/g, ''));
 
@@ -2055,6 +2055,7 @@ export class DeepBook implements DexInterface {
         let response = null;
         let mainGasCoin = null;
         let status: string | undefined = undefined;
+        let gasCoinVersionUpdated: boolean = false;
 
         try {
             let firstCoin: string | undefined = undefined;
@@ -2095,6 +2096,10 @@ export class DeepBook implements DexInterface {
 
                 await this.gasManager!.mergeUntrackedGasCoinsInto(mainGasCoin)
 
+                if (mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate) {
+                    throw new Error("Unable to update the version of the mainGasCoin after merging untracked gasCoins into it. Please retry this transaction");
+                }
+
                 firstCoin = mainGasCoin.objectId;
             }
 
@@ -2129,7 +2134,15 @@ export class DeepBook implements DexInterface {
             throw error;
         } finally {
             if (mainGasCoin) {
-                if (await mainGasCoin.updateInstance(this.suiClient)) {
+                if (response) {
+                    gasCoinVersionUpdated = this.executor!.tryUpdateGasCoinVersion(requestId, response, mainGasCoin);
+                    if (! gasCoinVersionUpdated) {
+                        gasCoinVersionUpdated = await this.gasManager!.tryUpdateMainGasCoinVersion();
+                    }
+                } else {
+                    gasCoinVersionUpdated = await this.gasManager!.tryUpdateMainGasCoinVersion();
+                }
+                if (gasCoinVersionUpdated) {
                     mainGasCoin.status = GasCoinStatus.Free;
                 } else {
                     mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
@@ -2258,6 +2271,7 @@ export class DeepBook implements DexInterface {
         let response = null;
         let status: string | undefined = undefined;
         let mainGasCoin = null;
+        let gasCoinVersionUpdated: boolean = false;
         try {
             const block = new SuiTxBlock();
             mainGasCoin = await this.gasManager!.getMainGasCoin();
@@ -2266,6 +2280,10 @@ export class DeepBook implements DexInterface {
             }
 
             await this.gasManager!.mergeUntrackedGasCoinsInto(mainGasCoin)
+
+            if (mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate) {
+                throw new Error("Unable to update the version of the mainGasCoin after merging untracked gasCoins into it. Please retry this transaction");
+            }
 
             block.txBlock.setGasPayment([mainGasCoin]);
             const transaction = block.transferSui(recipient, BigInt(quantity * FLOAT_SCALING_FACTOR));
@@ -2292,7 +2310,15 @@ export class DeepBook implements DexInterface {
             }
         } finally {
             if (mainGasCoin) {
-                if (await mainGasCoin.updateInstance(this.suiClient)) {
+                if (response) {
+                    gasCoinVersionUpdated = this.executor!.tryUpdateGasCoinVersion(requestId, response, mainGasCoin);
+                    if (! gasCoinVersionUpdated) {
+                        gasCoinVersionUpdated = await this.gasManager!.tryUpdateMainGasCoinVersion();
+                    }
+                } else {
+                    gasCoinVersionUpdated = await this.gasManager!.tryUpdateMainGasCoinVersion();
+                }
+                if (gasCoinVersionUpdated) {
                     mainGasCoin.status = GasCoinStatus.Free;
                 } else {
                     mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;

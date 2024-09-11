@@ -1,14 +1,15 @@
-import { LoggerFactory } from "../../../logger";
+import { LoggerFactory } from "../../../logger.js";
 import { GasManager, GasCoin, GasCoinStatus } from "../gas_manager.js";
 import { SuiClient } from "@mysten/sui.js/client";
 import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
 import { fromHEX } from "@mysten/sui.js/utils";
 import { TransactionBlock } from "@mysten/sui.js/transactions";
+import { resolve } from "path";
 
 import { readFileSync } from "fs";
 
 let readPrivateKey = (): string => {
-    const keyStoreFilePath: string = "./test/wallet_1.txt";
+    const keyStoreFilePath: string = "./dexes/deepbook/test/wallet_1.txt";
     return readFileSync(keyStoreFilePath, "utf8").trimEnd();
 }
 
@@ -21,6 +22,8 @@ let main = async () => {
     let lf = new LoggerFactory(logConfig);
     let logger = lf.createLogger("test_gas_mgr");
 
+    logger.info(`cwd => ${resolve(process.cwd())}`);
+
     let suiClient = new SuiClient({
         url: "https://mysten-rpc.testnet.sui.io:443"
     });
@@ -28,13 +31,19 @@ let main = async () => {
     const secretKey = readPrivateKey();
     let keyPair = Ed25519Keypair.fromSecretKey(fromHEX(secretKey));
     const wallet = keyPair.getPublicKey().toSuiAddress();
-    const expectedCount = 6;
+    logger.info(`wallet=${wallet}`);
+    const expectedCount = 5;
     const balancePerInstance = BigInt(1_000_000_000); // 1 SUI
     const minBalancePerInstance = BigInt(100_000_000); // 0.1 SUI
-    const topupIntervalMs = 10_000; // 10 seconds
-    let gasMgr = new GasManager(lf, suiClient, wallet, keyPair, expectedCount,
-                                balancePerInstance, minBalancePerInstance,
-                                topupIntervalMs);
+    //const topupIntervalMs = 10_000; // 10 seconds
+    const topupIntervalMs = 5_000; // 5 seconds
+    const logResponses = true;
+    let gasMgr: GasManager | null = new GasManager(lf, suiClient, wallet,
+                                                   keyPair, expectedCount,
+                                                   balancePerInstance,
+                                                   minBalancePerInstance,
+                                                   topupIntervalMs,
+                                                   logResponses);
     await gasMgr.start();
 
     let serializer = (_: any, value: any) => {
@@ -77,8 +86,11 @@ let main = async () => {
 
             logger.info(`split mainGasCoin=${mainGasCoin.objectId} digest=${response.digest} status=${response.effects?.status.status}`);
         } finally {
-            mainGasCoin.updateInstance(suiClient);
-            mainGasCoin.status = GasCoinStatus.Free;
+            if (await mainGasCoin.updateInstance(suiClient)) {
+                mainGasCoin.status = GasCoinStatus.Free;
+            } else {
+                mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
+            }
         }
     } else {
         logger.info("Failed to fetch mainGasCoin");
