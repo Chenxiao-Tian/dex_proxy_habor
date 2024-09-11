@@ -4,6 +4,11 @@ import { Logger } from "winston";
 import { SuiClient } from "@mysten/sui.js/client";
 import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
 import { TransactionBlock } from "@mysten/sui.js/transactions";
+import { SuiTransactionBlockResponse } from "@mysten/sui.js/client";
+
+const sleep = async (duration_in_ms: number) => {
+    return new Promise(resolve => setTimeout(resolve, duration_in_ms));
+}
 
 export enum GasCoinStatus {
     Free,
@@ -40,7 +45,7 @@ export class GasCoin {
                 let fields = data.content.fields as any;
                 const updatedVersion = BigInt(data.version);
                 if (this.version < updatedVersion) {
-                    this.#logger.debug(`oldVer=${this.version} newVer=${data.version}`);
+                    this.#logger.debug(`Queried RPC node. oldVer=${this.version} < newVer=${data.version}, status=${GasCoinStatus[this.status]}`);
                     this.digest = data.digest;
                     this.version = BigInt(data.version);
                     this.balanceMist = BigInt(fields.balance);
@@ -50,8 +55,8 @@ export class GasCoin {
                     // as there are a few corner cases where the version of a
                     // coin should not be updated.
                     // TODO: revisit this at some point.
-                    this.#logger.debug(`oldVer=${this.version} >= newVer=${data.version}`);
-                    return true;
+                    this.#logger.debug(`Queried RPC node. oldVer=${this.version} >= newVer=${data.version}, status=${GasCoinStatus[this.status]}`);
+                    return false;
                 }
             }
             return false;
@@ -62,9 +67,23 @@ export class GasCoin {
     }
 
     repr = (): string => {
-        return `objectId=${this.objectId} version=${this.version} digest=${this.digest} balanceMist=${this.balanceMist}`;
+        return `{objectId=${this.objectId}, version=${this.version}, digest=${this.digest}, balanceMist=${this.balanceMist}, status=${GasCoinStatus[this.status]}}`;
     }
 };
+
+class SplitCoinsResult {
+    txSuceeded: boolean = false;
+    digest: string = "";
+    coinsCreated: Array<GasCoin> = new Array<GasCoin>();
+    gasCoinVersionUpdated: boolean = false;
+}
+
+class MergeCoinsResult {
+    txSuceeded: boolean = false;
+    digest: string = "";
+    coinsDeleted: Array<string> = new Array<string>();
+    gasCoinVersionUpdated: boolean = false;
+}
 
 export class GasManager {
     static #suiCoinStructType: string = "0x2::coin::Coin<0x2::sui::SUI>"
@@ -81,12 +100,13 @@ export class GasManager {
     #gasCoins: Map<string, GasCoin>;
     #gasCoinKeys: Array<string>;
     #syncIntervalMs: number;
+    #logResponses: boolean;
     #nextCoinIdx: number = 0;
 
     constructor(lf: LoggerFactory, suiClient: SuiClient, walletAddress: string,
                 keyPair: Ed25519Keypair, expectedCount: number,
                 balancePerInstanceMist: bigint, minBalancePerInstanceMist: bigint,
-                syncIntervalMs: number) {
+                syncIntervalMs: number, logResponses: boolean) {
         this.#loggerFactory = lf;
         this.#logger = this.#loggerFactory.createLogger("gas_mgr");
         this.#suiClient = suiClient;
@@ -98,6 +118,7 @@ export class GasManager {
         this.#gasCoins = new Map<string, GasCoin>();
         this.#gasCoinKeys = new Array<string>();
         this.#syncIntervalMs = syncIntervalMs;
+        this.#logResponses = logResponses;
     }
 
     start = async () => {
@@ -117,7 +138,19 @@ export class GasManager {
 
         this.#gasCoins.delete(this.#mainGasCoin.objectId);
 
-        this.#logger.info(`Setting mainGasCoin=${this.#mainGasCoin.repr()}`);
+        this.#logger.info(`Set mainGasCoin=${this.#mainGasCoin.repr()}`);
+    }
+
+    #gasCoinSummary = (prefix: string): string => {
+        let summary = `${prefix}=[`;
+        let index = 1;
+        for (let coin of this.#gasCoins.values()) {
+            summary = (`${summary}#${index}=${coin.repr()}`);
+            if (index < this.#gasCoins.size) summary = `${summary}, `;
+            ++index;
+        }
+
+        return `${summary}]`;
     }
 
     #trackInstances = async () => {
@@ -133,7 +166,6 @@ export class GasManager {
                 if (data && data.content &&
                     data.content.dataType === "moveObject") {
                     let fields = data.content.fields as any;
-                    this.#logger.debug(`coin=${data.objectId} version=${data.version}`);
                     this.#gasCoins.set(data.objectId,
                                        new GasCoin(this.#loggerFactory,
                                                    data.objectId,
@@ -143,7 +175,10 @@ export class GasManager {
                 }
             }
 
+
             this.#logger.info(`Found ${this.#gasCoins.size} gasCoin instance(s) in the linked wallet`);
+            this.#logger.debug(this.#gasCoinSummary("gasCoins"));
+
         } catch (error) {
             const msg = `Unable to setup tracking of gasCoin instance(s). Error=${error}`;
             this.#logger.error(msg);
@@ -151,7 +186,7 @@ export class GasManager {
         }
     }
 
-    #tryUpdateMainGasCoinVersion = async (): Promise<boolean> => {
+    tryUpdateMainGasCoinVersion = async (): Promise<boolean> => {
         if (this.#mainGasCoin == undefined) return false;
 
         let attempts = 2;
@@ -160,6 +195,7 @@ export class GasManager {
         for (let attempt = 0; attempt < attempts; ++attempt) {
             versionUpdated = await this.#mainGasCoin.updateInstance(this.#suiClient);
             if (versionUpdated) break;
+            await sleep(500); // 500 ms
         }
 
         return versionUpdated;
@@ -171,18 +207,21 @@ export class GasManager {
 
         this.#logger.info(`Merging ${coinsToMerge.length} coins with balance <= ${this.#minBalancePerInstanceMist} and balance > ${this.#balancePerInstanceMist} into the mainGasCoin`);
 
+        let gasCoinVersionUpdated: boolean = false;
         try {
-            const merged = await this.#mergeCoins(this.#mainGasCoin,
+            let response = await this.#mergeCoins(this.#mainGasCoin,
                                                   coinsToMerge);
-            if (merged) {
+            if (response.txSuceeded) {
                 for (let coin of coinsToMerge) {
                     this.#gasCoins.delete(coin);
                 }
             }
+
+            gasCoinVersionUpdated = response.gasCoinVersionUpdated;
         } finally {
             // Do not free the mainGasCoin at this stage as it's part of a larger
             // operation.
-            if (! await this.#tryUpdateMainGasCoinVersion()) {
+            if (! gasCoinVersionUpdated && ! await this.tryUpdateMainGasCoinVersion()) {
                 this.#mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate;
                 throw new Error(`Unable to update the mainGasCoin=${this.#mainGasCoin.repr()} after merging other coins into it`);
             }
@@ -191,24 +230,24 @@ export class GasManager {
 
     #splitIntoRequiredInstances = async () => {
         if (this.#mainGasCoin == undefined) return;
-        if (this.#gasCoins.size == this.#expectedCount) return;
+        if (this.#expectedCount <= this.#gasCoins.size) return;
 
         const instancesNeeded = this.#expectedCount - this.#gasCoins.size;
         const instanceToSplit = this.#mainGasCoin;
 
         this.#logger.info(`Available child gasCoinInstances=${this.#gasCoins.size} is less than the expectedCount=${this.#expectedCount}. Splitting the mainGasCoin into ${instancesNeeded + 1} coins`);
 
+        let gasCoinVersionUpdated = false;
         try {
-            await this.#createChildInstances(instancesNeeded, instanceToSplit);
+            gasCoinVersionUpdated = await this.#createChildInstances(instancesNeeded, instanceToSplit);
         } finally {
             // Free the gas coin at the call site
-            if(! await this.#tryUpdateMainGasCoinVersion()) {
+            if(! gasCoinVersionUpdated && ! await this.tryUpdateMainGasCoinVersion()) {
                 this.#mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate;
                 throw new Error(`Unable to update the mainGasCoin=${this.#mainGasCoin.repr()} after creating child instances from it`);
             }
         }
     }
-
 
     #setupCoinInstances = async () => {
         try {
@@ -283,7 +322,7 @@ export class GasManager {
 
     #handleCoinsNeedingVersionUpdate = async () => {
         if (this.#mainGasCoin && this.#mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate) {
-            if (await this.#mainGasCoin.updateInstance(this.#suiClient)) {
+            if (await this.tryUpdateMainGasCoinVersion()) {
                 this.#mainGasCoin.status = GasCoinStatus.Free;
             }
         }
@@ -303,7 +342,8 @@ export class GasManager {
             return false;
         }
 
-        this.#logger.debug(`onSyncTimer: mainGasCoin=${this.#mainGasCoin.repr()}`);
+        let status: string = `onSyncTimer: mainGasCoin=${this.#mainGasCoin.repr()}`
+        this.#logger.debug(this.#gasCoinSummary(`${status} children`));
 
         if (this.#mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate) {
             this.#logger.debug(`onSyncTimer: The version of the ${this.#mainGasCoin.repr()} is stale. Will retry updating in next iteration of the periodic task`);
@@ -322,6 +362,7 @@ export class GasManager {
         let trackedCoinsToMerge = Array<string>();
         let untrackedCoinsToMerge = Array<string>();
         let coinsMerged = false;
+        let gasCoinVersionUpdated = false;
         try {
             await this.#handleCoinsNeedingVersionUpdate();
 
@@ -338,9 +379,11 @@ export class GasManager {
             if (trackedCoinsToMerge.length + untrackedCoinsToMerge.length > 0) {
                 this.#logger.debug(`Scanning found ${untrackedCoinsToMerge.length} untracked, ${trackedCoinsToMerge.length} tracked gas coins to merge`);
 
-                coinsMerged = await this.#mergeCoins(this.#mainGasCoin!,
+                let response = await this.#mergeCoins(this.#mainGasCoin!,
                                                      [...untrackedCoinsToMerge,
                                                       ...trackedCoinsToMerge]);
+                coinsMerged = response.txSuceeded;
+                gasCoinVersionUpdated = response.gasCoinVersionUpdated;
             }
         } finally {
             setTimeout(async () => { await this.#onSyncTimer(); },
@@ -356,11 +399,13 @@ export class GasManager {
                         this.#gasCoins.delete(coin);
                     }
 
-                    if (! await this.#mainGasCoin.updateInstance(this.#suiClient)) {
-                        this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
-                        this.#logger.error(`Failed to update the version of the mainGasCoin=${this.#mainGasCoin}. Will split the mainGasCoin in the next iteration of the periodic task.`);
-                        return;
-
+                    if (! gasCoinVersionUpdated) {
+                        gasCoinVersionUpdated = await this.tryUpdateMainGasCoinVersion();
+                        if (! gasCoinVersionUpdated) {
+                            this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
+                            this.#logger.error(`Failed to update the version of the mainGasCoin=${this.#mainGasCoin.repr()}. Will split the mainGasCoin in the next iteration of the periodic task.`);
+                            return;
+                        }
                     }
 
                     const instancesNeeded = this.#expectedCount - this.#gasCoins.size;
@@ -368,8 +413,7 @@ export class GasManager {
                     if (instancesNeeded > 0) {
                         this.#logger.info(`Available child gasCoinInstances=${this.#gasCoins.size} is less than the expectedCount=${this.#expectedCount}. Splitting the mainGasCoin into ${instancesNeeded + 1} coins`);
 
-                        await this.#createChildInstances(instancesNeeded,
-                                                         instanceToSplit);
+                        gasCoinVersionUpdated = await this.#createChildInstances(instancesNeeded, instanceToSplit);
                     }
                 } else {
                     for (let coinId of trackedCoinsToMerge) {
@@ -383,55 +427,52 @@ export class GasManager {
                         }
                     }
                 }
-                if (! await this.#mainGasCoin.updateInstance(this.#suiClient)) {
+                if (! gasCoinVersionUpdated && ! await this.tryUpdateMainGasCoinVersion()) {
                     this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
-                    this.#logger.error(`Failed to update the version of the mainGasCoin=${this.#mainGasCoin}`);
+                    this.#logger.error(`Failed to update the version of the mainGasCoin=${this.#mainGasCoin.repr()}`);
                     return;
                 }
             }
 
             if (untrackedCoinsToMerge.length > 0 && trackedCoinsToMerge.length ===0) {
-                if (! await this.#mainGasCoin.updateInstance(this.#suiClient)) {
+                if (! gasCoinVersionUpdated && ! await this.tryUpdateMainGasCoinVersion()) {
                     this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
-                    this.#logger.error(`Failed to update the version of the mainGasCoin=${this.#mainGasCoin}`);
+                    this.#logger.error(`Failed to update the version of the mainGasCoin=${this.#mainGasCoin.repr()}`);
                     return;
                 }
             }
 
-            this.#mainGasCoin.status = GasCoinStatus.Free;
+            const instancesNeeded = this.#expectedCount - this.#gasCoins.size;
+            const instanceToSplit = this.#mainGasCoin;
+            if (instancesNeeded > 0) {
+                this.#logger.info(`Available child gasCoinInstances=${this.#gasCoins.size} is less than the expectedCount=${this.#expectedCount}. Splitting the mainGasCoin into ${instancesNeeded + 1} coins`);
+
+                gasCoinVersionUpdated = await this.#createChildInstances(instancesNeeded, instanceToSplit);
+
+                if (! gasCoinVersionUpdated && ! this.tryUpdateMainGasCoinVersion()) {
+                    this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
+                    this.#logger.error(`Failed to update the version of the mainGasCoin=${this.#mainGasCoin.repr()}`);
+                    return;
+                }
+            } else {
+                this.#mainGasCoin.status = GasCoinStatus.Free;
+            }
         }
     }
 
     #createChildInstances = async (instancesNeeded: number,
-                                   instanceToSplit: GasCoin) => {
+                                   instanceToSplit: GasCoin): Promise<boolean> => {
+        let gasCoinVersionUpdated = false;
         try {
-            const splitStatus = await this.#splitCoins(instanceToSplit!,
-                                                       instancesNeeded,
-                                                       this.#balancePerInstanceMist);
+            let response = await this.#splitCoins(instanceToSplit!,
+                                                  instancesNeeded,
+                                                  this.#balancePerInstanceMist);
 
-            if (splitStatus) {
-                let coins = await this.#suiClient.getOwnedObjects({
-                    owner: this.#walletAddress,
-                    filter: { StructType: "0x2::coin::Coin<0x2::sui::SUI>" },
-                    options: { showContent: true }
-                });
-
-                for (let coin of coins.data) {
-                    let data = coin.data;
-                    if (data) {
-                        if (data.objectId === this.#mainGasCoin!.objectId ||
-                            this.#gasCoins.has(data.objectId)) {
-                            continue;
-                        }
-                        if (data.content && data.content.dataType === "moveObject") {
-                            let fields = data.content.fields as any;
-                            this.#gasCoins.set(data.objectId,
-                                               new GasCoin(this.#loggerFactory,
-                                                           data.objectId,
-                                                           data.digest,
-                                                           data.version,
-                                                           fields.balance));
-                        }
+            gasCoinVersionUpdated = response.gasCoinVersionUpdated;
+            if (response.txSuceeded) {
+                for (let coin of response.coinsCreated) {
+                    if (! this.#gasCoins.has(coin.objectId)) {
+                        this.#gasCoins.set(coin.objectId, coin);
                     }
                 }
 
@@ -440,13 +481,64 @@ export class GasManager {
         } finally {
             this.#gasCoinKeys = [...this.#gasCoins.keys()];
             this.#nextCoinIdx = 0;
+
+            return gasCoinVersionUpdated;
         }
     }
 
+    #parseSplitCoinsResponse = (response: SuiTransactionBlockResponse,
+                                balancePerCoin: bigint,
+                                instanceToSplit: GasCoin): SplitCoinsResult => {
+        let parsedResponse = new SplitCoinsResult();
+
+        if (response.effects?.gasObject && response.effects?.gasUsed) {
+            const versionFromTx = BigInt(response.effects!.gasObject.reference.version);
+            const digestFromTx =response.effects!.gasObject.reference.digest;
+
+            const gasUsed = BigInt(response.effects!.gasUsed.computationCost) + BigInt(response.effects!.gasUsed.storageCost) - BigInt(response.effects!.gasUsed.storageRebate);
+
+            if (instanceToSplit.version < versionFromTx) {
+                const oldVersion = instanceToSplit.version;
+                instanceToSplit.version = versionFromTx;
+                instanceToSplit.digest = digestFromTx;
+                instanceToSplit.balanceMist -= gasUsed;
+
+                this.#logger.info(`gasCoin=${instanceToSplit.objectId} updated. Details=${instanceToSplit.repr()}`);
+
+                parsedResponse.gasCoinVersionUpdated = true;
+            }
+        }
+
+        if (response.effects?.status.status === "success") {
+            parsedResponse.txSuceeded = true;
+        } else {
+            return parsedResponse;
+        }
+        parsedResponse.txSuceeded = true;
+
+        if (response?.digest) {
+            parsedResponse.digest = response.digest;
+        }
+
+        if (response.effects?.created) {
+            for (let instance of response.effects.created) {
+                let gasCoin = new GasCoin(this.#loggerFactory,
+                                          instance.reference.objectId,
+                                          instance.reference.digest,
+                                          instance.reference.version,
+                                          `${balancePerCoin}`);
+
+                parsedResponse.coinsCreated.push(gasCoin);
+            }
+        }
+
+        return parsedResponse;
+    }
+
     #splitCoins = async (instanceToSplit: GasCoin, count: number,
-                         balancePerCoin: bigint) => {
+                         balancePerCoin: bigint): Promise<SplitCoinsResult> => {
         const txBlock = new TransactionBlock();
-        let response = null;
+        let parsedResponse = new SplitCoinsResult();
 
         try {
             let amounts = new Array<bigint>();
@@ -460,21 +552,72 @@ export class GasManager {
 
             txBlock.setGasPayment([instanceToSplit]);
 
-            response = await this.#suiClient.signAndExecuteTransactionBlock({
+            let response = await this.#suiClient.signAndExecuteTransactionBlock({
                 signer: this.#keyPair,
                 transactionBlock: txBlock,
                 options: { showEffects: true }
             });
+
+            if (this.#logResponses) {
+                const deserialized = JSON.stringify(response);
+                this.#logger.debug(`Split coins response: ${deserialized}`);
+            }
+
+            parsedResponse = this.#parseSplitCoinsResponse(response,
+                                                           balancePerCoin,
+                                                           instanceToSplit);
+
+            if (parsedResponse.txSuceeded) {
+                this.#logger.info(`Split ${instanceToSplit.repr()} into ${parsedResponse.coinsCreated.length} coin(s), txDigest=${parsedResponse.digest}`);
+            }
+
         } catch (error) {
             this.#logger.error(`Failed to split coin=${instanceToSplit.objectId}. Error=${error}`);
         }
 
-        const digest = response?.digest;
-        const status = response?.effects?.status.status;
+        return parsedResponse;
+    }
 
-        this.#logger.info(`Split coin=${instanceToSplit.objectId} digest=${digest} status=${status}`);
+    #parseMergeCoinsResponse = (response: SuiTransactionBlockResponse,
+                                gasCoin: GasCoin): MergeCoinsResult => {
+        let parsedResponse = new MergeCoinsResult();
 
-        return status === "success";
+        if (response.effects?.gasObject && response.effects?.gasUsed) {
+            const versionFromTx = BigInt(response.effects!.gasObject.reference.version);
+            const digestFromTx =response.effects!.gasObject.reference.digest;
+
+            const gasUsed = BigInt(response.effects!.gasUsed.computationCost) + BigInt(response.effects!.gasUsed.storageCost) - BigInt(response.effects!.gasUsed.storageRebate);
+
+            if (gasCoin.version < versionFromTx) {
+                const oldVersion = gasCoin.version;
+                gasCoin.version = versionFromTx;
+                gasCoin.digest = digestFromTx;
+                gasCoin.balanceMist -= gasUsed;
+
+                this.#logger.info(`gasCoin=${gasCoin.objectId} updated. Details=${gasCoin.repr()}`);
+
+                parsedResponse.gasCoinVersionUpdated = true;
+            }
+        }
+
+        if (response.effects?.status.status === "success") {
+            parsedResponse.txSuceeded = true;
+        } else {
+            return parsedResponse;
+        }
+        parsedResponse.txSuceeded = true;
+
+        if (response?.digest) {
+            parsedResponse.digest = response.digest;
+        }
+
+        if (response.effects?.deleted) {
+            for (let instance of response.effects.deleted) {
+                parsedResponse.coinsDeleted.push(instance.objectId);
+            }
+        }
+
+        return parsedResponse;
     }
 
     #mergeCoins = async (parentInstance: GasCoin,
@@ -485,33 +628,40 @@ export class GasManager {
         this.#logger.debug(`mainGasCoin=${parentInstance.objectId} version=${parentInstance.version}`);
 
         let txBlock = new TransactionBlock();
-        let response = null;
+        let parsedResponse = new MergeCoinsResult();
 
         try {
             txBlock.mergeCoins(txBlock.gas, instancesToMerge);
             txBlock.setGasPayment([parentInstance]);
 
-            response = await this.#suiClient.signAndExecuteTransactionBlock({
+            let response = await this.#suiClient.signAndExecuteTransactionBlock({
                 signer: this.#keyPair,
                 transactionBlock: txBlock,
                 options: { showEffects: true }
             });
 
-            const status = response.effects?.status.status;
-            const digest = response.digest;
+            if (this.#logResponses) {
+                const deserialized = JSON.stringify(response);
+                this.#logger.debug(`Merge coins response: ${deserialized}`);
+            }
 
-            this.#logger.info(`Merged ${instancesToMerge.length} coin(s) into the gasCoin=${parentInstance.objectId} digest=${digest} status=${status}`);
+            parsedResponse = this.#parseMergeCoinsResponse(response, parentInstance);
+            if (parsedResponse.txSuceeded) {
+                this.#logger.info(`Merged ${parsedResponse.coinsDeleted.length} coin(s) into the gasCoin=${parentInstance.repr()}, txDigest=${parsedResponse.digest}`);
+            }
         } catch (error) {
             this.#logger.error(`Failed to merge coins. Error=${error}`);
         }
 
-        return response?.effects?.status.status === "success";
+        return parsedResponse;
     }
 
     // The caller is responsible for obtaining the gasCoin before calling this
     // and freeing it afterwards
     mergeUntrackedGasCoinsInto = async (gasCoin: GasCoin) => {
         let untrackedCoinsToMerge = new Array<string>();
+        let gasCoinVersionUpdated = false;
+        let parsedResponse = new MergeCoinsResult();
 
         try {
             untrackedCoinsToMerge = await this.#untrackedCoinsToMerge();
@@ -522,13 +672,17 @@ export class GasManager {
                 return
             }
 
-            await this.#mergeCoins(gasCoin,
-                                   untrackedCoinsToMerge);
+            parsedResponse = await this.#mergeCoins(gasCoin,
+                                                    untrackedCoinsToMerge);
 
         } catch (error) {
             this.#logger.error(`mergeUntrackedGasCoinsInto: Failed to merge untracked coins into gasCoin=${gasCoin.objectId}. Error=${error}`);
         } finally {
-            await gasCoin.updateInstance(this.#suiClient);
+            if (! parsedResponse.gasCoinVersionUpdated) {
+                if(! await gasCoin.updateInstance(this.#suiClient)) {
+                    gasCoin.status == GasCoinStatus.NeedsVersionUpdate;
+                }
+            }
         }
     }
 
@@ -560,7 +714,7 @@ export class GasManager {
         }
 
         if (this.#mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate) {
-            if (await this.#mainGasCoin.updateInstance(this.#suiClient)) {
+            if (await this.tryUpdateMainGasCoinVersion()) {
                 this.#mainGasCoin.status = GasCoinStatus.Free;
             } else {
                 this.#logger.error(`Unable to update the version of the mainGasCoin={this.#mainGasCoin}`);
