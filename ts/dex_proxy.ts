@@ -1,7 +1,6 @@
 import { LoggerFactory } from "./logger.js";
 import { WebServer } from "./web_server.js";
 import { DeepBook } from "./dexes/deepbook/deepbook.js";
-import { Synfutures } from "./dexes/synfutures/synfutures.js";
 import { parseConfig } from "./config.js";
 import { DexInterface, Mode} from "./types";
 import { WebSocket } from "ws";
@@ -24,9 +23,6 @@ export class DexProxy {
 
         if (config.dex.name == "deepbook") {
             this.dexImpl = new DeepBook(lf, this.webServer, config, mode, this);
-        }
-        else if (config.dex.name == "synfutures") {
-            this.dexImpl = new Synfutures(lf, this.webServer, config, mode, this);
         }
         else {
             const error = `${config.dex.name} is not supported`;
