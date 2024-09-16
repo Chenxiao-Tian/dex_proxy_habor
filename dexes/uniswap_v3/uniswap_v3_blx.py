@@ -71,6 +71,7 @@ class UniswapV3Bloxroute(DexCommon):
             'Accept': 'application/json'
         }
         self.__bundle_id: int = 1
+        self.__gas_limit_counter: int = 0  # for making gas_limit unique hence tx_hash unique for all txns of a block
 
     def __split_symbol_to_base_quote_ccy(self, symbol):
         instrument = self.__instruments.get_instrument(
@@ -82,7 +83,8 @@ class UniswapV3Bloxroute(DexCommon):
             Creates raw_tx,signed_tx for given client_request_id
         """
         transaction_type = request.request_type
-
+        request.gas_limit = request.gas_limit + self.__gas_limit_counter
+        self.__gas_limit_counter = (self.__gas_limit_counter + 1) % 1000  # tweak in gas_limit to get unique tx_hashes
         if transaction_type == RequestType.ORDER:
             base_ccy_symbol, quote_ccy_symbol, _ = self.__split_symbol_to_base_quote_ccy(request.symbol)
             side = request.side
