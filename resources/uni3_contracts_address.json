@@ -639,7 +639,9 @@
             {
                 "symbol": "WHSOL",
                 "address": "0xd31a59c85ae9d8edefec411d448f90841571b89c",
-                "valid_withdrawal_addresses": []
+                "valid_withdrawal_addresses": [
+                  "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+                ]
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
