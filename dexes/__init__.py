@@ -6,3 +6,4 @@ from .paradex.paradex import Paradex
 from .lyra.lyra import Lyra
 from .per.per import Per
 from .hype.hype import Hype
+from .native.native import Native

@@ -82,6 +82,14 @@ stages:
     ENVIRONMENT:  prod
   - PROCESS_NAME: dex_proxy-per-eth
     ENVIRONMENT:  prod
+  - PROCESS_NAME: dex_proxy-chainEth-native-test
+    ENVIRONMENT:  dev
+  - PROCESS_NAME: dex_proxy-chainArb-native-test
+    ENVIRONMENT:  dev
+  - PROCESS_NAME: dex_proxy-chainEth-native-main
+    ENVIRONMENT:  prod
+  - PROCESS_NAME: dex_proxy-chainArb-native-main
+    ENVIRONMENT:  prod
   - PROCESS_NAME: dex_proxy-uni3-arb-1
     ENVIRONMENT:  prod
 
