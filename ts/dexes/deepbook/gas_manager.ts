@@ -694,12 +694,13 @@ export class GasManager {
         const startingIdx = this.#nextCoinIdx;
         let idx = startingIdx;
         do {
-            const coinId = this.#gasCoinKeys[this.#nextCoinIdx];
+            const coinId = this.#gasCoinKeys[idx];
             let coin = this.#gasCoins.get(coinId);
             if (coin === undefined) { throw new Error(`No gas coin found with id=${coinId}`); }
-            this.#nextCoinIdx = (this.#nextCoinIdx + 1) % this.#gasCoinKeys.length;
+            idx = (idx + 1) % this.#gasCoinKeys.length;
 
             if (coin.status === GasCoinStatus.Free) {
+                this.#nextCoinIdx = (idx + 1) % this.#gasCoinKeys.length;
                 coin.status = GasCoinStatus.InUse;
                 return coin;
             }

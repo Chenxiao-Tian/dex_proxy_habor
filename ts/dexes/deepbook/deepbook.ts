@@ -1429,6 +1429,8 @@ export class DeepBook implements DexInterface {
                                                     txBlockGenerator,
                                                     txBlockResponseOptions);
         } catch (error) {
+            this.logger.error(`[${requestId}] Failed to insert order. params=${JSON.stringify(params)}`);
+
             if (error instanceof Error) {
                 const parsedError = DeepBook.tryParseError(error.toString());
                 this.logger.error(`[${requestId}] ${parsedError.type}`);
@@ -1673,6 +1675,7 @@ export class DeepBook implements DexInterface {
                                                     txBlockGenerator,
                                                     txBlockResponseOptions);
         } catch (error) {
+            this.logger.error(`[${requestId}] Failed to cancel all orders. poolId=${poolId}`);
             if (error instanceof Error) {
                 const parsedError = DeepBook.tryParseError(error.toString());
                 if (parsedError.type && parsedError.txNumber !== null) {
@@ -1751,6 +1754,8 @@ export class DeepBook implements DexInterface {
                                                     txBlockGenerator,
                                                     txBlockResponseOptions);
         } catch (error) {
+            this.logger.error(`[${requestId}] Failed to cancel orders. poolId=${poolId} clientOrderIds=${clientOrderIds}`);
+
             if (error instanceof Error) {
                 const parsedError = DeepBook.tryParseError(error.toString());
                 if (parsedError.type && parsedError.txNumber !== null) {

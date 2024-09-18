@@ -9,6 +9,8 @@ const main = async () => {
         delete_("orders", { "pool_id": poolId }),
         delete_("orders", { "pool_id": poolId }),
         delete_("orders", { "pool_id": poolId }),
+        delete_("orders", { "pool_id": poolId }),
+        delete_("orders", { "pool_id": poolId }),
         delete_("orders", { "pool_id": poolId })
     ]);
 }
