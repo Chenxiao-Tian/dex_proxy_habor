@@ -1,11 +1,11 @@
 import { LoggerFactory } from "./logger.js";
 import { WebServer } from "./web_server.js";
 import { DeepBook } from "./dexes/deepbook/deepbook.js";
+import { DeepBookV3 } from "./dexes/deepbook_v3/deepbook_v3.js";
 import { parseConfig } from "./config.js";
 import { DexInterface, Mode} from "./types";
 import { WebSocket } from "ws";
 import { parseArgs } from "node:util";
-import http from "http";
 import winston from "winston";
 
 export class DexProxy {
@@ -23,6 +23,9 @@ export class DexProxy {
 
         if (config.dex.name == "deepbook") {
             this.dexImpl = new DeepBook(lf, this.webServer, config, mode, this);
+        }
+        else if (config.dex.name == "deepbook_v3") {
+            this.dexImpl = new DeepBookV3(lf, this.webServer, config, mode, this);
         }
         else {
             const error = `${config.dex.name} is not supported`;
