@@ -1,0 +1,41 @@
+{
+  "logging": {
+    "level": "debug"
+  },
+  "key_store_file_path": "./dexes/deepbook_v3/wallets/wallet_2.txt",
+  "server": {
+    "port": 3002
+  },
+  "dex": {
+    "name": "deepbook_v3",
+    "log_responses": true,
+    "chain_name": "Sui Mainnet for Test",
+    "env": "mainnet",
+    "wallet_address": "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
+    "exchange_connectors": {
+      "rest": {
+        "url": "https://sui-mainnet.g.allthatnode.com/full/json_rpc",
+        "comment_1": "The following header section is only required by ATN. Comment it out if using a different RPC service",
+        "headers": {
+          "x-allthatnode-api-key": "35278f2e995d4b13b7a4f00648b42410"
+        }
+      },
+      "ws": {
+        "url": "wss://sui-mainnet-rpc.allthatnode.com/jUaHO5Ln9iumZgs24kEbKPvxT2buRqLp",
+        "rpc_call_timeout_s": 30,
+        "reconnect_timeout_s": 3,
+        "max_reconnects": 5
+      }
+    },
+    "gas_manager": {
+      "max_balance_per_instance_mist": "2,000,000,000",
+      "min_balance_per_instance_mist": "1,000,000,000",
+      "gas_budget_mist": "100,000,000",
+      "sync_interval_s": 30,
+      "gas_coin_expected_count": 6
+    },
+    "order_cache": {
+      "purge_interval_s": 600
+    }
+  }
+}
