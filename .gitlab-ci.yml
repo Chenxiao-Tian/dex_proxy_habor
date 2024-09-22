@@ -51,6 +51,9 @@ stages:
   - PROCESS_NAME: dex_proxy-dbv3-test-1
     ENVIRONMENT: dev
     TS_DEX_PROXY: "true"
+  - PROCESS_NAME: dex_proxy-dbv3-1
+    ENVIRONMENT: prod
+    TS_DEX_PROXY: "true"
   - PROCESS_NAME: dex_proxy-deep-test-1
     ENVIRONMENT: dev
     TS_DEX_PROXY: "true"
