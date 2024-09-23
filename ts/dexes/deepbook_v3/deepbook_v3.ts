@@ -474,6 +474,17 @@ export class DeepBookV3 implements DexInterface {
   start = async () => {
     if (this.mode === "read-write") {
       await this.gasManager!.start();
+
+      this.currentEpoch = await this.queryEpoch();
+      if (this.currentEpoch === undefined) {
+        throw new Error("Unable to fetch current epoch on startup. Exiting");
+      } else {
+        this.logger.info(`Setting currentEpoch=${this.currentEpoch}`);
+      }
+
+      // 5 minutes
+      const trackEpochIntervalMs = 5 * 60 * 1000;
+      setInterval(this.trackEpoch, trackEpochIntervalMs);
     }
 
     if (this.config.dex.subscribe_to_events) {
@@ -503,17 +514,6 @@ export class DeepBookV3 implements DexInterface {
         );
       }
     }
-
-    this.currentEpoch = await this.queryEpoch();
-    if (this.currentEpoch === undefined) {
-      throw new Error("Unable to fetch current epoch on startup. Exiting");
-    } else {
-      this.logger.info(`Setting currentEpoch=${this.currentEpoch}`);
-    }
-
-    // 5 minutes
-    const trackEpochIntervalMs = 5 * 60 * 1000;
-    setInterval(this.trackEpoch, trackEpochIntervalMs);
 
     await this.server.start();
   };
