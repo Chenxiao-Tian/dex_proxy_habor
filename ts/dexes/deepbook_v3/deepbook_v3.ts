@@ -234,7 +234,7 @@ export class DeepBookV3 implements DexInterface {
     }
     this.environment = config.dex.env;
 
-    if (this.environment === 'mainnet') {
+    if (this.environment === "mainnet") {
       this.deepbookPackageId = DeepBookV3.MAINNET_DEEPBOOKV3_PACKAGE_ID;
     } else {
       this.deepbookPackageId = DeepBookV3.TESTNET_DEEPBOOKV3_PACKAGE_ID;
@@ -351,7 +351,14 @@ export class DeepBookV3 implements DexInterface {
           );
           this.withdrawalAddresses.set(coinType, withdrawalAddresses);
 
-          this.coinTypeId.set(this.getCoinName(coinType), coinType);
+          let nativeName: string = entry.native_name;
+          if (this.coinTypeId.has(nativeName)) {
+            throw new Error(
+              `Duplicate native_name entry in the resources file ${coinType}`
+            );
+          }
+
+          this.coinTypeId.set(nativeName, coinType);
         }
       }
     } catch (error) {
@@ -2877,15 +2884,6 @@ export class DeepBookV3 implements DexInterface {
     }
 
     return parts[0];
-  }
-
-  getCoinName(coinTypeId: string): string {
-    const parts = coinTypeId.split("::");
-    if (parts.length != 3) {
-      throw new Error('coinTypeId should be in the format "0x123::coin::COIN"');
-    }
-
-    return parts[2];
   }
 
   getCoinTypeId(coinName: string): string {
