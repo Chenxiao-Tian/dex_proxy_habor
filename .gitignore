@@ -6,6 +6,7 @@
 # Node artifact files
 node_modules/
 dist/
+*package-lock.json
 
 # Compiled Java class files
 *.class
@@ -25,6 +26,9 @@ dist/
 
 # JetBrains IDE
 .idea/
+
+# Visual Studio Code IDE
+.vscode/
 
 # Unit test reports
 TEST*.xml
