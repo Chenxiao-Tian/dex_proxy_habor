@@ -44,10 +44,6 @@ export class Executor {
         BigInt(response.effects!.gasUsed.storageCost) -
         BigInt(response.effects!.gasUsed.storageRebate);
 
-      this.#logger.info(
-        `[${requestId}] gasCoin=${gasCoin.repr()} attempting to update version using tx response. NewVer=${versionFromTx}`
-      );
-
       if (BigInt(gasCoin.version) < versionFromTx) {
         const oldVersion = gasCoin.version;
         gasCoin.version = versionFromTx.toString();
@@ -113,7 +109,8 @@ export class Executor {
               gasCoin
             );
             if (!gasCoinVersionUpdated) {
-              gasCoinVersionUpdated = await this.#gasManager.tryUpdateGasCoinVersion(gasCoin);
+              gasCoinVersionUpdated =
+                await this.#gasManager.tryUpdateGasCoinVersion(gasCoin);
             }
           } else {
             gasCoinVersionUpdated =
