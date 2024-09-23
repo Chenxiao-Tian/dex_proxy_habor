@@ -291,7 +291,7 @@ export class GasManager {
         !gasCoinVersionUpdated &&
         !(await this.tryUpdateGasCoinVersion(this.#mainGasCoin))
       ) {
-        this.#mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate;
+        this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
         throw new Error(
           `Unable to update the mainGasCoin=${this.#mainGasCoin.repr()} after merging other coins into it`
         );
@@ -326,7 +326,7 @@ export class GasManager {
         !gasCoinVersionUpdated &&
         !(await this.tryUpdateGasCoinVersion(this.#mainGasCoin))
       ) {
-        this.#mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate;
+        this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
         throw new Error(
           `Unable to update the mainGasCoin=${this.#mainGasCoin.repr()} after creating child instances from it`
         );
@@ -743,8 +743,8 @@ export class GasManager {
 
       if (parsedResponse.txSuceeded) {
         this.#logger.info(
-          `Split ${instanceToSplit.repr()} into ${
-            parsedResponse.coinsCreated.length
+          `Splitted ${instanceToSplit.repr()} into ${
+            parsedResponse.coinsCreated.length + 1
           } coin(s), txDigest=${parsedResponse.digest}`
         );
       } else {
@@ -872,6 +872,7 @@ export class GasManager {
   mergeUntrackedGasCoinsInto = async (gasCoin: GasCoin) => {
     let untrackedCoinsToMerge = new Array<string>();
     let parsedResponse = new MergeCoinsResult();
+    let foundUntrackedCoinsToMerge = false;
 
     try {
       untrackedCoinsToMerge = await this.#untrackedCoinsToMerge();
@@ -886,15 +887,16 @@ export class GasManager {
         return;
       }
 
+      foundUntrackedCoinsToMerge = true;
       parsedResponse = await this.#mergeCoins(gasCoin, untrackedCoinsToMerge);
     } catch (error) {
       this.#logger.error(
         `mergeUntrackedGasCoinsInto: Failed to merge untracked coins into gasCoin=${gasCoin.repr()}. Error=${error}`
       );
     } finally {
-      if (!parsedResponse.gasCoinVersionUpdated) {
+      if (foundUntrackedCoinsToMerge && !parsedResponse.gasCoinVersionUpdated) {
         if (!(await this.tryUpdateGasCoinVersion(gasCoin))) {
-          gasCoin.status == GasCoinStatus.NeedsVersionUpdate;
+          gasCoin.status = GasCoinStatus.NeedsVersionUpdate;
         }
       }
     }

@@ -41,7 +41,11 @@ import {
   PaginatedEvents,
 } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { fromHEX, normalizeSuiAddress } from "@mysten/sui/utils";
+import {
+  fromHEX,
+  normalizeSuiAddress,
+  SUI_CLOCK_OBJECT_ID,
+} from "@mysten/sui/utils";
 import { Transaction } from "@mysten/sui/transactions";
 import { readFileSync } from "fs";
 import { dirname } from "path";
@@ -61,35 +65,25 @@ interface ParsedExchangeError {
 class MandatoryFields {
   static InsertRequest = [
     "pool",
+    "pool_id",
     "expiration_ts",
-    "price_scale",
-    "quantity_scale",
     "client_order_id",
     "order_type",
     "side",
     "quantity",
     "price",
   ];
-  static BulkInsertRequest = [
-    "pool",
-    "expiration_ts",
-    "price_scale",
-    "quantity_scale",
-    "orders",
-  ];
+  static BulkInsertRequest = ["pool", "pool_id", "expiration_ts", "orders"];
   static CancelRequest = ["pool", "client_order_id"];
   static BulkCancelRequest = ["pool", "client_order_ids"];
   static CancelAllRequest = ["pool"];
   static TransactionBlockRequest = ["digest"];
   static OrderStatusRequest = ["pool", "client_order_id"];
-  static AllOpenOrdersRequest = ["pool", "pool_address"];
-  static PoolDepositRequest = ["pool_id", "coin_type_id", "quantity"];
-  static PoolWithdrawalRequest = ["pool_id", "coin_type_id", "quantity"];
+  static AllOpenOrdersRequest = ["pool", "pool_id"];
   static SuiWithdrawalRequest = ["recipient", "quantity"];
   static WithdrawalRequest = ["coin_type_id", "recipient", "quantity"];
   static ObjectInfoRequest = ["id"];
   static PoolInfoRequest = ["pool"];
-  static UserPositionRequest = ["id"];
   static BalanceManagerFundsRequest = ["coin"];
   static DepositIntoBalanceManagerRequest = ["coin", "quantity"];
   static WithdrawFromBalanceManagerRequest = ["coin", "quantity"];
@@ -125,6 +119,7 @@ export class DeepBookV3 implements DexInterface {
   private currentEpoch: string | undefined;
 
   private environment: NetworkType;
+  private deepbookPackageId: string;
 
   private static exchangeErrors = new Map<string, Map<string, string>>([
     [
@@ -154,8 +149,9 @@ export class DeepBookV3 implements DexInterface {
   ]);
 
   public channels: Array<string> = ["ORDER", "TRADE"];
-  private deepbookPackageId: string =
+  private static TESTNET_DEEPBOOKV3_PACKAGE_ID: string =
     "0x48cc688a15bdda6017c730a3c65b30414e642d041f2931ef14e08f6b0b2a1b7f";
+  private static MAINNET_DEEPBOOKV3_PACKAGE_ID: string = "";
 
   constructor(
     lf: LoggerFactory,
@@ -237,6 +233,12 @@ export class DeepBookV3 implements DexInterface {
       throw new Error("The key, `dex.env` must be present in the config");
     }
     this.environment = config.dex.env;
+
+    if (this.environment === 'mainnet') {
+      this.deepbookPackageId = DeepBookV3.MAINNET_DEEPBOOKV3_PACKAGE_ID;
+    } else {
+      this.deepbookPackageId = DeepBookV3.TESTNET_DEEPBOOKV3_PACKAGE_ID;
+    }
 
     this.balanceManagerId = config.dex.balance_manager_id;
     if (this.balanceManagerId === undefined) {
@@ -908,7 +910,7 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<RestResult> => {
     assertFields(params, MandatoryFields.OrderStatusRequest);
 
-    const pool = params.get("pool") as PoolId;
+    const pool: string = params.get("pool");
     const clientOrderId = params.get("client_order_id") as ClientOrderId;
 
     this.logger.debug(
@@ -946,6 +948,9 @@ export class DeepBookV3 implements DexInterface {
         order.status = "Open";
       }
 
+      // Note: Order qty is getting changed to what qty was inserted in the order book
+      // Similarly execQty and remQty are the state after the order was inserted in the book
+      order.qty = BigInt(exchangeOrderStatus.quantity) as Quantity;
       order.execQty = BigInt(exchangeOrderStatus.filled_quantity) as Quantity;
       order.remQty = (order.qty - order.execQty) as Quantity;
     } else {
@@ -983,7 +988,7 @@ export class DeepBookV3 implements DexInterface {
   };
 
   processOpenOrdersResponse = async (
-    pool: PoolId,
+    poolId: PoolId,
     openOrders: Array<any>
   ): Promise<Array<OrderStatus>> => {
     let result = new Array<OrderStatus>();
@@ -992,24 +997,34 @@ export class DeepBookV3 implements DexInterface {
       cachedOrder = this.orderCache.get(openOrder.client_order_id);
 
       const exchangeOrderId = openOrder.order_id as ExchangeOrderId;
+
+      const qty = BigInt(openOrder.quantity) as Quantity;
       const execQty = BigInt(openOrder.filled_quantity) as Quantity;
+      const remQty = (qty - execQty) as Quantity;
 
       if (cachedOrder !== undefined) {
         if (cachedOrder.exchangeOrderId === null) {
           cachedOrder.exchangeOrderId = exchangeOrderId;
         }
-        cachedOrder.execQty = execQty;
-        cachedOrder.remQty = (cachedOrder.qty -
-          cachedOrder.execQty) as Quantity;
-      } else {
-        const qty = BigInt(openOrder.quantity) as Quantity;
-        const remQty = (qty - execQty) as Quantity;
 
+        // Note: Order qty is getting changed to what qty was inserted in the order book
+        // Similarly execQty and remQty are the state after the order was inserted in the book
+        cachedOrder.qty = qty;
+        cachedOrder.execQty = execQty;
+        cachedOrder.remQty = remQty;
+
+        if (
+          cachedOrder.status === "Unknown" ||
+          cachedOrder.status === "PendingInsert"
+        ) {
+          cachedOrder.status = "Open";
+        }
+      } else {
         cachedOrder = {
           clientOrderId: openOrder.client_order_id as ClientOrderId,
           exchangeOrderId: exchangeOrderId,
           status: "Open",
-          poolId: pool,
+          poolId: poolId,
           qty: qty,
           remQty: remQty,
           execQty: execQty,
@@ -1042,8 +1057,8 @@ export class DeepBookV3 implements DexInterface {
 
   getOpenOrdersImpl = async (
     requestId: bigint,
-    pool: PoolId,
-    poolAddress: string
+    pool: string,
+    poolId: PoolId
   ): Promise<Array<any>> => {
     const tokens: Array<string> = pool.split("_");
 
@@ -1054,7 +1069,7 @@ export class DeepBookV3 implements DexInterface {
     const tx = new Transaction();
     tx.moveCall({
       target: `${this.deepbookPackageId}::pool::get_account_order_details`,
-      arguments: [tx.object(poolAddress), tx.object(this.balanceManagerId)],
+      arguments: [tx.object(poolId), tx.object(this.balanceManagerId)],
       typeArguments: [
         this.getCoinTypeId(tokens[0]),
         this.getCoinTypeId(tokens[1]),
@@ -1105,18 +1120,18 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<RestResult> => {
     assertFields(params, MandatoryFields.AllOpenOrdersRequest);
 
-    const pool: PoolId = params.get("pool");
-    const poolAddress: string = params.get("pool_address");
+    const pool: string = params.get("pool");
+    const poolId: PoolId = params.get("pool_id");
 
     this.logger.debug(
-      `[${requestId}] Fetching all open orders. pool=${pool}, poolAddress=${poolAddress}`
+      `[${requestId}] Fetching all open orders. pool=${pool}, poolId=${poolId}`
     );
 
     let openOrders = null;
     try {
       openOrders = await this.processOpenOrdersResponse(
-        pool as PoolId,
-        await this.getOpenOrdersImpl(requestId, pool, poolAddress)
+        poolId,
+        await this.getOpenOrdersImpl(requestId, pool, poolId)
       );
     } catch (error) {
       this.logger.error(`[${requestId}] ${error}`);
@@ -1155,13 +1170,13 @@ export class DeepBookV3 implements DexInterface {
   };
 
   parseInsertRequest = (request: any): Order => {
-    const qty = BigInt(Number(request.quantity));
-    const price = BigInt(Number(request.price));
+    const qty = BigInt(request.quantity);
+    const price = BigInt(request.price);
 
     return {
       clientOrderId: request.client_order_id as ClientOrderId,
       status: "PendingInsert",
-      poolId: request.pool as PoolId,
+      poolId: request.pool_id as PoolId,
       qty: qty as Quantity,
       remQty: qty as Quantity,
       execQty: 0n as Quantity,
@@ -1262,6 +1277,7 @@ export class DeepBookV3 implements DexInterface {
         if (event.type.endsWith("OrderInfo")) {
           let orderPlacedEvent = this.processOrderPlacedEvent(event);
 
+          // TODO: maybe we don't need this
           order.execQty = BigInt(orderPlacedEvent.exec_qty) as Quantity;
           order.remQty = BigInt(orderPlacedEvent.rem_qty) as Quantity;
           order.exchangeOrderId = orderPlacedEvent.exchange_order_id;
@@ -1280,7 +1296,7 @@ export class DeepBookV3 implements DexInterface {
   static parseOrderType = (type: string | null): number => {
     if (type == "GTC") return 0;
     else if (type === "IOC") return 1;
-    else if (type == "POST_ONLY") return 3;
+    else if (type == "GPO") return 3;
     else throw new ParsedOrderError("UNKNOWN", `Unknown order type: ${type}`);
   };
 
@@ -1292,8 +1308,7 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<RestResult> => {
     assertFields(params, MandatoryFields.InsertRequest);
 
-    const priceScale: number = params.price_scale;
-    const quantityScale: number = params.quantity_scale;
+    const pool: string = params.pool;
 
     let order = this.parseInsertRequest(params);
     this.orderCache.add(order.clientOrderId, order);
@@ -1302,8 +1317,15 @@ export class DeepBookV3 implements DexInterface {
     const orderType = DeepBookV3.parseOrderType(order.type);
     const selfMatchingPrevention: number = 2; // CANCEL_MAKER
 
+    const tokens: Array<string> = pool.split("_");
+    if (tokens.length != 2) {
+      throw new Error("Invalid pool name");
+    }
+    const baseCoinTypeId: string = this.getCoinTypeId(tokens[0]);
+    const quoteCoinTypeId: string = this.getCoinTypeId(tokens[1]);
+
     this.logger.debug(
-      `[${requestId}] Calling placeLimitOrder with args: poolId=${order.poolId}, clientOrderId=${order.clientOrderId}, price=${order.price}, quantity=${order.qty}, isBid=${isBid}, orderType=${orderType}, expirationTimestamp=${order.expirationTs}, selfMatchingPrevention=${selfMatchingPrevention}`
+      `[${requestId}] Inserting order: params=${JSON.stringify(params)}`
     );
 
     let response = null;
@@ -1314,20 +1336,30 @@ export class DeepBookV3 implements DexInterface {
         );
 
         const tx = new Transaction();
-        tx.add(
-          this.mainDeepbookClient.deepBook.placeLimitOrder({
-            poolKey: order.poolId,
-            balanceManagerKey: "MANAGER",
-            clientOrderId: order.clientOrderId,
-            price: Number(order.price) / priceScale,
-            quantity: Number(order.qty) / quantityScale,
-            isBid: isBid,
-            expiration: order.expirationTs,
-            orderType: orderType,
-            selfMatchingOption: selfMatchingPrevention,
-            payWithDeep: true,
-          })
-        );
+
+        let tradeProof = tx.moveCall({
+          target: `${this.deepbookPackageId}::balance_manager::generate_proof_as_owner`,
+          arguments: [tx.object(this.balanceManagerId)],
+        });
+
+        tx.moveCall({
+          target: `${this.deepbookPackageId}::pool::place_limit_order`,
+          arguments: [
+            tx.object(order.poolId),
+            tx.object(this.balanceManagerId),
+            tradeProof,
+            tx.pure.u64(order.clientOrderId),
+            tx.pure.u8(orderType),
+            tx.pure.u8(selfMatchingPrevention),
+            tx.pure.u64(order.price),
+            tx.pure.u64(order.qty),
+            tx.pure.bool(isBid),
+            tx.pure.bool(true),
+            tx.pure.u64(order.expirationTs),
+            tx.object(SUI_CLOCK_OBJECT_ID),
+          ],
+          typeArguments: [baseCoinTypeId, quoteCoinTypeId],
+        });
 
         return tx;
       };
@@ -1369,13 +1401,23 @@ export class DeepBookV3 implements DexInterface {
 
     this.checkTransactionFailure(requestId, response);
 
-    this.logger.info(`[${requestId}] Order inserted`);
+    const status = response.effects!.status.status;
+    if (status === "success") {
+      this.logger.info(
+        `[${requestId}] Order inserted for pool=${pool}. Digest=${response.digest}`
+      );
+    } else {
+      this.logger.error(
+        `[${requestId}] Failed to insert order for pool=${pool}. Digest=${response.digest}`
+      );
+    }
+
     let events = await this.processInsertResponse(response, order);
 
     return {
-      statusCode: response.effects!.status.status === "success" ? 200 : 400,
+      statusCode: status === "success" ? 200 : 400,
       payload: {
-        status: response.effects!.status.status,
+        status: status,
         tx_digest: response.digest,
         events: events,
       },
@@ -1406,6 +1448,7 @@ export class DeepBookV3 implements DexInterface {
         if (event.type.endsWith("OrderInfo")) {
           let orderPlacedEvent = this.processOrderPlacedEvent(event);
 
+          // TODO: maybe we don't need this
           let order = this.orderCache.get(orderPlacedEvent.client_order_id);
           if (order) {
             order.execQty = BigInt(orderPlacedEvent.exec_qty) as Quantity;
@@ -1427,13 +1470,13 @@ export class DeepBookV3 implements DexInterface {
   parseBulkInsertRequest = (request: any): Array<Order> => {
     let result = new Array<Order>();
     for (let order of request.orders) {
-      const qty = BigInt(Number(order.quantity));
-      const price = BigInt(Number(order.price));
+      const qty = BigInt(order.quantity);
+      const price = BigInt(order.price);
 
       result.push({
         clientOrderId: order.client_order_id as ClientOrderId,
         status: "PendingInsert",
-        poolId: request.pool as PoolId,
+        poolId: request.pool_id as PoolId,
         qty: qty as Quantity,
         remQty: qty as Quantity,
         execQty: 0n as Quantity,
@@ -1460,8 +1503,6 @@ export class DeepBookV3 implements DexInterface {
 
     // Will be same for all orders as all are on same pool
     const pool: string = params.pool;
-    const priceScale: number = params.price_scale;
-    const quantityScale: number = params.quantity_scale;
 
     let orders = this.parseBulkInsertRequest(params);
     let clientOrderIds = new Array<ClientOrderId>();
@@ -1470,8 +1511,14 @@ export class DeepBookV3 implements DexInterface {
       clientOrderIds.push(order.clientOrderId);
     }
 
-    let response = null;
+    const tokens: Array<string> = pool.split("_");
+    if (tokens.length != 2) {
+      throw new Error("Invalid pool name");
+    }
+    const baseCoinTypeId: string = this.getCoinTypeId(tokens[0]);
+    const quoteCoinTypeId: string = this.getCoinTypeId(tokens[1]);
 
+    let response = null;
     try {
       let txBlockGenerator = () => {
         this.logger.debug(
@@ -1482,20 +1529,29 @@ export class DeepBookV3 implements DexInterface {
         let tx = new Transaction();
 
         for (let order of orders) {
-          tx.add(
-            this.mainDeepbookClient.deepBook.placeLimitOrder({
-              poolKey: order.poolId,
-              balanceManagerKey: "MANAGER",
-              clientOrderId: order.clientOrderId,
-              price: Number(order.price) / priceScale,
-              quantity: Number(order.qty) / quantityScale,
-              isBid: order.side === "BUY",
-              expiration: order.expirationTs,
-              orderType: DeepBookV3.parseOrderType(order.type),
-              selfMatchingOption: selfMatchingPrevention,
-              payWithDeep: true,
-            })
-          );
+          let tradeProof = tx.moveCall({
+            target: `${this.deepbookPackageId}::balance_manager::generate_proof_as_owner`,
+            arguments: [tx.object(this.balanceManagerId)],
+          });
+
+          tx.moveCall({
+            target: `${this.deepbookPackageId}::pool::place_limit_order`,
+            arguments: [
+              tx.object(order.poolId),
+              tx.object(this.balanceManagerId),
+              tradeProof,
+              tx.pure.u64(order.clientOrderId),
+              tx.pure.u8(DeepBookV3.parseOrderType(order.type)),
+              tx.pure.u8(selfMatchingPrevention),
+              tx.pure.u64(order.price),
+              tx.pure.u64(order.qty),
+              tx.pure.bool(order.side === "BUY"),
+              tx.pure.bool(true),
+              tx.pure.u64(order.expirationTs),
+              tx.object(SUI_CLOCK_OBJECT_ID),
+            ],
+            typeArguments: [baseCoinTypeId, quoteCoinTypeId],
+          });
         }
 
         return tx;
@@ -1534,8 +1590,6 @@ export class DeepBookV3 implements DexInterface {
 
     this.checkTransactionFailure(requestId, response);
 
-    let events = await this.processBulkInsertResponse(response, clientOrderIds);
-
     const status = response.effects!.status.status;
     if (status === "success") {
       this.logger.info(
@@ -1546,6 +1600,8 @@ export class DeepBookV3 implements DexInterface {
         `[${requestId}] Failed to bulk insert orders for pool=${pool}. Digest=${response.digest}`
       );
     }
+
+    let events = await this.processBulkInsertResponse(response, clientOrderIds);
 
     return {
       statusCode: status === "success" ? 200 : 400,
@@ -1560,6 +1616,7 @@ export class DeepBookV3 implements DexInterface {
   processOrderCancelledEvent = (event: SuiEvent | any): OrderCancelledEvent => {
     let json = event.parsedJson ? (event.parsedJson as any) : event;
 
+    // qty, qtyCancelled, execQty are the state after the order was inserted in the order book
     const qty = json.original_quantity;
     const qtyCancelled = json.base_asset_quantity_canceled;
     const execQty = BigInt(qty) - BigInt(qtyCancelled);
@@ -1612,7 +1669,7 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<RestResult> => {
     assertFields(params, MandatoryFields.CancelRequest);
 
-    const pool = params.get("pool") as PoolId;
+    const pool: string = params.get("pool");
     const clientOrderId = params.get("client_order_id") as ClientOrderId;
 
     let order = this.orderCache.get(clientOrderId);
@@ -1751,7 +1808,7 @@ export class DeepBookV3 implements DexInterface {
   cancelAll = async (requestId: bigint, params: any): Promise<RestResult> => {
     assertFields(params, MandatoryFields.CancelAllRequest);
 
-    const pool = params.get("pool") as PoolId;
+    const pool: string = params.get("pool");
 
     let response = null;
     try {
@@ -1803,8 +1860,6 @@ export class DeepBookV3 implements DexInterface {
 
     this.checkTransactionFailure(requestId, response);
 
-    let events = await this.processBulkCancelResponse(response);
-
     const status = response.effects!.status.status;
     if (status === "success") {
       this.logger.info(
@@ -1815,6 +1870,8 @@ export class DeepBookV3 implements DexInterface {
         `[${requestId}] Failed to cancel all orders for pool=${pool}. Digest=${response.digest}`
       );
     }
+
+    let events = await this.processBulkCancelResponse(response);
 
     return {
       statusCode: status === "success" ? 200 : 400,
@@ -1829,7 +1886,7 @@ export class DeepBookV3 implements DexInterface {
   bulkCancel = async (requestId: bigint, params: any): Promise<RestResult> => {
     assertFields(params, MandatoryFields.BulkCancelRequest);
 
-    const pool = params.get("pool") as PoolId;
+    const pool: string = params.get("pool");
     const clientOrderIds: Array<string> = params
       .get("client_order_ids")
       .split(",");
@@ -1913,8 +1970,6 @@ export class DeepBookV3 implements DexInterface {
 
     this.checkTransactionFailure(requestId, response);
 
-    let events = await this.processBulkCancelResponse(response);
-
     const status = response.effects!.status.status;
     if (status === "success") {
       this.logger.info(
@@ -1925,6 +1980,8 @@ export class DeepBookV3 implements DexInterface {
         `[${requestId}] Failed to bulk cancel orders for pool=${pool}. Digest=${response.digest}`
       );
     }
+
+    let events = await this.processBulkCancelResponse(response);
 
     return {
       statusCode: status === "success" ? 200 : 400,
@@ -2059,7 +2116,6 @@ export class DeepBookV3 implements DexInterface {
             }
       */
 
-      // TODO: maybe make this address configurable
       MoveEventType: `${this.deepbookPackageId}::order_info::OrderFilled`,
     };
 
@@ -2449,7 +2505,7 @@ export class DeepBookV3 implements DexInterface {
     assertFields(params, MandatoryFields.PoolInfoRequest);
 
     // example pool = SUI_DBUSDC
-    const pool = params.get("pool");
+    const pool: string = params.get("pool");
     this.logger.debug(`[${requestId}] Querying pool with pool=${pool}`);
 
     let res = null;
@@ -2698,7 +2754,7 @@ export class DeepBookV3 implements DexInterface {
           gasCoinVersionUpdated =
             await this.gasManager!.tryUpdateGasCoinVersion(mainGasCoin);
         }
-        if (await this.gasManager!.tryUpdateGasCoinVersion(mainGasCoin)) {
+        if (gasCoinVersionUpdated) {
           mainGasCoin.status = GasCoinStatus.Free;
         } else {
           mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;

@@ -20,9 +20,54 @@ const deepBookClient = new DeepBookClient({
   env: "testnet",
 });
 
-const priceLow = 0.01;
+const priceLow = 0.001;
 const priceHigh = 100;
-const isBid = true;
+let isBid = true;
+
+console.log(
+  "SUI_DBUSDC ",
+  "isBid=",
+  isBid,
+  "\n",
+  await deepBookClient.getLevel2Range("SUI_DBUSDC", priceLow, priceHigh, isBid),
+  "\n"
+);
+console.log(
+  "DEEP_SUI ",
+  "isBid=",
+  isBid,
+  "\n",
+  await deepBookClient.getLevel2Range("DEEP_SUI", priceLow, priceHigh, isBid),
+  "\n"
+);
+console.log(
+  "DEEP_DBUSDC ",
+  "isBid=",
+  isBid,
+  "\n",
+  await deepBookClient.getLevel2Range(
+    "DEEP_DBUSDC",
+    priceLow,
+    priceHigh,
+    isBid
+  ),
+  "\n"
+);
+console.log(
+  "DBUSDT_DBUSDC ",
+  "isBid=",
+  isBid,
+  "\n",
+  await deepBookClient.getLevel2Range(
+    "DBUSDT_DBUSDC",
+    priceLow,
+    priceHigh,
+    isBid
+  ),
+  "\n"
+);
+
+isBid = false;
 
 console.log(
   "SUI_DBUSDC ",

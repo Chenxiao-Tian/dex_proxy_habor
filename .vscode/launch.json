@@ -1,0 +1,17 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "uni_v3_blx",
+            "justMyCode": false,
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/srijan/Test/dex-proxy/dex_proxy.py",
+            "console": "integratedTerminal",
+            "args": "-c /home/srijan/Test/dex-proxy/dexes/uniswap_v3/uniswap_v3-dex_proxy-config.json -n uni_v3_blx -s"
+        }
+    ]
+}
