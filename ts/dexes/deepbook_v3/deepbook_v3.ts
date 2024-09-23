@@ -291,7 +291,8 @@ export class DeepBookV3 implements DexInterface {
         config.dex.gas_manager.gas_coin_expected_count,
         maxBalancePerInstanceMist,
         minBalancePerInstanceMist,
-        syncIntervalMs
+        syncIntervalMs,
+        this.log_responses
       );
 
       const gasBudgetMist = BigInt(
@@ -327,7 +328,7 @@ export class DeepBookV3 implements DexInterface {
 
   fetchWithdrawalAddresses = (): void => {
     const filePrefix = dirname(process.argv[1]);
-    const filename = `${filePrefix}/../../resources/deep_v3_withdrawal_addresses.json`;
+    const filename = `${filePrefix}/../../resources/dbv3_withdrawal_addresses.json`;
     try {
       let contents = JSON.parse(readFileSync(filename, "utf8"));
       this.logger.info(
@@ -459,10 +460,6 @@ export class DeepBookV3 implements DexInterface {
     POST("/deposit-into-balance-manager", this.depositIntoBalanceManager);
 
     POST("/create-balance-manager", this.createBalanceManager);
-
-    // TODO: maybe we need this in v3 too
-    // POST("/withdraw-from-pool", this.withdrawFromPool);
-    // POST("/deposit-into-pool", this.depositIntoPool);
   };
 
   start = async () => {
@@ -2301,14 +2298,12 @@ export class DeepBookV3 implements DexInterface {
             mainGasCoin
           );
           if (!gasCoinVersionUpdated) {
-            gasCoinVersionUpdated = await mainGasCoin.updateInstance(
-              this.suiClient
-            );
+            gasCoinVersionUpdated =
+              await this.gasManager!.tryUpdateGasCoinVersion(mainGasCoin);
           }
         } else {
-          gasCoinVersionUpdated = await mainGasCoin.updateInstance(
-            this.suiClient
-          );
+          gasCoinVersionUpdated =
+            await this.gasManager!.tryUpdateGasCoinVersion(mainGasCoin);
         }
         if (gasCoinVersionUpdated) {
           mainGasCoin.status = GasCoinStatus.Free;
@@ -2696,16 +2691,14 @@ export class DeepBookV3 implements DexInterface {
             mainGasCoin
           );
           if (!gasCoinVersionUpdated) {
-            gasCoinVersionUpdated = await mainGasCoin.updateInstance(
-              this.suiClient
-            );
+            gasCoinVersionUpdated =
+              await this.gasManager!.tryUpdateGasCoinVersion(mainGasCoin);
           }
         } else {
-          gasCoinVersionUpdated = await mainGasCoin.updateInstance(
-            this.suiClient
-          );
+          gasCoinVersionUpdated =
+            await this.gasManager!.tryUpdateGasCoinVersion(mainGasCoin);
         }
-        if (await mainGasCoin.updateInstance(this.suiClient)) {
+        if (await this.gasManager!.tryUpdateGasCoinVersion(mainGasCoin)) {
           mainGasCoin.status = GasCoinStatus.Free;
         } else {
           mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
@@ -2874,216 +2867,4 @@ export class DeepBookV3 implements DexInterface {
 
     return is_bid == true ? "BUY" : "SELL";
   }
-
-  // TODO: maybe we need depositIntoPool in v3 too
-  // depositIntoPool = async (
-  //   requestId: bigint,
-  //   path: string,
-  //   params: any,
-  //   receivedAtMs: number
-  // ): Promise<RestResult> => {
-  //   assertFields(params, MandatoryFields.PoolDepositRequest);
-
-  //   const poolId = params["pool_id"] as PoolId;
-  //   const coinTypeId: string = params["coin_type_id"];
-  //   const coinTypeAddress: string = this.getCoinTypeAddress(coinTypeId);
-  //   const quantity: number = Number(params["quantity"]);
-
-  //   this.logger.debug(
-  //     `[${requestId}] Handling depositIntoPool request. params=${JSON.stringify(
-  //       params
-  //     )}`
-  //   );
-
-  //   let response = null;
-  //   let mainGasCoin = null;
-  //   let status: string | undefined = undefined;
-  //   try {
-  //     let firstCoin: string | undefined = undefined;
-  //     if (!coinTypeId.endsWith("SUI")) {
-  //       const coinInstances: Array<string> = await this.getCoinInstances(
-  //         coinTypeId
-  //       );
-
-  //       firstCoin = coinInstances[0];
-
-  //       if (coinInstances.length > 1) {
-  //         this.logger.info(
-  //           `Merging coin instances ${coinInstances} into ${firstCoin}...`
-  //         );
-
-  //         try {
-  //           let txBlockGenerator = () => {
-  //             const block = new SuiTxBlock();
-  //             const mergeTransaction: Transaction =
-  //               block.mergeCoinsIntoFirstCoin(coinInstances);
-  //             return mergeTransaction;
-  //           };
-
-  //           let txBlockResponseOptions = {};
-
-  //           const mergeResponse = await this.executor!.execute(
-  //             requestId,
-  //             txBlockGenerator,
-  //             txBlockResponseOptions
-  //           );
-
-  //           this.logger.info(
-  //             `Merged coin instances ${coinInstances} into ${firstCoin}. Digest=${mergeResponse["digest"]}`
-  //           );
-  //         } catch (error) {
-  //           this.logger.error(`[${requestId}] ${error}`);
-  //           throw error;
-  //         }
-  //       }
-  //     } else {
-  //       mainGasCoin = await this.gasManager!.getMainGasCoin();
-  //       if (mainGasCoin === null) {
-  //         throw new Error(
-  //           "The mainGasCoin is being used in a concurrent transaction. Please retry"
-  //         );
-  //       }
-
-  //       await this.gasManager!.mergeUntrackedGasCoinsInto(mainGasCoin);
-
-  //       firstCoin = mainGasCoin.objectId;
-  //     }
-
-  //     const decimals = await this.getCoinDecimals(coinTypeId);
-
-  //     const nativeAmount = BigInt(quantity * 10 ** decimals);
-
-  //     this.logger.info(
-  //       `Depositing coin ${firstCoin} into pool ${poolId}. Amount: ${nativeAmount} (${quantity})`
-  //     );
-
-  //     let txBlockGenerator = async (accountCap: AccountCap) => {
-  //       this.logger.info(`[${requestId}] accCapId=${accountCap.id}`);
-
-  //       return await await accountCap.client.deposit(
-  //         poolId,
-  //         firstCoin,
-  //         nativeAmount
-  //       );
-  //     };
-
-  //     let txBlockResponseOptions = {
-  //       showEffects: true,
-  //       showEvents: true,
-  //       showBalanceChanges: true,
-  //       showObjectChanges: true,
-  //     };
-
-  //     response = await this.executor!.execute(
-  //       requestId,
-  //       txBlockGenerator,
-  //       txBlockResponseOptions
-  //     );
-  //   } catch (error) {
-  //     this.logger.error(`[${requestId}] ${error}`);
-  //     throw error;
-  //   } finally {
-  //      if (mainGasCoin) {
-  //        if (await mainGasCoin.updateInstance(this.suiClient)) {
-  //          mainGasCoin.status = GasCoinStatus.Free;
-  //        } else {
-  //          mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
-  //        }
-  //      }
-  //   }
-
-  //   const digest = response["digest"];
-
-  //   status = response?.effects?.status.status;
-
-  //   if (status === "success") {
-  //     this.logger.info(
-  //       `[${requestId}] Successfully deposited ${quantity} ${coinTypeId} into ${poolId}. Digest=${digest}`
-  //     );
-  //   } else {
-  //     this.logger.error(
-  //       `[${requestId}] Failed to deposit ${quantity} ${coinTypeId} into ${poolId}. Digest=${digest}`
-  //     );
-  //   }
-
-  //   return {
-  //     statusCode: status === "success" ? 200 : 400,
-  //     payload: response,
-  //   };
-  // };
-
-  // TODO: maybe we need withdrawFromPool in v3 too
-  // withdrawFromPool = async (requestId: bigint,
-  //                           path: string,
-  //                           params: any,
-  //                           receivedAtMs: number): Promise<RestResult> => {
-  //     assertFields(params, MandatoryFields.PoolWithdrawalRequest);
-
-  //     const poolId = params["pool_id"] as PoolId;
-  //     const quantity: number = Number(params["quantity"]);
-  //     const coinTypeId: string = params["coin_type_id"];
-  //     const coinTypeAddress: string = this.getCoinTypeAddress(coinTypeId);
-  //     const decimals = await this.getCoinDecimals(coinTypeId);
-
-  //     this.logger.debug(`[${requestId}] Handling withdrawFromPool request. params=${JSON.stringify(params)}`);
-
-  //     let response = null;
-  //     let status: string | undefined = undefined;
-  //     try {
-  //         const pool = await this.getPoolInfoImpl(requestId, poolId);
-
-  //         let assetType: string = '';
-
-  //         if (coinTypeId == pool.base_asset) {
-  //             assetType = 'base'
-  //         }
-  //         else if (coinTypeId == pool.quote_asset) {
-  //             assetType = 'quote'
-  //         }
-  //         else {
-  //             throw new Error('Coin type is not part of pool ' + coinTypeId);
-  //         }
-
-  //         const nativeAmount = BigInt(quantity * 10 ** decimals);
-
-  //         this.logger.info(`Withdrawing coin ${coinTypeId} from pool ${poolId}. Amount: ${nativeAmount} (${quantity})`);
-
-  //         let txBlockGenerator = async (accountCap: AccountCap) => {
-  //             this.logger.info(`[${requestId}] accCapId=${accountCap.id}`);
-  //             return await accountCap.client.withdraw(
-  //                 poolId,
-  //                 nativeAmount,
-  //                 <"base"|"quote">assetType
-  //             );
-  //         }
-
-  //         let txBlockResponseOptions = {
-  //             showEffects: true,
-  //             showEvents: true,
-  //             showBalanceChanges: true
-  //         };
-
-  //         response = await this.executor!.execute(requestId,
-  //                                                 txBlockGenerator,
-  //                                                 txBlockResponseOptions);
-  //     } catch (error) {
-  //         this.logger.error(`[${requestId}] ${error}`);
-  //         throw error;
-  //     }
-
-  //     const digest = response["digest"];
-
-  //     status = response?.effects?.status.status;
-
-  //     if (status === "success") {
-  //         this.logger.info(`Successfully withdrawn ${quantity} ${coinTypeId} from ${poolId}. Digest=${digest}`);
-  //     } else {
-  //         this.logger.error(`Failed to withdraw ${quantity} ${coinTypeId} from ${poolId}. Digest=${digest}`);
-  //     }
-
-  //     return {
-  //         statusCode: (status === "success") ? 200 : 400,
-  //         payload: response
-  //     }
-  // }
 }

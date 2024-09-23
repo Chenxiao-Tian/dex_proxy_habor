@@ -113,14 +113,11 @@ export class Executor {
               gasCoin
             );
             if (!gasCoinVersionUpdated) {
-              gasCoinVersionUpdated = await gasCoin.updateInstance(
-                this.#suiClient
-              );
+              gasCoinVersionUpdated = await this.#gasManager.tryUpdateGasCoinVersion(gasCoin);
             }
           } else {
-            gasCoinVersionUpdated = await gasCoin.updateInstance(
-              this.#suiClient
-            );
+            gasCoinVersionUpdated =
+              await this.#gasManager.tryUpdateGasCoinVersion(gasCoin);
           }
           if (gasCoinVersionUpdated) {
             gasCoin.status = GasCoinStatus.Free;
