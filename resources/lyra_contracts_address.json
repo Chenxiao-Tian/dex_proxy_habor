@@ -2,7 +2,11 @@
     "Ethereum Mainnet": {
         "bridge_details": {
             "matching_address": "0xeB8d770ec18DB98Db922E9D83260A585b9F0DeAD",
-            "cash_address": "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
+            "cash_addresses": {
+                "USDC": "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
+                "WSTETH": "0xE7603DF191D699d8BD9891b821347dbAb889E5a5",
+                "WETH": "0xbE9DBda519e15a1c0d238cEa0b3daD47a484A6Ff"
+            },
             "deposit_module_address": "0x9B3FE5E5a3bcEa5df4E08c41Ce89C4e3Ff01Ace3",
             "withdraw_module_address": "0x9d0E8f5b25384C7310CB8C6aE32C8fbeb645d083",
             "transfer_module_address": "0x01259207A40925b794C8ac320456F7F6c8FE2636",
@@ -27,6 +31,24 @@
                     "l1_socket_bridge_connector_address": "0x22d8360eB04F46195c7B02A66658C375948d8A99",
                     "l2_socket_bridge_address": "0x4C9faD010D8be90Aba505c85eacc483dFf9b8Fa9",
                     "l2_socket_bridge_connector_address": "0x1281c1464449db73bdaa30928bcc63dc25d8d187"
+                },
+                {
+                    "symbol": "WSTETH",
+                    "l1_token_address": "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0",
+                    "l2_token_address": "0xdf77b286eDa539CCb6326e9eDB86aa69D83108a5",
+                    "l1_socket_bridge_address": "0xeBB5D642aA8ccDeE98373D6aC3ee0602b63824b3",
+                    "l1_socket_bridge_connector_address": "0x727aD65db6aE99DB5Dbee8F202846DD6009bf6D5",
+                    "l2_socket_bridge_address": "0x760c8D80905dCE001E9f0982F3Eb7722C342DecF",
+                    "l2_socket_bridge_connector_address": "0x03490730DFAb89f2468da469C5459156F85a69f8"
+                },
+                {
+                    "symbol": "WETH",
+                    "l1_token_address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+                    "l2_token_address": "0x15CEcd5190A43C7798dD2058308781D0662e678E",
+                    "l1_socket_bridge_address": "0xD4efe33C66B8CdE33B8896a2126E41e5dB571b7e",
+                    "l1_socket_bridge_connector_address": "0xf71A92D4bEFc2e18671c3b20377d45729790e880",
+                    "l2_socket_bridge_address": "0x92728d330d024b19332419D5c5aa59887A2862d6",
+                    "l2_socket_bridge_connector_address": "0x8487daa5864a5cE18E5a89406c11EC748da33fbB"
                 }
             ]
         },
@@ -76,6 +98,18 @@
                     "0x8bE891689037c58c425edc76DBf3B62451304dD1",
                     "0x787Cbf841f03cdd5DcDD9E6DC3F2d1F0b6f999dA",
                     "0xb4c4BbD9974D7F4D6e0814A7f9aA1f018F032818"
+                ]
+            },
+            {
+                "symbol": "WSTETH",
+                "valid_withdrawal_addresses": [
+
+                ]
+            },
+            {
+                "symbol": "WETH",
+                "valid_withdrawal_addresses": [
+                    "0x27BFfB0f09C18539f9a47a39958Bb149Fe42A155"
                 ]
             }
         ],
