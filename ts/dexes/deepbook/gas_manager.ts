@@ -4,7 +4,11 @@ import { Logger } from "winston";
 import { SuiClient } from "@mysten/sui.js/client";
 import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
 import { TransactionBlock } from "@mysten/sui.js/transactions";
-import { SuiTransactionBlockResponse } from "@mysten/sui.js/client";
+import {
+    SuiTransactionBlockResponse,
+    SuiObjectData,
+    PaginatedObjectsResponse
+} from "@mysten/sui.js/client";
 
 const sleep = async (duration_in_ms: number) => {
     return new Promise(resolve => setTimeout(resolve, duration_in_ms));
@@ -153,24 +157,64 @@ export class GasManager {
         return `${summary}]`;
     }
 
+    #getSuiCoins = async (): Promise<Array<SuiObjectData>> => {
+        this.#logger.debug(`Fetching SUI coins owned by wallet`);
+
+        let request = async (cursor: string | null) => {
+            try {
+                return await this.#suiClient.getOwnedObjects({
+                    owner: this.#walletAddress,
+                    filter: { StructType: GasManager.#suiCoinStructType },
+                    options: { showContent: true },
+                    cursor: cursor
+                });
+            } catch(error) {
+            this.#logger.error(`Unable to query the RPC node for SUI coins owned by the wallet. Error=${error}`);
+                throw error;
+            }
+        };
+
+        let result = await (async () => {
+            let result = new Array<SuiObjectData>();
+
+            let cursor: string | null = null;
+
+            const parseResponse = (
+                response: PaginatedObjectsResponse
+            ): string | null => {
+                for (let item of response.data) {
+                    if (item.data) result.push(item.data);
+                }
+                return (response.hasNextPage) ? response.nextCursor! : null;
+            }
+
+            // Handling paginated results
+            do {
+                let response: PaginatedObjectsResponse = await request(cursor);
+                cursor = parseResponse(response);
+            } while (cursor !== null);
+
+            return result;
+        })();
+
+        this.#logger.debug(`Fetched information about ${result.length} SUI coins owned by our wallet`);
+
+        return result;
+    }
+
     #trackInstances = async () => {
         try {
-            let coins = await this.#suiClient.getOwnedObjects({
-                owner: this.#walletAddress,
-                filter: { StructType: GasManager.#suiCoinStructType },
-                options: { showContent: true }
-            });
+            let coins = await this.#getSuiCoins();
 
-            for (let coin of coins.data) {
-                let data = coin.data;
-                if (data && data.content &&
-                    data.content.dataType === "moveObject") {
-                    let fields = data.content.fields as any;
-                    this.#gasCoins.set(data.objectId,
+            for (let coin of coins) {
+                if (coin && coin.content &&
+                    coin.content.dataType === "moveObject") {
+                    let fields = coin.content.fields as any;
+                    this.#gasCoins.set(coin.objectId,
                                        new GasCoin(this.#loggerFactory,
-                                                   data.objectId,
-                                                   data.digest,
-                                                   data.version,
+                                                   coin.objectId,
+                                                   coin.digest,
+                                                   coin.version,
                                                    fields.balance));
                 }
             }
@@ -279,21 +323,16 @@ export class GasManager {
         let untrackedCoinsToMerge = new Array<string>();
 
         try {
-            let coins = await this.#suiClient.getOwnedObjects({
-                owner: this.#walletAddress,
-                filter: { StructType: "0x2::coin::Coin<0x2::sui::SUI>" },
-                options: { showContent: true }
-            });
+            let coins = await this.#getSuiCoins();
 
-            for (let coin of coins.data) {
-                let data = coin.data;
-                if (data) {
-                    if (data.objectId === this.#mainGasCoin?.objectId ||
-                        this.#gasCoins.has(data.objectId)) {
+            for (let coin of coins) {
+                if (coin) {
+                    if (coin.objectId === this.#mainGasCoin?.objectId ||
+                        this.#gasCoins.has(coin.objectId)) {
                         continue;
                     } else {
-                        this.#logger.debug(`Found untracked gasCoin=${data.objectId} in wallet`);
-                        untrackedCoinsToMerge.push(data.objectId);
+                        this.#logger.debug(`Found untracked gasCoin=${coin.objectId} in wallet`);
+                        untrackedCoinsToMerge.push(coin.objectId);
                     }
                 }
             }
