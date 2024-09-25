@@ -425,7 +425,7 @@ export class DeepBook implements DexInterface {
             parsedEvent = this.processOrderCancelledEvent(event);
         } else if (event.type.includes("AllOrdersCanceled")) {
             parsedEvent =
-                await this.processAllOrdersCancelledEvent(event);
+                this.processAllOrdersCancelledEvent(event);
         } else if (event.type.includes("OrderFilled")) {
             channel = "TRADE";
             parsedEvent = this.processOrderFilledEvent(event);
@@ -450,7 +450,7 @@ export class DeepBook implements DexInterface {
                     "data": parsedEvent
                 }
             };
-            this.dexProxy.onEvent(channel, update);
+            await this.dexProxy.onEvent(channel, update);
         }
     }
 
@@ -927,7 +927,7 @@ export class DeepBook implements DexInterface {
 
         this.logger.debug(`[${requestId}] Fetching order status. params=${JSON.stringify(params)}`);
 
-        const order = await this.orderCache.get(clientOrderId);
+        const order = this.orderCache.get(clientOrderId);
         if (order === undefined) {
             const error = `client_order_id=${clientOrderId} does not exist`;
             this.logger.error(`[${requestId}] ${error}`);
@@ -953,11 +953,13 @@ export class DeepBook implements DexInterface {
                 this.logger.debug(`[${requestId}] Query response: ${dump}`);
             }
 
-            if (order.status === "Unknown") {
-                order.status = "Open";
+            if (
+              order.status === "Unknown" ||
+              order.status === "PendingInsert"
+            ) {
+              order.status = "Open";
             }
-            const remQty = BigInt(exchangeStatus.quantity) as Quantity;
-            order.remQty = remQty
+            order.remQty = BigInt(exchangeStatus.quantity) as Quantity;
             order.execQty = (order.qty - order.remQty) as Quantity;
         } else {
             this.logger.debug(`getOrderStatus did not have an update for ${clientOrderId}`);
@@ -995,16 +997,30 @@ export class DeepBook implements DexInterface {
         let result = new Array<OrderStatus>();
         for (let openOrder of openOrders) {
             let cachedOrder = this.orderCache.get(openOrder.clientOrderId);
-            if (cachedOrder !== undefined) {
-                // TODO: Check cached details
-            } else {
-                const qty = BigInt(openOrder.originalQuantity) as Quantity;
-                const remQty = BigInt(openOrder.quantity) as Quantity;
-                const execQty = (qty - remQty) as Quantity;
 
+            const qty = BigInt(openOrder.originalQuantity) as Quantity;
+            const remQty = BigInt(openOrder.quantity) as Quantity;
+            const execQty = (qty - remQty) as Quantity;
+            const exchangeOrderId = openOrder.orderId as ExchangeOrderId;
+
+            if (cachedOrder !== undefined) {
+                if (cachedOrder.exchangeOrderId === null) {
+                  cachedOrder.exchangeOrderId = exchangeOrderId;
+                }
+
+                cachedOrder.remQty = remQty;
+                cachedOrder.execQty = execQty;
+
+                if (
+                  cachedOrder.status === "Unknown" ||
+                  cachedOrder.status === "PendingInsert"
+                ) {
+                  cachedOrder.status = "Open";
+                }
+            } else {
                 cachedOrder = {
                     clientOrderId: openOrder.clientOrderId as ClientOrderId,
-                    exchangeOrderId: openOrder.orderId as ExchangeOrderId,
+                    exchangeOrderId: exchangeOrderId,
                     status: "Open",
                     poolId: poolId,
                     qty: qty,
@@ -1021,6 +1037,7 @@ export class DeepBook implements DexInterface {
                                     cachedOrder);
 
             }
+
             result.push({
                 client_order_id: cachedOrder.clientOrderId,
                 exchange_order_id: cachedOrder.exchangeOrderId,
@@ -1182,7 +1199,7 @@ export class DeepBook implements DexInterface {
 
         order.status = (response.effects!.status.status === "success")
                        ? "Open" : "Finalised";
-        if (order.type === "IOC" && ! response.events) {
+        if (order.type === "IOC") {
             order.status = "Finalised";
             this.orderCache.delete(order.clientOrderId);
         }
@@ -1190,22 +1207,33 @@ export class DeepBook implements DexInterface {
 
         let events = new Array<Event>();
 
-        if (order.status !== "Finalised") {
-            for (let event of response.events! as SuiEvent[]) {
+        if (response.events) {
+            for (let event of response.events as SuiEvent[]) {
                 if (event.type.includes("OrderPlaced")) {
-                    let orderPlacedEvent =
-                        this.processOrderPlacedEvent(event);
+                  let orderPlacedEvent = this.processOrderPlacedEvent(event);
 
-                    order.execQty = BigInt(orderPlacedEvent.exec_qty) as Quantity;
-                    order.remQty = BigInt(orderPlacedEvent.rem_qty) as Quantity;
-                    order.exchangeOrderId = orderPlacedEvent.exchange_order_id;
+                  order.execQty = BigInt(orderPlacedEvent.exec_qty) as Quantity;
+                  order.remQty = BigInt(orderPlacedEvent.rem_qty) as Quantity;
+                  order.exchangeOrderId = orderPlacedEvent.exchange_order_id;
 
-                    events.push(orderPlacedEvent);
+                  events.push(orderPlacedEvent);
                 } else if (event.type.includes("OrderFilled")) {
-                    let orderFilledEvent =
-                        this.processOrderFilledEvent(event);
-                    events.push(orderFilledEvent);
-                }
+                  let orderFilledEvent = this.processOrderFilledEvent(event);
+                  events.push(orderFilledEvent);
+                } else if (event.type.includes("AllOrdersCanceled")) {
+                  // Can receive cancel event in order insert response due to STP
+                  let cancelledOrdersEvents =
+                    this.processAllOrdersCancelledEvent(event);
+                  for (let cancelledOrder of cancelledOrdersEvents) {
+                    events.push(cancelledOrder);
+                    this.orderCache.delete(cancelledOrder.client_order_id);
+                  }
+                } else if (event.type.includes("OrderCanceled")) {
+                  // Can receive cancel event in order insert response due to STP
+                  let cancelledOrderEvent = this.processOrderCancelledEvent(event);
+                  events.push(cancelledOrderEvent);
+                  this.orderCache.delete(cancelledOrderEvent.client_order_id);
+                } 
             }
         }
 
@@ -1310,7 +1338,7 @@ export class DeepBook implements DexInterface {
             if (order) {
                 order.status = (response.effects!.status.status === "success")
                                ? "Open" : "Finalised";
-                if (order.type === "IOC" && ! response.events) {
+                if (order.type === "IOC") {
                     order.status = "Finalised";
                     this.orderCache.delete(order.clientOrderId);
                 }
@@ -1323,25 +1351,36 @@ export class DeepBook implements DexInterface {
         if (response.events) {
             for (let event of response.events as SuiEvent[]) {
                 if (event.type.includes("OrderPlaced")) {
-                    let orderPlacedEvent =
-                        this.processOrderPlacedEvent(event);
+                  let orderPlacedEvent = this.processOrderPlacedEvent(event);
 
-                    let order =
-                        this.orderCache.get(orderPlacedEvent.client_order_id);
-                    if (order) {
-                        order.execQty =
-                            BigInt(orderPlacedEvent.exec_qty) as Quantity;
-                        order.remQty =
-                            BigInt(orderPlacedEvent.rem_qty) as Quantity;
-                        order.exchangeOrderId =
-                            orderPlacedEvent.exchange_order_id;
-                    }
+                  let order = this.orderCache.get(
+                    orderPlacedEvent.client_order_id
+                  );
+                  if (order) {
+                    order.execQty = BigInt(
+                      orderPlacedEvent.exec_qty
+                    ) as Quantity;
+                    order.remQty = BigInt(orderPlacedEvent.rem_qty) as Quantity;
+                    order.exchangeOrderId = orderPlacedEvent.exchange_order_id;
+                  }
 
-                    events.push(orderPlacedEvent);
+                  events.push(orderPlacedEvent);
                 } else if (event.type.includes("OrderFilled")) {
-                    let orderFilledEvent =
-                        this.processOrderFilledEvent(event);
-                    events.push(orderFilledEvent);
+                  let orderFilledEvent = this.processOrderFilledEvent(event);
+                  events.push(orderFilledEvent);
+                } else if (event.type.includes("AllOrdersCanceled")) {
+                  // Can receive cancel event in order insert response due to STP
+                  let cancelledOrdersEvents =
+                  this.processAllOrdersCancelledEvent(event);
+                  for (let cancelledOrder of cancelledOrdersEvents) {
+                    events.push(cancelledOrder);
+                    this.orderCache.delete(cancelledOrder.client_order_id);
+                  }
+                } else if (event.type.includes("OrderCanceled")) {
+                  // Can receive cancel event in order insert response due to STP
+                  let cancelledOrderEvent = this.processOrderCancelledEvent(event);
+                  events.push(cancelledOrderEvent);
+                  this.orderCache.delete(cancelledOrderEvent.client_order_id);
                 }
             }
         }
@@ -1503,14 +1542,11 @@ export class DeepBook implements DexInterface {
 
         let events = new Array<Event>();
 
-        if (order.status === "Cancelled") {
-            for (let event of response.events! as SuiEvent[]) {
+        if (response.events) {
+            for (let event of response.events as SuiEvent[]) {
                 if (event.type.includes("OrderCanceled")) {
                     let orderCancelledEvent =
                         this.processOrderCancelledEvent(event);
-
-                    order.remQty = 0n as Quantity;
-
                     events.push(orderCancelledEvent);
                 }
             }
@@ -1528,7 +1564,7 @@ export class DeepBook implements DexInterface {
         const poolId = params.get("pool_id") as PoolId;
         const clientOrderId = params.get("client_order_id") as ClientOrderId;
 
-        let order = await this.orderCache.get(clientOrderId);
+        let order = this.orderCache.get(clientOrderId);
         if (order === undefined) {
             const error = `client_order_id: ${clientOrderId} does not exist`;
             this.logger.error(`[${requestId}] ${error}`);
@@ -1604,8 +1640,8 @@ export class DeepBook implements DexInterface {
         }
     }
 
-    processAllOrdersCancelledEvent = async (event: SuiEvent):
-        Promise<Array<OrderCancelledEvent>> => {
+    processAllOrdersCancelledEvent = (event: SuiEvent):
+        Array<OrderCancelledEvent> => {
 
         let parsedEvents = new Array<OrderCancelledEvent>();
 
@@ -1619,7 +1655,7 @@ export class DeepBook implements DexInterface {
 
             parsedEvents.push(parsedEvent);
 
-            let order = await this.orderCache.get(clientOrderId);
+            let order = this.orderCache.get(clientOrderId);
             if (order === undefined) {
                 this.logger.warn(`Cancelled unknown order[clOid:${clientOrderId}, exOid:${exchangeOrderId}]`);
             } else {
@@ -1635,18 +1671,14 @@ export class DeepBook implements DexInterface {
 
         let events = new Array<OrderCancelledEvent>();
 
-        if (response.effects!.status.status === "success") {
-            const orderStatus = "Cancelled";
-
-            if (response.events) {
-                for (const event of response.events) {
-                    if (event.type.includes("AllOrdersCanceled")) {
-                        let cancelledOrders =
-                            await this.processAllOrdersCancelledEvent(event);
-                        for (let cancelledOrder of cancelledOrders) {
-                            events.push(cancelledOrder);
-                            this.orderCache.delete(cancelledOrder.client_order_id);
-                        }
+        if (response.events) {
+            for (const event of response.events) {
+                if (event.type.includes("AllOrdersCanceled")) {
+                    let cancelledOrders =
+                        this.processAllOrdersCancelledEvent(event);
+                    for (let cancelledOrder of cancelledOrders) {
+                        events.push(cancelledOrder);
+                        this.orderCache.delete(cancelledOrder.client_order_id);
                     }
                 }
             }
@@ -2119,7 +2151,7 @@ export class DeepBook implements DexInterface {
             let txBlockGenerator = async (accountCap: AccountCap, gasCoin: GasCoin) => {
                 this.logger.info(`[${requestId}] accCapId=${accountCap.id} gasCoin=${gasCoin.objectId}`);
 
-                return await await accountCap.client.deposit(
+                return await accountCap.client.deposit(
                     poolId,
                     firstCoin,
                     nativeAmount

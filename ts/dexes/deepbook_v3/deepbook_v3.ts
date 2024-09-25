@@ -549,7 +549,7 @@ export class DeepBookV3 implements DexInterface {
           data: parsedEvent,
         },
       };
-      this.dexProxy.onEvent(channel, update);
+      await this.dexProxy.onEvent(channel, update);
     }
   };
 
@@ -926,10 +926,18 @@ export class DeepBookV3 implements DexInterface {
 
     const order = this.orderCache.get(clientOrderId);
     if (order === undefined) {
-      const error = `client_order_id=${clientOrderId} does not exist`;
-      this.logger.error(`[${requestId}] ${error}`);
-      throw new ParsedOrderError("UNKNOWN", error);
+      this.logger.error(
+        `[${requestId}] client_order_id=${clientOrderId} does not exist`
+      );
+
+      return {
+        statusCode: 400,
+        payload: {
+          type: "ORDER_NOT_FOUND",
+        },
+      };
     }
+
     const exchangeOrderId = order.exchangeOrderId;
 
     let exchangeOrderStatus: any = null;
@@ -1271,7 +1279,7 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<Array<Event>> => {
     order.status =
       response.effects!.status.status === "success" ? "Open" : "Finalised";
-    if (order.type === "IOC" && !response.events) {
+    if (order.type === "IOC") {
       order.status = "Finalised";
       this.orderCache.delete(order.clientOrderId);
     }
@@ -1279,8 +1287,8 @@ export class DeepBookV3 implements DexInterface {
 
     let events = new Array<Event>();
 
-    if (order.status !== "Finalised") {
-      for (let event of response.events! as SuiEvent[]) {
+    if (response.events) {
+      for (let event of response.events as SuiEvent[]) {
         if (event.type.endsWith("OrderInfo")) {
           let orderPlacedEvent = this.processOrderPlacedEvent(event);
 
@@ -1293,6 +1301,11 @@ export class DeepBookV3 implements DexInterface {
         } else if (event.type.endsWith("OrderFilled")) {
           let orderFilledEvent = this.processOrderFilledEvent(event);
           events.push(orderFilledEvent);
+        } else if (event.type.includes("OrderCanceled")) {
+          // Can receive cancel event in order insert response due to STP
+          let orderCancelledEvent = this.processOrderCancelledEvent(event);
+          events.push(orderCancelledEvent);
+          this.orderCache.delete(orderCancelledEvent.client_order_id);
         }
       }
     }
@@ -1440,7 +1453,7 @@ export class DeepBookV3 implements DexInterface {
       if (order) {
         order.status =
           response.effects!.status.status === "success" ? "Open" : "Finalised";
-        if (order.type === "IOC" && !response.events) {
+        if (order.type === "IOC") {
           order.status = "Finalised";
           this.orderCache.delete(order.clientOrderId);
         }
@@ -1467,6 +1480,11 @@ export class DeepBookV3 implements DexInterface {
         } else if (event.type.endsWith("OrderFilled")) {
           let orderFilledEvent = this.processOrderFilledEvent(event);
           events.push(orderFilledEvent);
+        } else if (event.type.includes("OrderCanceled")) {
+          // Can receive cancel event in order insert response due to STP
+          let orderCancelledEvent = this.processOrderCancelledEvent(event);
+          events.push(orderCancelledEvent);
+          this.orderCache.delete(orderCancelledEvent.client_order_id);
         }
       }
     }
@@ -1655,11 +1673,10 @@ export class DeepBookV3 implements DexInterface {
 
     let events = new Array<OrderCancelledEvent>();
 
-    if (order.status === "Cancelled") {
-      for (let event of response.events! as SuiEvent[]) {
+    if (response.events) {
+      for (let event of response.events as SuiEvent[]) {
         if (event.type.includes("OrderCanceled")) {
           let orderCancelledEvent = this.processOrderCancelledEvent(event);
-          order.remQty = 0n as Quantity;
           events.push(orderCancelledEvent);
         }
       }
@@ -1772,26 +1789,21 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<Array<OrderCancelledEvent>> => {
     let events = new Array<OrderCancelledEvent>();
 
-    if (response.effects!.status.status === "success") {
-      if (response.events) {
-        for (const event of response.events) {
-          if (event.type.includes("OrderCanceled")) {
-            let orderCancelledEvent = this.processOrderCancelledEvent(event);
-            let order = this.orderCache.get(
-              orderCancelledEvent.client_order_id
+    if (response.events) {
+      for (const event of response.events) {
+        if (event.type.includes("OrderCanceled")) {
+          let orderCancelledEvent = this.processOrderCancelledEvent(event);
+          let order = this.orderCache.get(orderCancelledEvent.client_order_id);
+          if (order === undefined) {
+            this.logger.warn(
+              `Cancelled unknown order[clOid:${orderCancelledEvent.client_order_id}, exOid:${orderCancelledEvent.exchange_order_id}]`
             );
-            if (order === undefined) {
-              this.logger.warn(
-                `Cancelled unknown order[clOid:${orderCancelledEvent.client_order_id}, exOid:${orderCancelledEvent.exchange_order_id}]`
-              );
-            } else {
-              order.status = "Cancelled";
-              order.remQty = 0n as Quantity;
-              this.orderCache.delete(orderCancelledEvent.client_order_id);
-            }
-
-            events.push(orderCancelledEvent);
+          } else {
+            order.status = "Cancelled";
+            this.orderCache.delete(orderCancelledEvent.client_order_id);
           }
+
+          events.push(orderCancelledEvent);
         }
       }
     }
