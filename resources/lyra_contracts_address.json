@@ -2,10 +2,13 @@
     "Ethereum Mainnet": {
         "bridge_details": {
             "matching_address": "0xeB8d770ec18DB98Db922E9D83260A585b9F0DeAD",
+            "__cash_addresses_details": "https://github.com/derivexyz/v2-matching/tree/master/deployments/957",
             "cash_addresses": {
                 "USDC": "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
-                "WSTETH": "0xE7603DF191D699d8BD9891b821347dbAb889E5a5",
-                "WETH": "0xbE9DBda519e15a1c0d238cEa0b3daD47a484A6Ff"
+                "WSTETH": "0x69c7AADFfD607F74eE610f047f552CaDecabca4E",
+                "WETH": "0xE201fCEfD4852f96810C069f66560dc25B2C7A55",
+                "WBTC": "0x7da2D398dddDfC946Efd2C758c4688D21887790d",
+                "USDT": "0x5E72430EC945CCc183c34e2860FFC2b5bac712c2"
             },
             "deposit_module_address": "0x9B3FE5E5a3bcEa5df4E08c41Ce89C4e3Ff01Ace3",
             "withdraw_module_address": "0x9d0E8f5b25384C7310CB8C6aE32C8fbeb645d083",
