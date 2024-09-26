@@ -312,11 +312,11 @@ class Lyra(DexCommon):
         __assert(self._api.l2_api.deposit_module_address, "deposit_module_adress")
         __assert(self._api.l2_api.domain_separator, "domain_separator")
         __assert(self._api.l2_api.action_typehash, "action_typehash")
-        __assert(self._api.l2_api.cash_address, "cash_address")
+        __assert(self._api.l2_api.cash_addresses, "cash_addresses")
         __assert(self._api.l2_api.risk_manager_addresses, "risk_manager_addresses")
         __assert(self._api.l2_api.rfq_module_address, "rfq_module_addresss")
 
-        self.signing_data = SigningData(
+        self.order_signing_data = SigningData(
             self._api.l2_api._wallet_address,
             self._api.l2_api._account.key,
             self._api.l2_api.trade_module_address,
@@ -324,7 +324,7 @@ class Lyra(DexCommon):
             self._api.l2_api.deposit_module_address,
             self._api.l2_api.domain_separator,
             self._api.l2_api.action_typehash,
-            self._api.l2_api.cash_address,
+            self._api.l2_api.cash_addresses['USDC'],
             self._api.l2_api.risk_manager_addresses,
             self._api.l2_api.rfq_module_address
         )
@@ -491,7 +491,7 @@ class Lyra(DexCommon):
             )
 
             msg_signature = await self.pantheon.loop.run_in_executor(
-                self.__process_pool, generate_order_signature, self.signing_data, order
+                self.__process_pool, generate_order_signature, self.order_signing_data, order
             )
 
             end = time.time()
@@ -537,7 +537,7 @@ class Lyra(DexCommon):
             )
 
             msg_signature = await self.pantheon.loop.run_in_executor(
-                self.__process_pool, generate_quote_signature, self.signing_data, quote
+                self.__process_pool, generate_quote_signature, self.order_signing_data, quote
             )
 
             end = time.time()
@@ -631,11 +631,24 @@ class Lyra(DexCommon):
 
             self._request_cache.add(transfer)
 
+            transfer_signing_data = SigningData(
+                self._api.l2_api._wallet_address,
+                self._api.l2_api._account.key,
+                self._api.l2_api.trade_module_address,
+                self._api.l2_api.withdraw_module_address,
+                self._api.l2_api.deposit_module_address,
+                self._api.l2_api.domain_separator,
+                self._api.l2_api.action_typehash,
+                self._api.l2_api.cash_addresses[symbol],
+                self._api.l2_api.risk_manager_addresses,
+                self._api.l2_api.rfq_module_address
+            )
+
             native_amount = self.__get_native_amount(symbol, amount)
             deposit_signature = await self.pantheon.loop.run_in_executor(
                 self.__process_pool,
                 generate_subaccount_deposit_signature,
-                self.signing_data,
+                transfer_signing_data,
                 req_id,
                 native_amount,
                 nonce,
@@ -718,11 +731,24 @@ class Lyra(DexCommon):
 
             self._request_cache.add(transfer)
 
+            transfer_signing_data = SigningData(
+                self._api.l2_api._wallet_address,
+                self._api.l2_api._account.key,
+                self._api.l2_api.trade_module_address,
+                self._api.l2_api.withdraw_module_address,
+                self._api.l2_api.deposit_module_address,
+                self._api.l2_api.domain_separator,
+                self._api.l2_api.action_typehash,
+                self._api.l2_api.cash_addresses[symbol],
+                self._api.l2_api.risk_manager_addresses,
+                self._api.l2_api.rfq_module_address
+            )
+
             native_amount = self.__get_native_amount(symbol, amount)
             withdraw_signature = await self.pantheon.loop.run_in_executor(
                 self.__process_pool,
                 generate_subaccount_withdraw_signature,
-                self.signing_data,
+                transfer_signing_data,
                 req_id,
                 native_amount,
                 nonce,
@@ -1084,7 +1110,7 @@ class Lyra(DexCommon):
         )
 
         signature = await self.pantheon.loop.run_in_executor(
-            self.__process_pool, generate_order_signature, self.signing_data, order
+            self.__process_pool, generate_order_signature, self.order_signing_data, order
         )
 
         return {
