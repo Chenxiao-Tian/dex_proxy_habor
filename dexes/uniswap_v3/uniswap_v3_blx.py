@@ -25,6 +25,7 @@ class BlockInfo:
     def __init__(self):
         self.next_block_num: int = 0
         self.next_block_uuid: str = ""
+        self.next_block_expected_time_s: int = 0
         self.raw_txn_to_client_id = {}
         self.raw_txs_in_targeted_block = []
         self.client_requ_id_vs_raw_txs = {}
@@ -40,7 +41,7 @@ class OrderInfo:
 class UniswapV3Bloxroute(DexCommon):
     CHANNELS = ['ORDER']
 
-    def __init__(self, pantheon: Pantheon, config, server, event_sink):
+    def __init__(self, pantheon: Pantheon, config: dict, server, event_sink):
         super().__init__(pantheon, ConnectorType.UniswapV3, config, server, event_sink)
 
         self.msg_queue = asyncio.Queue()
@@ -72,6 +73,9 @@ class UniswapV3Bloxroute(DexCommon):
         }
         self.__bundle_id: int = 1
         self.__gas_limit_counter: int = 0  # for making gas_limit unique hence tx_hash unique for all txns of a block
+
+        self.__block_time_s: int = config.get("block_time_s", 12)
+        self.__order_deadline_buffer_s = config.ge("order_deadline_buffer_s", 5)
 
     def __split_symbol_to_base_quote_ccy(self, symbol):
         instrument = self.__instruments.get_instrument(
@@ -144,7 +148,7 @@ class UniswapV3Bloxroute(DexCommon):
         side = Side.BUY if params['side'] == 'BUY' else Side.SELL
         fee_rate = int(params['fee_rate'])
         gas_limit = 500000  # TODO: Check for the most suitable value
-        timeout_s = int(time.time() + params['timeout_s'])
+        timeout_s = 0 # it will be set properly in further code before sending to builders
         order = OrderRequest(client_request_id, symbol, base_ccy_qty,
                              quote_ccy_qty, side, fee_rate, gas_limit, timeout_s, received_at_ms)
         return order
@@ -156,7 +160,10 @@ class UniswapV3Bloxroute(DexCommon):
             gas_price_wei = int(params['gas_price_wei'])
             if self._request_cache.get(client_request_id) is not None:
                 return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
+
             order = self.__parse_params_to_order(params, received_at_ms)
+            next_block_num, next_block_uuid, next_block_expected_time_s = self.__update_and_get_next_block_num()
+            order.deadline_since_epoch_s = next_block_expected_time_s + self.__order_deadline_buffer_s
             base_ccy_symbol, quote_ccy_symbol, instrument = self.__split_symbol_to_base_quote_ccy(order.symbol)
             self._logger.debug(
                 f'Inserting={order}, gas_price_wei={gas_price_wei}')
@@ -166,8 +173,6 @@ class UniswapV3Bloxroute(DexCommon):
                 self._request_cache.finalise_request(
                     client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'message': 'unexpected instrument native code'}}
-
-            next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
 
             targeted_block = params.get('targeted_block')
             if ((targeted_block is not None) and (int(targeted_block) != next_block_num)):
@@ -220,7 +225,7 @@ class UniswapV3Bloxroute(DexCommon):
                 f'{"Wrapping" if wrap_unwrap.request == "wrap" else "Unwrapping"}={wrap_unwrap}, gas_price_wei={gas_price_wei}')
             self._request_cache.add(wrap_unwrap)
 
-            next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
+            next_block_num, next_block_uuid, _ = self.__update_and_get_next_block_num()
 
             nonce = self.__dex_helper.get_txs_count() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
 
@@ -261,7 +266,7 @@ class UniswapV3Bloxroute(DexCommon):
         return False
 
     async def _approve(self, request: ApproveRequest, gas_price_wei, nonce=None):
-        next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
+        next_block_num, next_block_uuid, _ = self.__update_and_get_next_block_num()
 
         nonce = self.__dex_helper.get_txs_count() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
         request.nonce = nonce
@@ -280,7 +285,7 @@ class UniswapV3Bloxroute(DexCommon):
         if path == '/private/withdraw':
             assert address_to is not None
 
-            next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
+            next_block_num, next_block_uuid, _ = self.__update_and_get_next_block_num()
 
             nonce = self.__dex_helper.get_txs_count() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
             request.nonce = nonce
@@ -361,7 +366,7 @@ class UniswapV3Bloxroute(DexCommon):
                              error_message=
                              'Amend request not supported for non-order request by uni3 dex-proxy with Bloxroute integrated')
 
-        next_block_num, next_block_uuid = self.__update_and_get_next_block_num()
+        next_block_num, next_block_uuid, next_block_expected_time_s = self.__update_and_get_next_block_num()
 
         if request.client_request_id not in self.__targeted_block_info.client_requ_id_vs_raw_txs:
 
@@ -391,7 +396,7 @@ class UniswapV3Bloxroute(DexCommon):
         if (not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol)):
             return ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message='unexpected instrument native code')
 
-        request.deadline_since_epoch_s = int(time.time() + params["timeout_s"])
+        request.deadline_since_epoch_s = next_block_expected_time_s + self.__order_deadline_buffer_s
         request.base_ccy_qty = Decimal(params["base_ccy_qty"])
         request.quote_ccy_qty = Decimal(params["quote_ccy_qty"])
 
@@ -552,7 +557,7 @@ class UniswapV3Bloxroute(DexCommon):
                 if len(open_requests) == 0:
                     continue
 
-                curr_block_num = self.__dex_helper.get_block_num()
+                curr_block_num, _ = self.__dex_helper.get_curr_block()
 
                 # Caching: so that we don't call rpc method self._api.get_block for same block_num
                 block_num_vs_block_data = {}
@@ -581,6 +586,9 @@ class UniswapV3Bloxroute(DexCommon):
 
                         if targeted_block_data == None:
                             continue
+
+                        if request.request_type == RequestType.ORDER and request.deadline_since_epoch_s <= targeted_block_data.timestamp:
+                            self._logger.error(f'Wrong order deadline might have been set. Please check. Request={request}')
 
                         request_mined = False
                         for tx_hash, _ in request.tx_hashes:
@@ -669,20 +677,25 @@ class UniswapV3Bloxroute(DexCommon):
                 self._logger.exception(
                     f'Error in adding or updating ERC20 token (symbol={symbol}, address={address}): %r', ex)
 
-    def __update_and_get_next_block_num(self) -> tuple[int, str]:
-        next_block_num = self.__dex_helper.get_block_num() + 1
+    def __update_and_get_next_block_num(self) -> tuple[int, str, int]:
+        curr_block_num, curr_block_time_s = self.__dex_helper.get_curr_block()
+        next_block_num = curr_block_num + 1
 
         if next_block_num > self.__targeted_block_info.next_block_num:
             self.__targeted_block_info.next_block_num = next_block_num
             self.__targeted_block_info.next_block_uuid = str(uuid.uuid4())
+            self.__targeted_block_info.next_block_expected_time_s = curr_block_time_s + self.__block_time_s
             self.__targeted_block_info.raw_txs_in_targeted_block = []
             self.__targeted_block_info.raw_txn_to_client_id = {}
             self.__targeted_block_info.client_requ_id_vs_raw_txs = {}
+        elif next_block_num == self.__targeted_block_info.next_block_num:
+            if curr_block_time_s + self.__block_time_s > self.__targeted_block_info.next_block_expected_time_s:
+                self._logger.debug('Deducted chain re-organisation')
+                self.__targeted_block_info.next_block_expected_time_s = curr_block_time_s + self.__block_time_s
+            elif curr_block_time_s + self.__block_time_s < self.__targeted_block_info.next_block_expected_time_s:
+                self._logger.error("Expected block time has decreased")
 
-        return self.__targeted_block_info.next_block_num, self.__targeted_block_info.next_block_uuid
-
-    def __validate_can_send(self, gas_price_wei: int) -> tuple[bool, str]:
-        return self._check_max_allowed_gas_price(gas_price_wei)
+        return self.__targeted_block_info.next_block_num, self.__targeted_block_info.next_block_uuid, self.__targeted_block_info.next_block_expected_time_s
 
     def __validate_tokens_address(self, instr_native_code: str, base_ccy: str, quote_ccy: str) -> bool:
         base_ccy_address = self._api.get_erc20_contract(base_ccy).address
