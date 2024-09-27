@@ -75,7 +75,7 @@ class UniswapV3Bloxroute(DexCommon):
         self.__gas_limit_counter: int = 0  # for making gas_limit unique hence tx_hash unique for all txns of a block
 
         self.__block_time_s: int = config.get("block_time_s", 12)
-        self.__order_deadline_buffer_s = config.ge("order_deadline_buffer_s", 5)
+        self.__order_deadline_buffer_s = config.get("order_deadline_buffer_s", 5)
 
     def __split_symbol_to_base_quote_ccy(self, symbol):
         instrument = self.__instruments.get_instrument(
