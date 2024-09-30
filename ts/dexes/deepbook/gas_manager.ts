@@ -48,8 +48,8 @@ export class GasCoin {
             if (data && data.content && data.content.dataType === "moveObject") {
                 let fields = data.content.fields as any;
                 const updatedVersion = BigInt(data.version);
-                if (this.version < updatedVersion) {
-                    this.#logger.debug(`Queried RPC node. oldVer=${this.version} < newVer=${data.version}, status=${GasCoinStatus[this.status]}`);
+                if (this.version <= updatedVersion) {
+                    this.#logger.debug(`Queried RPC node. oldVer=${this.version} <= newVer=${data.version}, status=${GasCoinStatus[this.status]}`);
                     this.digest = data.digest;
                     this.version = BigInt(data.version);
                     this.balanceMist = BigInt(fields.balance);

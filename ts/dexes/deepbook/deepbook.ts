@@ -1306,11 +1306,11 @@ export class DeepBook implements DexInterface {
             let errorStr = error_.toString();
             this.logger.error(`[${requestId}] ${errorStr}`);
             throw new ParsedOrderError("UNKNOWN", errorStr);;
-        }
-
-        if (this.log_responses) {
-            const dump = JSON.stringify(response);
-            this.logger.debug(`[${requestId}] Insert response: ${dump}`);
+        } finally {
+            if (this.log_responses) {
+                const dump = JSON.stringify(response);
+                this.logger.debug(`[${requestId}] Insert response: ${dump}`);
+            }
         }
 
         this.checkTransactionFailure(requestId, response);
@@ -1486,11 +1486,11 @@ export class DeepBook implements DexInterface {
             let errorStr = error_.toString();
             this.logger.error(`[${requestId}] ${errorStr}`);
             throw error;
-        }
-
-        if (this.log_responses) {
-            const dump = JSON.stringify(response);
-            this.logger.debug(`[${requestId}] Insert response: ${dump}`);
+        } finally {
+            if (this.log_responses) {
+                const dump = JSON.stringify(response);
+                this.logger.debug(`[${requestId}] Insert response: ${dump}`);
+            }
         }
 
         this.checkTransactionFailure(requestId, response);
@@ -1618,11 +1618,11 @@ export class DeepBook implements DexInterface {
             let errorStr = error_.toString();
             this.logger.error(`[${requestId}] ${errorStr}`);
             throw new ParsedOrderError("UNKNOWN", errorStr);;
-        }
-
-        if (this.log_responses) {
-            const dump = JSON.stringify(response);
-            this.logger.debug(`[${requestId}] Cancel response: ${dump}`);
+        } finally {
+            if (this.log_responses) {
+                const dump = JSON.stringify(response);
+                this.logger.debug(`[${requestId}] Cancel response: ${dump}`);
+            }
         }
 
         this.checkTransactionFailure(requestId, response);
@@ -1725,11 +1725,11 @@ export class DeepBook implements DexInterface {
             let errorStr = error_.toString();
             this.logger.error(`[${requestId}] ${errorStr}`);
             throw new ParsedOrderError("UNKNOWN", errorStr);;
-        }
-
-        if (this.log_responses) {
-            const dump = JSON.stringify(response);
-            this.logger.debug(`[${requestId}] Cancel all response: ${dump}`);
+        } finally {
+            if (this.log_responses) {
+                const dump = JSON.stringify(response);
+                this.logger.debug(`[${requestId}] Cancel all response: ${dump}`);
+            }
         }
 
         this.checkTransactionFailure(requestId, response);
@@ -1808,12 +1808,13 @@ export class DeepBook implements DexInterface {
             let errorStr = error_.toString();
             this.logger.error(`[${requestId}] ${errorStr}`);
             throw new ParsedOrderError("UNKNOWN", errorStr, 500);;
+        } finally {
+            if (this.log_responses) {
+                const dump = JSON.stringify(response);
+                this.logger.debug(`[${requestId}] Cancel bulk response: ${dump}`);
+            }
         }
 
-        if (this.log_responses) {
-            const dump = JSON.stringify(response);
-            this.logger.debug(`[${requestId}] Cancel bulk response: ${dump}`);
-        }
 
         this.checkTransactionFailure(requestId, response);
 
