@@ -642,6 +642,31 @@
                 "valid_withdrawal_addresses": [
                   "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
                 ]
+            },
+            {
+                "symbol": "NEIRO",
+                "address": "0x812ba41e071c7b7fa4ebcfb62df5f45f6fa853ee",
+                "valid_withdrawal_addresses": [
+                  "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                  "0xaB75B39F34bB66cFC4E7766642290fdB430773ad",
+                  "0x812ba41e071c7b7fa4ebcfb62df5f45f6fa853ee",
+                  "0x80f2e8D51Fe435B7f9C8799d3EF65003e14E200C",
+                  "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                  "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5"
+                ]
+            },
+            {
+                "symbol": "NEIROETH",
+                "address": "0xEE2a03Aa6Dacf51C18679C516ad5283d8E7C2637",
+                "valid_withdrawal_addresses": [
+                  "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                  "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                  "0xaB75B39F34bB66cFC4E7766642290fdB430773ad",
+                  "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974",
+                  "0x80f2e8D51Fe435B7f9C8799d3EF65003e14E200C",
+                  "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                  "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5"
+                ]
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
