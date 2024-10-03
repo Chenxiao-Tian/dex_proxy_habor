@@ -732,26 +732,31 @@ class UniswapV3Bloxroute(DexCommon):
         }
 
         json_str = json.dumps(body)
-        self._logger.info(f'Sending {json_str} to builders')
+        self._logger.info(f"Sending {json_str} to builders")
 
-        bundle_jobs = [self.__shoot_bundle(builder_rpc_url, json_str) for builder_rpc_url in self.__builders_rpc]
+        sign_begin_at_ms = int(time.time() * 1_000)
+        
+        message = messages.encode_defunct(text=Web3.keccak(text=json_str).hex())
+        public_key_address = self.__flashbot_signing_account.address
+        signature = Account.sign_message(message, self.__flashbot_signing_account.key).signature.hex()
+        flashbot_signature = f"{public_key_address}:{signature}"
+        signed_header = self.__builders_request_header.copy()
+        signed_header["X-Flashbots-Signature"] = flashbot_signature
+
+        signed_at_ms = int(time.time() * 1_000)
+        self._logger.info(f"stat=signBundleTelem, responseDelayMs={signed_at_ms - sign_begin_at_ms}")
+
+        bundle_jobs = []
+        for builder_rpc_url in self.__builders_rpc:
+            if "flashbots" in builder_rpc_url or "titanbuilder" in builder_rpc_url:
+                bundle_jobs.append(self.__shoot_bundle(builder_rpc_url, signed_header, json_str))
+            else:
+                bundle_jobs.append(self.__shoot_bundle(builder_rpc_url, self.__builders_request_header, json_str))
+
         await asyncio.gather(*bundle_jobs)
 
-    async def __shoot_bundle(self, builder_url: str, json_str: str):
+    async def __shoot_bundle(self, builder_url: str, header: dict, json_str: str):
         try:
-            if "flashbots" in builder_url:
-                sign_begin_at_ms = int(time.time() * 1_000)
-                message = messages.encode_defunct(text=Web3.keccak(text=json_str).hex())
-                public_key_address = self.__flashbot_signing_account.address
-                signature = Account.sign_message(message, self.__flashbot_signing_account.key).signature.hex()
-                flashbot_signature = f"{public_key_address}:{signature}"
-                header = self.__builders_request_header.copy()
-                header["X-Flashbots-Signature"] = flashbot_signature
-                signed_at_ms = int(time.time() * 1_000)
-                self._logger.info(f"stat=signBundleTelem, builder={builder_url}, responseDelayMs={signed_at_ms - sign_begin_at_ms}")
-            else:
-                header = self.__builders_request_header
-
             send_at_ms = int(time.time() * 1_000)
             result = await self.__builders_session.post(builder_url, data=json_str, headers=header)
             response = await result.json()
