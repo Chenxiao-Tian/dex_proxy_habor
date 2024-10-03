@@ -52,6 +52,24 @@
                     "l1_socket_bridge_connector_address": "0xf71A92D4bEFc2e18671c3b20377d45729790e880",
                     "l2_socket_bridge_address": "0x92728d330d024b19332419D5c5aa59887A2862d6",
                     "l2_socket_bridge_connector_address": "0x8487daa5864a5cE18E5a89406c11EC748da33fbB"
+                },
+                {
+                    "symbol": "WBTC",
+                    "l1_token_address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+                    "l2_token_address": "0x9b80ab732a6F1030326Af0014f106E12C4Db18EC",
+                    "l1_socket_bridge_address": "0x3Eec7c855aF33280F1eD38b93059F5aa5862E3ab",
+                    "l1_socket_bridge_connector_address": "0xceA535B2a0A690ebA76ac6A4AF2A1ee7B9Fed1aa",
+                    "l2_socket_bridge_address": "0xaf33761742beF3B7d0D0726671660CCF260fc5c3",
+                    "l2_socket_bridge_connector_address": "0xa3f9a7a13055f37479Ebc28E57C005F5c9A31F68"
+                },
+                {
+                    "symbol": "USDT",
+                    "l1_token_address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+                    "l2_token_address": "0x954bE1803546150bfd887c9ff70fd221F2F505d3",
+                    "l1_socket_bridge_address": "0x5e98A25d8d6FF69A8992d6Aa57948dFB77D4ECBa",
+                    "l1_socket_bridge_connector_address": "0x3553c0102684c20e2f8192d6F013c7242710b4b3",
+                    "l2_socket_bridge_address": "0xF64010ACE8f7333dF61F6D0ae3d08C5d4704D69A",
+                    "l2_socket_bridge_connector_address": "0x0e276315EB155d28C7Aebd78AC118F967277a265"
                 }
             ]
         },
@@ -113,6 +131,18 @@
                 "symbol": "WETH",
                 "valid_withdrawal_addresses": [
                     "0x27BFfB0f09C18539f9a47a39958Bb149Fe42A155"
+                ]
+            },
+            {
+                "symbol": "USDT",
+                "valid_withdrawal_addresses": [
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155"
+                ]
+            },
+            {
+                "symbol": "WBTC",
+                "valid_withdrawal_addresses": [
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155"
                 ]
             }
         ],

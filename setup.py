@@ -21,6 +21,6 @@ setuptools.setup(
     install_requires=[
         'msgpack==1.0.8',
         'orjson==3.6.1',
-        "pyutils @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@8d46542"
+        "pyutils @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@4422865"
     ]
 )
