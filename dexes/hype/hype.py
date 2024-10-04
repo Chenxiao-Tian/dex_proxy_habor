@@ -48,8 +48,6 @@ class Hype(DexCommon):
         self.__chain_name = config['chain_name']
         self.__native_token = config['native_token']
 
-        self.__gas_price_tracker = GasPriceTracker(pantheon, config['gas_price_tracker'])
-
         self.__process_pool = concurrent.futures.ProcessPoolExecutor(
             max_workers=config["max_signature_generators"]
         )
@@ -79,9 +77,6 @@ class Hype(DexCommon):
         self.coin_to_asset = {asset_info["name"]: asset for (asset, asset_info) in enumerate(meta_info['universe'])}
 
         await super().start(eth_private_key)
-
-        await self.__gas_price_tracker.start()
-        await self.__gas_price_tracker.wait_gas_price_ready()
 
         max_nonce_cached = self._request_cache.get_max_nonce()
         self._api.initialize_starting_nonce(max_nonce_cached + 1)
@@ -159,7 +154,10 @@ class Hype(DexCommon):
         return await self._api.get_transaction_receipt(tx_hash)
 
     def _get_gas_price(self, request, priority_fee: PriorityFee):
-        return self.__gas_price_tracker.get_gas_price(priority_fee=priority_fee)
+        # No matter what gas price we specify in our request Arbitrum always charge only base gas fees which is almost always fixed to 0.01 GWei.
+        # https://auros-group.slack.com/archives/C04258ZMMMF/p1726555641110039?thread_ts=1725590960.960719&cid=C04258ZMMMF
+        # return 0.05 GWei
+        return 50_000_000
 
     async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict, mined_tx_hash: str = None):
         await super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
@@ -472,7 +470,7 @@ class Hype(DexCommon):
             self._request_cache.add(transfer)
 
             timestamp = int(time.time() * 1000)
-            
+
             action = {"destination": self._api._wallet_address, "amount": str(amount), "time": timestamp, "type": "withdraw3"}
 
             signature = sign_withdraw_from_bridge_action(self._api._account, action, self.is_mainnet)
