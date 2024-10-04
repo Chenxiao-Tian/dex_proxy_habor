@@ -79,6 +79,7 @@ class MandatoryFields {
     static CancelAllRequest        = ["pool_id"];
     static BulkCancelRequest       = ["pool_id", "client_order_ids"];
     static TransactionBlockRequest = ["digest"];
+    static EventsFromDigests       = ["tx_digests"];
     static OrderStatusRequest      = ["pool_id", "client_order_id"];
     static AllOpenOrdersRequest    = ["pool_id"];
     static PoolDepositRequest      = ["pool_id", "coin_type_id", "quantity"];
@@ -356,6 +357,8 @@ export class DeepBook implements DexInterface {
         GET("/transaction", this.getTransactionBlock);
         GET("/transactions", this.getTransactionBlocks);
 
+        GET("/events", this.getEventsFromDigests);
+
         GET("/account-caps", this.getAccountCaps);
         POST("/account-cap", this.createAccountCap);
         POST("/child-account-cap", this.createChildAccountCap);
@@ -572,7 +575,7 @@ export class DeepBook implements DexInterface {
                 this.logger.info(`Detected epoch update from ${this.currentEpoch} to ${epoch}`);
                 this.currentEpoch = epoch;
                 this.logger.info(`Updated currentEpoch to ${this.currentEpoch}`);
-                await this.executor!.onEpochChange();
+                this.executor!.onEpochChange();
                 await this.gasManager!.onEpochChange();
             } else {
                 this.executor!.logSkippedObjects();
@@ -665,6 +668,72 @@ export class DeepBook implements DexInterface {
             statusCode: 200,
             payload: txBlock
         }
+    }
+
+    getEventsFromDigests = async (
+        requestId: bigint,
+        path: string,
+        params: any,
+        receivedAtMs: number
+    ): Promise<RestResult> => {
+        assertFields(params, MandatoryFields.EventsFromDigests);
+
+        const requestedDigests: string = params.get("tx_digests");
+        const txDigests: Array<string> = requestedDigests.split(",");
+        this.logger.debug(
+          `[${requestId}] Getting events for digests: ${requestedDigests}`
+        );
+
+        let events = new Array<Event>();
+        
+        for (let digest of txDigests) {
+            let response = null;
+            try {
+                response = await this.suiClient.getTransactionBlock({
+                    digest: digest,
+                    options: { showEvents: true },
+                });
+
+                if (response && response.events) {
+                    for (let event of response.events as SuiEvent[]) {
+                        if (event.type.includes("OrderPlaced")) {
+                            let orderPlacedEvent = this.processOrderPlacedEvent(event);
+                            events.push(orderPlacedEvent);
+                        } else if (event.type.includes("OrderFilled")) {
+                            let orderFilledEvent = this.processOrderFilledEvent(event);
+                            events.push(orderFilledEvent);
+                        } else if (event.type.includes("AllOrdersCanceled")) {
+                            let cancelledOrdersEvents =
+                                this.processAllOrdersCancelledEvent(event);
+                            for (let cancelledOrder of cancelledOrdersEvents) {
+                                events.push(cancelledOrder);
+                                this.orderCache.delete(cancelledOrder.client_order_id);
+                            }
+                        } else if (event.type.includes("OrderCanceled")) {
+                            let cancelledOrderEvent =
+                                this.processOrderCancelledEvent(event);
+                            events.push(cancelledOrderEvent);
+                            this.orderCache.delete(cancelledOrderEvent.client_order_id);
+                        }
+                    }
+                }
+            } catch (error) {
+                this.logger.error(`[${requestId}]: ${error}`);
+                throw error;
+            } finally {
+                if (this.log_responses) {
+                    const dump = JSON.stringify(response);
+                    this.logger.debug(
+                        `[${requestId}] getEventsFromTransactionBlock digest=${digest} response: ${dump}`
+                    );
+                }
+            }
+        }
+
+        return {
+            statusCode: 200,
+            payload: events,
+        };
     }
 
     getWalletAddress = async (requestId: bigint,
@@ -1759,7 +1828,7 @@ export class DeepBook implements DexInterface {
         const exchangeOrderIds: Array<string> = new Array<string>();
 
         for (let clientOrderId of clientOrderIds) {
-            let order = await this.orderCache.get(clientOrderId as ClientOrderId);
+            let order = this.orderCache.get(clientOrderId as ClientOrderId);
             if (order === undefined) {
                 const error = `client_order_id: ${clientOrderId} does not exist`;
                 this.logger.error(`[${requestId}] ${error}`);
@@ -2111,7 +2180,7 @@ export class DeepBook implements DexInterface {
                         let gasCoin = this.gasManager!.getFreeGasCoin();
                         let txBlockGenerator = async () => {
                             const block = new SuiTxBlock();
-                            return await block.mergeCoinsIntoFirstCoin(coinInstances);
+                            return block.mergeCoinsIntoFirstCoin(coinInstances);
                         };
 
                         let response = await this.executeWithObjectTimeoutCheck(
