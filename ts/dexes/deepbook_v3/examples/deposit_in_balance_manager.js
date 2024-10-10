@@ -3,12 +3,12 @@ import { BalanceManagerContract, DeepBookConfig } from "@mysten/deepbook-v3";
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { fromHEX } from "@mysten/sui/utils";
+import { fromHex } from "@mysten/sui/utils";
 
 const balanceManagers = {
   MANAGER_1: {
     address:
-      "0xd65d3223d2b61e7ecd85ffdf2c7dd2ddb196cdceee48e695b30bde2eeef67964",
+      "0x9d99510ddcce3e319c90d7caa8ffe81c433d201d404430bfcd08ca0bd85e514c",
     tradeCap: "",
   },
   MANAGER_2: {
@@ -23,7 +23,7 @@ const privateKey =
   "suiprivkey1qzklg5g6zq328ajfgmhhgnmruvkzdpccezueggdk8l7c957cnlkvv87lmz5";
 const secretKey =
   "0xadf4511a1022a3f64946ef744f63e32c268718c8b99421b63ffd82d3d89fecc6";
-const keypair = Ed25519Keypair.fromSecretKey(fromHEX(secretKey));
+const keypair = Ed25519Keypair.fromSecretKey(fromHex(secretKey));
 const address = keypair.toSuiAddress();
 
 const suiClient = new SuiClient({ url: getFullnodeUrl("testnet") });
@@ -37,6 +37,7 @@ const balanceManagerContract = new BalanceManagerContract(deepBookConfig);
 const tx = new Transaction();
 tx.add(balanceManagerContract.depositIntoManager("MANAGER_1", "SUI", 10));
 tx.add(balanceManagerContract.depositIntoManager("MANAGER_1", "DBUSDC", 10));
+tx.add(balanceManagerContract.depositIntoManager("MANAGER_1", "DBUSDT", 10));
 tx.add(balanceManagerContract.depositIntoManager("MANAGER_1", "DEEP", 100));
 
 const resp = await suiClient.signAndExecuteTransaction({
