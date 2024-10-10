@@ -13,7 +13,7 @@
     "env": "testnet",
     "subscribe_to_events": false,
     "wallet_address": "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c",
-    "balance_manager_id": "0xd65d3223d2b61e7ecd85ffdf2c7dd2ddb196cdceee48e695b30bde2eeef67964",
+    "balance_manager_id": "0x9d99510ddcce3e319c90d7caa8ffe81c433d201d404430bfcd08ca0bd85e514c",
     "exchange_connectors": {
       "rest": {
         "url": "https://fullnode.testnet.sui.io:443"

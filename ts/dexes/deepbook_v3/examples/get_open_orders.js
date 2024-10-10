@@ -3,10 +3,10 @@ import { bcs } from "@mysten/sui/bcs";
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { fromHEX, normalizeSuiAddress } from "@mysten/sui/utils";
+import { fromHex, normalizeSuiAddress } from "@mysten/sui/utils";
 
 const balance_manager_id =
-  "0xd65d3223d2b61e7ecd85ffdf2c7dd2ddb196cdceee48e695b30bde2eeef67964";
+  "0x9d99510ddcce3e319c90d7caa8ffe81c433d201d404430bfcd08ca0bd85e514c";
 
 const balanceManagers = {
   MANAGER_1: {
@@ -25,16 +25,18 @@ const privateKey =
   "suiprivkey1qzklg5g6zq328ajfgmhhgnmruvkzdpccezueggdk8l7c957cnlkvv87lmz5";
 const secretKey =
   "0xadf4511a1022a3f64946ef744f63e32c268718c8b99421b63ffd82d3d89fecc6";
-const keypair = Ed25519Keypair.fromSecretKey(fromHEX(secretKey));
+const keypair = Ed25519Keypair.fromSecretKey(fromHex(secretKey));
 const address = keypair.toSuiAddress();
 
 const suiClient = new SuiClient({ url: getFullnodeUrl("testnet") });
 
+const DEEPBOOK_V3_TESTNET_PACKAGE_ID =
+  "0xcbf4748a965d469ea3a36cf0ccc5743b96c2d0ae6dee0762ed3eca65fac07f7e";
 const SUI_DBUSDC =
-  "0x966c99a5ce0ce3e09dacac0a42cc2b888d9e1a0c5f39b69f556c38f38ef0b81d";
+  "0x520c89c6c78c566eed0ebf24f854a8c22d8fdd06a6f16ad01f108dad7f1baaea";
 const tx = new Transaction();
 tx.moveCall({
-  target: `0x48cc688a15bdda6017c730a3c65b30414e642d041f2931ef14e08f6b0b2a1b7f::pool::get_account_order_details`,
+  target: `${DEEPBOOK_V3_TESTNET_PACKAGE_ID}::pool::get_account_order_details`,
   arguments: [tx.object(SUI_DBUSDC), tx.object(balance_manager_id)],
   typeArguments: [
     `0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI`,

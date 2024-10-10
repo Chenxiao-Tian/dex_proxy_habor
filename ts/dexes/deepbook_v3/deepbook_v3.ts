@@ -42,7 +42,7 @@ import {
 } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import {
-  fromHEX,
+  fromHex,
   normalizeSuiAddress,
   SUI_CLOCK_OBJECT_ID,
 } from "@mysten/sui/utils";
@@ -78,6 +78,7 @@ class MandatoryFields {
   static BulkCancelRequest = ["pool", "client_order_ids"];
   static CancelAllRequest = ["pool"];
   static TransactionBlockRequest = ["digest"];
+  static EventsFromDigests = ["tx_digests_list"];
   static OrderStatusRequest = ["pool", "client_order_id"];
   static AllOpenOrdersRequest = ["pool", "pool_id"];
   static SuiWithdrawalRequest = ["recipient", "quantity"];
@@ -150,8 +151,9 @@ export class DeepBookV3 implements DexInterface {
 
   public channels: Array<string> = ["ORDER", "TRADE"];
   private static TESTNET_DEEPBOOKV3_PACKAGE_ID: string =
-    "0x48cc688a15bdda6017c730a3c65b30414e642d041f2931ef14e08f6b0b2a1b7f";
-  private static MAINNET_DEEPBOOKV3_PACKAGE_ID: string = "";
+    "0xcbf4748a965d469ea3a36cf0ccc5743b96c2d0ae6dee0762ed3eca65fac07f7e";
+  private static MAINNET_DEEPBOOKV3_PACKAGE_ID: string =
+    "0x6f2abaa15ea8f1935968310a196807272b37150878dc4072f2e0cbaa9eca894a";
 
   constructor(
     lf: LoggerFactory,
@@ -183,7 +185,7 @@ export class DeepBookV3 implements DexInterface {
 
     if (this.mode == "read-write") {
       const secretKey = this.readPrivateKey();
-      this.keyPair = Ed25519Keypair.fromSecretKey(fromHEX(secretKey));
+      this.keyPair = Ed25519Keypair.fromSecretKey(fromHex(secretKey));
       this.walletAddress = this.keyPair.getPublicKey().toSuiAddress();
     } else {
       this.keyPair = undefined;
@@ -451,6 +453,8 @@ export class DeepBookV3 implements DexInterface {
 
     GET("/transaction", this.getTransactionBlock);
     GET("/transactions", this.getTransactionBlocks);
+
+    GET("/events", this.getEventsFromDigests);
 
     POST("/order", this.insertOrder);
     POST("/orders", this.insertOrders);
@@ -798,6 +802,78 @@ export class DeepBookV3 implements DexInterface {
     };
   };
 
+  getEventsFromDigests = async (
+    requestId: bigint,
+    path: string,
+    params: any,
+    receivedAtMs: number
+  ): Promise<RestResult> => {
+    assertFields(params, MandatoryFields.EventsFromDigests);
+
+    const requestedDigests: string = params.get("tx_digests_list");
+    const txDigests: Array<string> = requestedDigests.split(",");
+    this.logger.debug(
+      `[${requestId}] Getting events for digests: ${requestedDigests}`
+    );
+
+    let events = new Array<Event>();
+
+    for (let digest of txDigests) {
+      let response = null;
+      try {
+        response = await this.suiClient.getTransactionBlock({
+          digest: digest,
+          options: { showEvents: true },
+        });
+
+        if (response && response.events) {
+          for (let event of response.events as SuiEvent[]) {
+            if (event.type.endsWith("OrderInfo")) {
+              let orderPlacedEvent = this.processOrderPlacedEvent(event);
+
+              let order = this.orderCache.get(orderPlacedEvent.client_order_id);
+              if (order && order.exchangeOrderId === null) {
+                order.exchangeOrderId = orderPlacedEvent.exchange_order_id;
+              }
+
+              events.push(orderPlacedEvent);
+            } else if (event.type.endsWith("OrderFilled")) {
+              let orderFilledEvent = this.processOrderFilledEvent(event);
+              events.push(orderFilledEvent);
+            } else if (event.type.includes("OrderCanceled")) {
+              let orderCancelledEvent = this.processOrderCancelledEvent(event);
+
+              let order = this.orderCache.get(
+                orderCancelledEvent.client_order_id
+              );
+              if (order) {
+                order.status = "Cancelled";
+                this.orderCache.delete(orderCancelledEvent.client_order_id);
+              }
+
+              events.push(orderCancelledEvent);
+            }
+          }
+        }
+      } catch (error) {
+        this.logger.error(`[${requestId}]: ${error}`);
+        throw error;
+      } finally {
+        if (this.log_responses) {
+          const dump = JSON.stringify(response);
+          this.logger.debug(
+            `[${requestId}] getEventsFromTransactionBlock digest=${digest} response: ${dump}`
+          );
+        }
+      }
+    }
+
+    return {
+      statusCode: 200,
+      payload: events,
+    };
+  };
+
   getWalletAddress = async (
     requestId: bigint,
     path: string,
@@ -950,15 +1026,15 @@ export class DeepBookV3 implements DexInterface {
       } catch (error) {
         this.logger.error(`[${requestId}] ${error}`);
         throw error;
+      } finally {
+        if (this.log_responses) {
+          const dump = JSON.stringify(exchangeOrderStatus);
+          this.logger.debug(`[${requestId}] Order query response: ${dump}`);
+        }
       }
     }
 
     if (exchangeOrderStatus !== null) {
-      if (this.log_responses) {
-        const dump = JSON.stringify(exchangeOrderStatus);
-        this.logger.debug(`[${requestId}] Query response: ${dump}`);
-      }
-
       if (order.status === "Unknown" || order.status === "PendingInsert") {
         order.status = "Open";
       }
@@ -1304,8 +1380,14 @@ export class DeepBookV3 implements DexInterface {
         } else if (event.type.includes("OrderCanceled")) {
           // Can receive cancel event in order insert response due to STP
           let orderCancelledEvent = this.processOrderCancelledEvent(event);
+
+          let order = this.orderCache.get(orderCancelledEvent.client_order_id);
+          if (order) {
+            order.status = "Cancelled";
+            this.orderCache.delete(orderCancelledEvent.client_order_id);
+          }
+
           events.push(orderCancelledEvent);
-          this.orderCache.delete(orderCancelledEvent.client_order_id);
         }
       }
     }
@@ -1412,11 +1494,11 @@ export class DeepBookV3 implements DexInterface {
       let errorStr = error_.toString();
       this.logger.error(`[${requestId}] ${errorStr}`);
       throw new ParsedOrderError("UNKNOWN", errorStr);
-    }
-
-    if (this.log_responses) {
-      const dump = JSON.stringify(response);
-      this.logger.debug(`[${requestId}] Insert response: ${dump}`);
+    } finally {
+      if (this.log_responses) {
+        const dump = JSON.stringify(response);
+        this.logger.debug(`[${requestId}] Insert response: ${dump}`);
+      }
     }
 
     this.checkTransactionFailure(requestId, response);
@@ -1483,8 +1565,14 @@ export class DeepBookV3 implements DexInterface {
         } else if (event.type.includes("OrderCanceled")) {
           // Can receive cancel event in order insert response due to STP
           let orderCancelledEvent = this.processOrderCancelledEvent(event);
+
+          let order = this.orderCache.get(orderCancelledEvent.client_order_id);
+          if (order) {
+            order.status = "Cancelled";
+            this.orderCache.delete(orderCancelledEvent.client_order_id);
+          }
+
           events.push(orderCancelledEvent);
-          this.orderCache.delete(orderCancelledEvent.client_order_id);
         }
       }
     }
@@ -1606,11 +1694,11 @@ export class DeepBookV3 implements DexInterface {
       let errorStr = error_.toString();
       this.logger.error(`[${requestId}] ${errorStr}`);
       throw error;
-    }
-
-    if (this.log_responses) {
-      const dump = JSON.stringify(response);
-      this.logger.debug(`[${requestId}] Insert response: ${dump}`);
+    } finally {
+      if (this.log_responses) {
+        const dump = JSON.stringify(response);
+        this.logger.debug(`[${requestId}] Bulk insert response: ${dump}`);
+      }
     }
 
     this.checkTransactionFailure(requestId, response);
@@ -1763,11 +1851,11 @@ export class DeepBookV3 implements DexInterface {
       let errorStr = error_.toString();
       this.logger.error(`[${requestId}] ${errorStr}`);
       throw new ParsedOrderError("UNKNOWN", errorStr);
-    }
-
-    if (this.log_responses) {
-      const dump = JSON.stringify(response);
-      this.logger.debug(`[${requestId}] Cancel response: ${dump}`);
+    } finally {
+      if (this.log_responses) {
+        const dump = JSON.stringify(response);
+        this.logger.debug(`[${requestId}] Cancel response: ${dump}`);
+      }
     }
 
     this.checkTransactionFailure(requestId, response);
@@ -1870,11 +1958,11 @@ export class DeepBookV3 implements DexInterface {
       let errorStr = error_.toString();
       this.logger.error(`[${requestId}] ${errorStr}`);
       throw new ParsedOrderError("UNKNOWN", errorStr);
-    }
-
-    if (this.log_responses) {
-      const dump = JSON.stringify(response);
-      this.logger.debug(`[${requestId}] Cancel all response: ${dump}`);
+    } finally {
+      if (this.log_responses) {
+        const dump = JSON.stringify(response);
+        this.logger.debug(`[${requestId}] Cancel all response: ${dump}`);
+      }
     }
 
     this.checkTransactionFailure(requestId, response);
@@ -1980,11 +2068,11 @@ export class DeepBookV3 implements DexInterface {
       let errorStr = error_.toString();
       this.logger.error(`[${requestId}] ${errorStr}`);
       throw new ParsedOrderError("UNKNOWN", errorStr);
-    }
-
-    if (this.log_responses) {
-      const dump = JSON.stringify(response);
-      this.logger.debug(`[${requestId}] Cancel bulk response: ${dump}`);
+    } finally {
+      if (this.log_responses) {
+        const dump = JSON.stringify(response);
+        this.logger.debug(`[${requestId}] Bulk cancel response: ${dump}`);
+      }
     }
 
     this.checkTransactionFailure(requestId, response);
@@ -2527,7 +2615,7 @@ export class DeepBookV3 implements DexInterface {
     const pool: string = params.get("pool");
     this.logger.debug(`[${requestId}] Querying pool with pool=${pool}`);
 
-    let res = null;
+    let response = null;
     try {
       const [poolInfo, whitelisted, poolParamsInfo] = await Promise.all([
         this.mainDeepbookClient.poolTradeParams(pool),
@@ -2535,7 +2623,7 @@ export class DeepBookV3 implements DexInterface {
         this.mainDeepbookClient.poolBookParams(pool),
       ]);
 
-      res = {
+      response = {
         takerFee: poolInfo.takerFee,
         makerFee: poolInfo.makerFee,
         stakeRequired: poolInfo.stakeRequired,
@@ -2544,19 +2632,19 @@ export class DeepBookV3 implements DexInterface {
         lotSize: poolParamsInfo.lotSize,
         minSize: poolParamsInfo.minSize,
       };
-
-      if (this.log_responses) {
-        const dump = JSON.stringify(res);
-        this.logger.debug(`[${requestId}] pool info: ${dump}`);
-      }
     } catch (error) {
       this.logger.error(`[${requestId}] ${error}`);
       throw error;
+    } finally {
+      if (this.log_responses) {
+        const dump = JSON.stringify(response);
+        this.logger.debug(`[${requestId}] Pool info: ${dump}`);
+      }
     }
 
     return {
       statusCode: 200,
-      payload: res,
+      payload: response,
     };
   };
 
