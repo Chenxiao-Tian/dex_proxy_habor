@@ -22,7 +22,13 @@ import {
   OrderFilledEvent,
 } from "../../order_cache.js";
 import { Coin, DeepBookClient, Pool } from "@mysten/deepbook-v3";
-import { ORDER_MAX_EXPIRE_TIMESTAMP_MS } from "./utils.js";
+import {
+  MAINNET_COINS_MAP,
+  MAINNET_POOLS_MAP,
+  ORDER_MAX_EXPIRE_TIMESTAMP_MS,
+  TESTNET_COINS_MAP,
+  TESTNET_POOLS_MAP,
+} from "./utils.js";
 import type { NetworkType } from "./types.js";
 import { bcs } from "@mysten/sui/bcs";
 import {
@@ -238,8 +244,12 @@ export class DeepBookV3 implements DexInterface {
 
     if (this.environment === "mainnet") {
       this.deepbookPackageId = DeepBookV3.MAINNET_DEEPBOOKV3_PACKAGE_ID;
+      this.coinsMap = MAINNET_COINS_MAP;
+      this.poolsMap = MAINNET_POOLS_MAP;
     } else {
       this.deepbookPackageId = DeepBookV3.TESTNET_DEEPBOOKV3_PACKAGE_ID;
+      this.coinsMap = TESTNET_COINS_MAP;
+      this.poolsMap = TESTNET_POOLS_MAP;
     }
 
     this.balanceManagerId = config.dex.balance_manager_id;
@@ -251,13 +261,14 @@ export class DeepBookV3 implements DexInterface {
 
     this.chainName = config.dex.chain_name;
     this.withdrawalAddresses = new Map<string, Set<string>>();
-    this.coinsMap = {};
-    this.poolsMap = {};
 
     if (this.chainName === undefined) {
       throw new Error("The key `dex.chain_name` must be present in the config");
     }
-    this.loadResources();
+
+    if (this.mode === "read-write") {
+      this.fetchWithdrawalAddresses();
+    }
 
     if (this.balanceManagerId) {
       let balanceManagers = {
@@ -332,45 +343,36 @@ export class DeepBookV3 implements DexInterface {
     this.registerEndpoints();
   }
 
-  loadResources = (): void => {
+  fetchWithdrawalAddresses = (): void => {
     try {
       const filePrefix = dirname(process.argv[1]);
       const filename = `${filePrefix}/../../resources/dbv3_withdrawal_addresses.json`;
       let contents = JSON.parse(readFileSync(filename, "utf8"));
 
       this.logger.info(
-        `Loading resources for chainName=${this.chainName} from ${filename}`
+        `Looking up configured withdrawal addresses for chainName=${this.chainName} from file=${filename}`
       );
-      this.coinsMap = contents[this.chainName].coins_map;
-      this.poolsMap = contents[this.chainName].pools_map;
 
-      if (this.mode === "read-write") {
-        this.fetchWithdrawalAddresses(contents);
+      let tokenData = contents[this.chainName]?.tokens;
+      if (tokenData) {
+        for (let entry of tokenData) {
+          let coinType = entry.coin_type;
+          if (this.withdrawalAddresses.has(coinType)) {
+            throw new Error(
+              `Duplicate entry in the resources file ${coinType}`
+            );
+          }
+
+          let withdrawalAddresses = new Set<string>(
+            entry.valid_withdrawal_addresses
+          );
+          this.withdrawalAddresses.set(coinType, withdrawalAddresses);
+        }
       }
     } catch (error) {
-      const msg: string = `Failed to parse resources file: ${error}`;
+      const msg: string = `Failed to parse withdrawal addresses file: ${error}`;
       this.logger.error(msg);
       throw new Error(msg);
-    }
-  };
-
-  fetchWithdrawalAddresses = (contents: any): void => {
-    this.logger.info(
-      `Looking up configured withdrawal addresses for chainName=${this.chainName}`
-    );
-    let tokenData = contents[this.chainName]?.tokens;
-    if (tokenData) {
-      for (let entry of tokenData) {
-        let coinType = entry.coin_type;
-        if (this.withdrawalAddresses.has(coinType)) {
-          throw new Error(`Duplicate entry in the resources file ${coinType}`);
-        }
-
-        let withdrawalAddresses = new Set<string>(
-          entry.valid_withdrawal_addresses
-        );
-        this.withdrawalAddresses.set(coinType, withdrawalAddresses);
-      }
     }
   };
 
