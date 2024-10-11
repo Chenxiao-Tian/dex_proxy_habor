@@ -1,8 +1,26 @@
 {
   "Sui Mainnet": {
+    "coins_map": {
+      "DEEP": {
+        "address": "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270",
+        "type": "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
+        "scalar": 1000000
+      },
+      "SUI": {
+        "address": "0x0000000000000000000000000000000000000000000000000000000000000002",
+        "type": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "scalar": 1000000000
+      }
+    },
+    "pools_map": {
+      "DEEP_SUI": {
+        "address": "0xe9aecf5859310f8b596fbe8488222a7fb15a55003455c9f42d1b60fab9cca9ba",
+        "baseCoin": "DEEP",
+        "quoteCoin": "SUI"
+      }
+    },
     "tokens": [
       {
-        "native_name": "SUI",
         "coin_type": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
         "valid_withdrawal_addresses": [
           "0x6854895d7850c7a3478c44e9c5526589be95a7b1a718c9fb0154a567fc2fb232",
@@ -23,21 +41,18 @@
         ]
       },
       {
-        "native_name": "USDC",
         "coin_type": "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN",
         "valid_withdrawal_addresses": [
           "0x4a5d59860daf389d0a34c321fc486aae3a4c1eb3666b684e6c51ff8163c58cc5"
         ]
       },
       {
-        "native_name": "USDT",
         "coin_type": "0xc060006111016b8a020ad5b33834984a437aaa7d3c74c18e09a95d48aceab08c::coin::COIN",
         "valid_withdrawal_addresses": [
           "0x4a5d59860daf389d0a34c321fc486aae3a4c1eb3666b684e6c51ff8163c58cc5"
         ]
       },
       {
-        "native_name": "WETH",
         "coin_type": "0xaf8cd5edc19c4512f4259f0bee101a40d41ebed738ade5874359610ef8eeced5::coin::COIN",
         "valid_withdrawal_addresses": [
           "0x4a5d59860daf389d0a34c321fc486aae3a4c1eb3666b684e6c51ff8163c58cc5"
@@ -47,9 +62,27 @@
   },
   "Sui Mainnet for Test": {
     "comment_0": "For testing using the test wallets on mainnet",
+    "coins_map": {
+      "DEEP": {
+        "address": "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270",
+        "type": "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
+        "scalar": 1000000
+      },
+      "SUI": {
+        "address": "0x0000000000000000000000000000000000000000000000000000000000000002",
+        "type": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "scalar": 1000000000
+      }
+    },
+    "pools_map": {
+      "DEEP_SUI": {
+        "address": "0xe9aecf5859310f8b596fbe8488222a7fb15a55003455c9f42d1b60fab9cca9ba",
+        "baseCoin": "DEEP",
+        "quoteCoin": "SUI"
+      }
+    },
     "tokens": [
       {
-        "native_name": "SUI",
         "coin_type": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
         "valid_withdrawal_addresses": [
           "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
@@ -58,7 +91,6 @@
         ]
       },
       {
-        "native_name": "USDC",
         "coin_type": "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN",
         "valid_withdrawal_addresses": [
           "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
@@ -67,7 +99,6 @@
         ]
       },
       {
-        "native_name": "USDT",
         "coin_type": "0xc060006111016b8a020ad5b33834984a437aaa7d3c74c18e09a95d48aceab08c::coin::COIN",
         "valid_withdrawal_addresses": [
           "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
@@ -76,7 +107,6 @@
         ]
       },
       {
-        "native_name": "WETH",
         "coin_type": "0xaf8cd5edc19c4512f4259f0bee101a40d41ebed738ade5874359610ef8eeced5::coin::COIN",
         "valid_withdrawal_addresses": [
           "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
@@ -87,9 +117,52 @@
     ]
   },
   "Sui Testnet": {
+    "coins_map": {
+      "DEEP": {
+        "address": "0x36dbef866a1d62bf7328989a10fb2f07d769f4ee587c0de4a0a256e57e0a58a8",
+        "type": "0x36dbef866a1d62bf7328989a10fb2f07d769f4ee587c0de4a0a256e57e0a58a8::deep::DEEP",
+        "scalar": 1000000
+      },
+      "SUI": {
+        "address": "0x0000000000000000000000000000000000000000000000000000000000000002",
+        "type": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "scalar": 1000000000
+      },
+      "DBUSDC": {
+        "address": "0xf7152c05930480cd740d7311b5b8b45c6f488e3a53a11c3f74a6fac36a52e0d7",
+        "type": "0xf7152c05930480cd740d7311b5b8b45c6f488e3a53a11c3f74a6fac36a52e0d7::DBUSDC::DBUSDC",
+        "scalar": 1000000
+      },
+      "DBUSDT": {
+        "address": "0xf7152c05930480cd740d7311b5b8b45c6f488e3a53a11c3f74a6fac36a52e0d7",
+        "type": "0xf7152c05930480cd740d7311b5b8b45c6f488e3a53a11c3f74a6fac36a52e0d7::DBUSDT::DBUSDT",
+        "scalar": 1000000
+      }
+    },
+    "pools_map": {
+      "DEEP_SUI": {
+        "address": "0x0d1b1746d220bd5ebac5231c7685480a16f1c707a46306095a4c67dc7ce4dcae",
+        "baseCoin": "DEEP",
+        "quoteCoin": "SUI"
+      },
+      "SUI_DBUSDC": {
+        "address": "0x520c89c6c78c566eed0ebf24f854a8c22d8fdd06a6f16ad01f108dad7f1baaea",
+        "baseCoin": "SUI",
+        "quoteCoin": "DBUSDC"
+      },
+      "DEEP_DBUSDC": {
+        "address": "0xee4bb0db95dc571b960354713388449f0158317e278ee8cda59ccf3dcd4b5288",
+        "baseCoin": "DEEP",
+        "quoteCoin": "DBUSDC"
+      },
+      "DBUSDT_DBUSDC": {
+        "address": "0x69cbb39a3821d681648469ff2a32b4872739d2294d30253ab958f85ace9e0491",
+        "baseCoin": "DBUSDT",
+        "quoteCoin": "DBUSDC"
+      }
+    },
     "tokens": [
       {
-        "native_name": "SUI",
         "coin_type": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
         "valid_withdrawal_addresses": [
           "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
@@ -99,7 +172,6 @@
         ]
       },
       {
-        "native_name": "DEEP",
         "coin_type": "0x36dbef866a1d62bf7328989a10fb2f07d769f4ee587c0de4a0a256e57e0a58a8::deep::DEEP",
         "valid_withdrawal_addresses": [
           "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
@@ -109,7 +181,6 @@
         ]
       },
       {
-        "native_name": "DBUSDT",
         "coin_type": "0xf7152c05930480cd740d7311b5b8b45c6f488e3a53a11c3f74a6fac36a52e0d7::DBUSDT::DBUSDT",
         "valid_withdrawal_addresses": [
           "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
@@ -119,7 +190,6 @@
         ]
       },
       {
-        "native_name": "DBUSDC",
         "coin_type": "0xf7152c05930480cd740d7311b5b8b45c6f488e3a53a11c3f74a6fac36a52e0d7::DBUSDC::DBUSDC",
         "valid_withdrawal_addresses": [
           "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
@@ -129,7 +199,6 @@
         ]
       },
       {
-        "native_name": "GOLD",
         "coin_type": "0xf398b9ecb31aed96c345538fb59ca5a1a2c247c5e60087411ead6c637129f1c4::gold::GOLD",
         "valid_withdrawal_addresses": [
           "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
@@ -139,7 +208,6 @@
         ]
       },
       {
-        "native_name": "FISH",
         "coin_type": "xf398b9ecb31aed96c345538fb59ca5a1a2c247c5e60087411ead6c637129f1c4::fish::FISH",
         "valid_withdrawal_addresses": [
           "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",

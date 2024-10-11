@@ -7,7 +7,7 @@ import { fromHex } from "@mysten/sui/utils";
 const balanceManagers = {
   MANAGER_1: {
     address:
-      "0x9d99510ddcce3e319c90d7caa8ffe81c433d201d404430bfcd08ca0bd85e514c",
+      "0xff40dfdaa475ffa9d86d5e74d321f1f275a079b4e70891ad51bc88fdddfde775",
     tradeCap: "",
   },
   MANAGER_2: {
