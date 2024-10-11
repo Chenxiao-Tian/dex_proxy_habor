@@ -25,3 +25,6 @@ export function convertObjArg(
 
   throw new Error("Invalid argument type");
 }
+
+// January 1, 2050 12:00:00 AM GMT
+export const ORDER_MAX_EXPIRE_TIMESTAMP_MS = 2524608000000;

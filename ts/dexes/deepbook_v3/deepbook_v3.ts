@@ -21,7 +21,8 @@ import {
   OrderCancelledEvent,
   OrderFilledEvent,
 } from "../../order_cache.js";
-import { DeepBookClient } from "@mysten/deepbook-v3";
+import { Coin, DeepBookClient, Pool } from "@mysten/deepbook-v3";
+import { ORDER_MAX_EXPIRE_TIMESTAMP_MS } from "./utils.js";
 import type { NetworkType } from "./types.js";
 import { bcs } from "@mysten/sui/bcs";
 import {
@@ -65,22 +66,20 @@ interface ParsedExchangeError {
 class MandatoryFields {
   static InsertRequest = [
     "pool",
-    "pool_id",
-    "expiration_ts",
     "client_order_id",
     "order_type",
     "side",
     "quantity",
     "price",
   ];
-  static BulkInsertRequest = ["pool", "pool_id", "expiration_ts", "orders"];
+  static BulkInsertRequest = ["pool", "orders"];
   static CancelRequest = ["pool", "client_order_id"];
   static BulkCancelRequest = ["pool", "client_order_ids"];
   static CancelAllRequest = ["pool"];
   static TransactionBlockRequest = ["digest"];
   static EventsFromDigests = ["tx_digests_list"];
   static OrderStatusRequest = ["pool", "client_order_id"];
-  static AllOpenOrdersRequest = ["pool", "pool_id"];
+  static AllOpenOrdersRequest = ["pool"];
   static SuiWithdrawalRequest = ["recipient", "quantity"];
   static WithdrawalRequest = ["coin_type_id", "recipient", "quantity"];
   static ObjectInfoRequest = ["id"];
@@ -115,7 +114,8 @@ export class DeepBookV3 implements DexInterface {
 
   private chainName: string;
   private withdrawalAddresses: Map<string, Set<string>>;
-  private coinTypeId: Map<string, string>;
+  private coinsMap: Record<string, Coin>;
+  private poolsMap: Record<string, Pool>;
 
   private currentEpoch: string | undefined;
 
@@ -153,7 +153,7 @@ export class DeepBookV3 implements DexInterface {
   private static TESTNET_DEEPBOOKV3_PACKAGE_ID: string =
     "0xcbf4748a965d469ea3a36cf0ccc5743b96c2d0ae6dee0762ed3eca65fac07f7e";
   private static MAINNET_DEEPBOOKV3_PACKAGE_ID: string =
-    "0x6f2abaa15ea8f1935968310a196807272b37150878dc4072f2e0cbaa9eca894a";
+    "0x2c8d603bc51326b8c13cef9dd07031a408a48dddb541963357661df5d3204809";
 
   constructor(
     lf: LoggerFactory,
@@ -249,6 +249,16 @@ export class DeepBookV3 implements DexInterface {
       );
     }
 
+    this.chainName = config.dex.chain_name;
+    this.withdrawalAddresses = new Map<string, Set<string>>();
+    this.coinsMap = {};
+    this.poolsMap = {};
+
+    if (this.chainName === undefined) {
+      throw new Error("The key `dex.chain_name` must be present in the config");
+    }
+    this.loadResources();
+
     if (this.balanceManagerId) {
       let balanceManagers = {
         MANAGER: {
@@ -262,12 +272,16 @@ export class DeepBookV3 implements DexInterface {
         address: this.walletAddress,
         env: this.environment,
         balanceManagers: balanceManagers,
+        coins: this.coinsMap,
+        pools: this.poolsMap,
       });
     } else {
       this.mainDeepbookClient = new DeepBookClient({
         client: this.suiClient,
         address: this.walletAddress,
         env: this.environment,
+        coins: this.coinsMap,
+        pools: this.poolsMap,
       });
     }
 
@@ -315,58 +329,48 @@ export class DeepBookV3 implements DexInterface {
       this.executor = undefined;
     }
 
-    this.chainName = config.dex.chain_name;
-    this.withdrawalAddresses = new Map<string, Set<string>>();
-    this.coinTypeId = new Map<string, string>();
-    if (mode === "read-write") {
-      if (this.chainName === undefined) {
-        throw new Error(
-          "The key `dex.chain_name` must be present in the config"
-        );
-      }
-      this.fetchWithdrawalAddresses();
-    }
-
     this.registerEndpoints();
   }
 
-  fetchWithdrawalAddresses = (): void => {
-    const filePrefix = dirname(process.argv[1]);
-    const filename = `${filePrefix}/../../resources/dbv3_withdrawal_addresses.json`;
+  loadResources = (): void => {
     try {
+      const filePrefix = dirname(process.argv[1]);
+      const filename = `${filePrefix}/../../resources/dbv3_withdrawal_addresses.json`;
       let contents = JSON.parse(readFileSync(filename, "utf8"));
+
       this.logger.info(
-        `Looking up configured withdrawal addresses for chainName=${this.chainName} from ${filename}`
+        `Loading resources for chainName=${this.chainName} from ${filename}`
       );
-      let tokenData = contents[this.chainName]?.tokens;
-      if (tokenData) {
-        for (let entry of tokenData) {
-          let coinType = entry.coin_type;
-          if (this.withdrawalAddresses.has(coinType)) {
-            throw new Error(
-              `Duplicate entry in the resources file ${coinType}`
-            );
-          }
+      this.coinsMap = contents[this.chainName].coins_map;
+      this.poolsMap = contents[this.chainName].pools_map;
 
-          let withdrawalAddresses = new Set<string>(
-            entry.valid_withdrawal_addresses
-          );
-          this.withdrawalAddresses.set(coinType, withdrawalAddresses);
-
-          let nativeName: string = entry.native_name;
-          if (this.coinTypeId.has(nativeName)) {
-            throw new Error(
-              `Duplicate native_name entry in the resources file ${coinType}`
-            );
-          }
-
-          this.coinTypeId.set(nativeName, coinType);
-        }
+      if (this.mode === "read-write") {
+        this.fetchWithdrawalAddresses(contents);
       }
     } catch (error) {
-      const msg: string = `Failed to parse withdrawal addresses: ${error}`;
+      const msg: string = `Failed to parse resources file: ${error}`;
       this.logger.error(msg);
       throw new Error(msg);
+    }
+  };
+
+  fetchWithdrawalAddresses = (contents: any): void => {
+    this.logger.info(
+      `Looking up configured withdrawal addresses for chainName=${this.chainName}`
+    );
+    let tokenData = contents[this.chainName]?.tokens;
+    if (tokenData) {
+      for (let entry of tokenData) {
+        let coinType = entry.coin_type;
+        if (this.withdrawalAddresses.has(coinType)) {
+          throw new Error(`Duplicate entry in the resources file ${coinType}`);
+        }
+
+        let withdrawalAddresses = new Set<string>(
+          entry.valid_withdrawal_addresses
+        );
+        this.withdrawalAddresses.set(coinType, withdrawalAddresses);
+      }
     }
   };
 
@@ -1148,22 +1152,15 @@ export class DeepBookV3 implements DexInterface {
 
   getOpenOrdersImpl = async (
     requestId: bigint,
-    pool: string,
-    poolId: PoolId
+    pool: Pool
   ): Promise<Array<any>> => {
-    const tokens: Array<string> = pool.split("_");
-
-    if (tokens.length != 2) {
-      throw new Error("Invalid pool name");
-    }
-
     const tx = new Transaction();
     tx.moveCall({
       target: `${this.deepbookPackageId}::pool::get_account_order_details`,
-      arguments: [tx.object(poolId), tx.object(this.balanceManagerId)],
+      arguments: [tx.object(pool.address), tx.object(this.balanceManagerId)],
       typeArguments: [
-        this.getCoinTypeId(tokens[0]),
-        this.getCoinTypeId(tokens[1]),
+        this.getCoinTypeId(pool.baseCoin),
+        this.getCoinTypeId(pool.quoteCoin),
       ],
     });
 
@@ -1210,19 +1207,18 @@ export class DeepBookV3 implements DexInterface {
     receivedAtMs: number
   ): Promise<RestResult> => {
     assertFields(params, MandatoryFields.AllOpenOrdersRequest);
-
-    const pool: string = params.get("pool");
-    const poolId: PoolId = params.get("pool_id");
-
-    this.logger.debug(
-      `[${requestId}] Fetching all open orders. pool=${pool}, poolId=${poolId}`
-    );
-
     let openOrders = null;
     try {
+      const poolName: string = params.get("pool");
+      const pool: Pool = this.getPool(poolName);
+
+      this.logger.debug(
+        `[${requestId}] Fetching all open orders. pool=${poolName}`
+      );
+
       openOrders = await this.processOpenOrdersResponse(
-        poolId,
-        await this.getOpenOrdersImpl(requestId, pool, poolId)
+        pool.address as PoolId,
+        await this.getOpenOrdersImpl(requestId, pool)
       );
     } catch (error) {
       this.logger.error(`[${requestId}] ${error}`);
@@ -1260,21 +1256,21 @@ export class DeepBookV3 implements DexInterface {
     }
   };
 
-  parseInsertRequest = (request: any): Order => {
+  parseInsertRequest = (request: any, poolId: PoolId): Order => {
     const qty = BigInt(request.quantity);
     const price = BigInt(request.price);
 
     return {
       clientOrderId: request.client_order_id as ClientOrderId,
       status: "PendingInsert",
-      poolId: request.pool_id as PoolId,
+      poolId: poolId,
       qty: qty as Quantity,
       remQty: qty as Quantity,
       execQty: 0n as Quantity,
       price: price as Price,
       type: request.order_type,
       side: request.side,
-      expirationTs: request.expiration_ts as TimestampMs,
+      expirationTs: ORDER_MAX_EXPIRE_TIMESTAMP_MS as TimestampMs,
 
       txDigests: new Array<TxDigest>(),
       exchangeOrderId: null,
@@ -1410,21 +1406,18 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<RestResult> => {
     assertFields(params, MandatoryFields.InsertRequest);
 
-    const pool: string = params.pool;
+    const poolName: string = params.pool;
+    const pool: Pool = this.getPool(poolName);
 
-    let order = this.parseInsertRequest(params);
+    let order = this.parseInsertRequest(params, pool.address as PoolId);
     this.orderCache.add(order.clientOrderId, order);
 
     const isBid = order.side === "BUY" ? true : false;
     const orderType = DeepBookV3.parseOrderType(order.type);
     const selfMatchingPrevention: number = 2; // CANCEL_MAKER
 
-    const tokens: Array<string> = pool.split("_");
-    if (tokens.length != 2) {
-      throw new Error("Invalid pool name");
-    }
-    const baseCoinTypeId: string = this.getCoinTypeId(tokens[0]);
-    const quoteCoinTypeId: string = this.getCoinTypeId(tokens[1]);
+    const baseCoinTypeId: string = this.getCoinTypeId(pool.baseCoin);
+    const quoteCoinTypeId: string = this.getCoinTypeId(pool.quoteCoin);
 
     this.logger.debug(
       `[${requestId}] Inserting order: params=${JSON.stringify(params)}`
@@ -1506,11 +1499,11 @@ export class DeepBookV3 implements DexInterface {
     const status = response.effects!.status.status;
     if (status === "success") {
       this.logger.info(
-        `[${requestId}] Order inserted for pool=${pool}. Digest=${response.digest}`
+        `[${requestId}] Order inserted for pool=${poolName}. Digest=${response.digest}`
       );
     } else {
       this.logger.error(
-        `[${requestId}] Failed to insert order for pool=${pool}. Digest=${response.digest}`
+        `[${requestId}] Failed to insert order for pool=${poolName}. Digest=${response.digest}`
       );
     }
 
@@ -1580,7 +1573,7 @@ export class DeepBookV3 implements DexInterface {
     return events;
   };
 
-  parseBulkInsertRequest = (request: any): Array<Order> => {
+  parseBulkInsertRequest = (request: any, poolId: PoolId): Array<Order> => {
     let result = new Array<Order>();
     for (let order of request.orders) {
       const qty = BigInt(order.quantity);
@@ -1589,14 +1582,14 @@ export class DeepBookV3 implements DexInterface {
       result.push({
         clientOrderId: order.client_order_id as ClientOrderId,
         status: "PendingInsert",
-        poolId: request.pool_id as PoolId,
+        poolId: poolId,
         qty: qty as Quantity,
         remQty: qty as Quantity,
         execQty: 0n as Quantity,
         price: price as Price,
         type: order.order_type,
         side: order.side,
-        expirationTs: request.expiration_ts as TimestampMs,
+        expirationTs: ORDER_MAX_EXPIRE_TIMESTAMP_MS as TimestampMs,
 
         txDigests: new Array<TxDigest>(),
         exchangeOrderId: null,
@@ -1615,21 +1608,18 @@ export class DeepBookV3 implements DexInterface {
     assertFields(params, MandatoryFields.BulkInsertRequest);
 
     // Will be same for all orders as all are on same pool
-    const pool: string = params.pool;
+    const poolName: string = params.pool;
+    const pool: Pool = this.getPool(poolName);
 
-    let orders = this.parseBulkInsertRequest(params);
+    let orders = this.parseBulkInsertRequest(params, pool.address as PoolId);
     let clientOrderIds = new Array<ClientOrderId>();
     for (let order of orders) {
       this.orderCache.add(order.clientOrderId, order);
       clientOrderIds.push(order.clientOrderId);
     }
 
-    const tokens: Array<string> = pool.split("_");
-    if (tokens.length != 2) {
-      throw new Error("Invalid pool name");
-    }
-    const baseCoinTypeId: string = this.getCoinTypeId(tokens[0]);
-    const quoteCoinTypeId: string = this.getCoinTypeId(tokens[1]);
+    const baseCoinTypeId: string = this.getCoinTypeId(pool.baseCoin);
+    const quoteCoinTypeId: string = this.getCoinTypeId(pool.quoteCoin);
 
     let response = null;
     try {
@@ -1642,6 +1632,7 @@ export class DeepBookV3 implements DexInterface {
         let tx = new Transaction();
 
         for (let order of orders) {
+          let orderType = DeepBookV3.parseOrderType(order.type);
           let tradeProof = tx.moveCall({
             target: `${this.deepbookPackageId}::balance_manager::generate_proof_as_owner`,
             arguments: [tx.object(this.balanceManagerId)],
@@ -1654,7 +1645,7 @@ export class DeepBookV3 implements DexInterface {
               tx.object(this.balanceManagerId),
               tradeProof,
               tx.pure.u64(order.clientOrderId),
-              tx.pure.u8(DeepBookV3.parseOrderType(order.type)),
+              tx.pure.u8(orderType),
               tx.pure.u8(selfMatchingPrevention),
               tx.pure.u64(order.price),
               tx.pure.u64(order.qty),
@@ -1706,11 +1697,11 @@ export class DeepBookV3 implements DexInterface {
     const status = response.effects!.status.status;
     if (status === "success") {
       this.logger.info(
-        `[${requestId}] Bulk orders inserted for pool=${pool}. Digest=${response.digest}`
+        `[${requestId}] Bulk orders inserted for pool=${poolName}. Digest=${response.digest}`
       );
     } else {
       this.logger.error(
-        `[${requestId}] Failed to bulk insert orders for pool=${pool}. Digest=${response.digest}`
+        `[${requestId}] Failed to bulk insert orders for pool=${poolName}. Digest=${response.digest}`
       );
     }
 
@@ -2687,13 +2678,43 @@ export class DeepBookV3 implements DexInterface {
 
     let posInfo = null;
     try {
-      posInfo = await this.mainDeepbookClient.checkManagerBalance(
+      let response = await this.mainDeepbookClient.checkManagerBalance(
         "MANAGER",
         coin
       );
+
+      posInfo = {
+        coinType: response.coinType,
+        availableBalance: response.balance,
+        lockedBalance: 0,
+      };
+
+      let tasks = [];
+      for (let poolName in this.poolsMap) {
+        let pool: Pool = this.poolsMap[poolName];
+        if (
+          coin === "DEEP" ||
+          coin === pool.baseCoin ||
+          coin === pool.quoteCoin
+        ) {
+          tasks.push(this.getLockedBalance(requestId, coin, poolName, pool));
+        }
+      }
+
+      (await Promise.all(tasks)).forEach((value) => {
+        posInfo!.lockedBalance += value;
+      });
     } catch (error) {
       this.logger.error(`[${requestId}] ${error}`);
       throw error;
+    } finally {
+      if (this.log_responses) {
+        this.logger.debug(
+          `[${requestId}] getBalanceManagerBalanceInfo coin=${coin} response: ${JSON.stringify(
+            posInfo
+          )}`
+        );
+      }
     }
 
     let jsonString = JSON.stringify(posInfo, (_, value) =>
@@ -2704,6 +2725,49 @@ export class DeepBookV3 implements DexInterface {
       statusCode: 200,
       payload: JSON.parse(jsonString),
     };
+  };
+
+  getLockedBalance = async (
+    requestId: bigint,
+    coin: string,
+    poolName: string,
+    pool: Pool
+  ): Promise<number> => {
+    let lockedBalance: number = 0;
+
+    let response = null;
+    try {
+      response = await this.mainDeepbookClient.lockedBalance(
+        poolName,
+        "MANAGER"
+      );
+
+      if (coin === pool.baseCoin) {
+        lockedBalance += response.base;
+      } else if (coin === pool.quoteCoin) {
+        lockedBalance += response.quote;
+      }
+
+      if (coin === "DEEP") {
+        lockedBalance += response.deep;
+      }
+    } catch (error) {
+      // Return lockedBalance = 0 on getting exception because the SDK throws exception
+      // if we haven't yet traded at that pool
+      //
+      // TODO: implement our own method to get locked balance from on-chain instead of
+      // using the SDK to differentiate between exception due not traded pool or a general exception
+    } finally {
+      if (this.log_responses) {
+        this.logger.debug(
+          `[${requestId}] getLockedBalance coin=${coin}, pool=${poolName}: response: ${JSON.stringify(
+            response
+          )}`
+        );
+      }
+    }
+
+    return lockedBalance;
   };
 
   depositIntoBalanceManager = async (
@@ -2987,12 +3051,21 @@ export class DeepBookV3 implements DexInterface {
   }
 
   getCoinTypeId(coinName: string): string {
-    const coinTypeId = this.coinTypeId.get(coinName);
-    if (coinTypeId === undefined) {
-      throw new Error(`${coinName} not loaded`);
+    const coin = this.coinsMap[coinName];
+    if (coin === undefined) {
+      throw new Error(`Coin ${coinName} not added in dex-proxy resources file`);
     }
 
-    return coinTypeId;
+    return coin.type;
+  }
+
+  getPool(poolName: string): Pool {
+    const pool = this.poolsMap[poolName];
+    if (pool === undefined) {
+      throw new Error(`Pool ${poolName} not added in dex-proxy resources file`);
+    }
+
+    return pool;
   }
 
   parsePrice(exchangeOrderId: ExchangeOrderId): Price {
