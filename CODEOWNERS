@@ -6,3 +6,8 @@ Dockerfile
 Dockerfile.ts
 Dockerfile.deepbook
 container/run
+
+
+# The dex_proxy exchange whitelists file needs to be approved by one of the following people
+[exchange-address-approvers][1] @james.bowe @mark.hingston2 @greg.markey @chris.duck @nitul.datt
+/resources/
