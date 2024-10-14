@@ -2,23 +2,26 @@
   "logging": {
     "level": "debug"
   },
-  "key_store_file_path": "./dexes/deepbook_v3/wallets/wallet_1.txt",
+  "key_store_file_path": "./dexes/deepbook_v3/wallets/wallet.txt",
   "server": {
-    "port": 3001
+    "port": 3000
   },
   "dex": {
     "name": "deepbook_v3",
     "log_responses": true,
     "chain_name": "Sui Mainnet for Test",
     "env": "mainnet",
+    "subscribe_to_events": false,
     "wallet_address": "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c",
+    "balance_manager_id": "0x1fe5a96fb4510de480663b1f9a14307d4e584e309d560c1dd36dcdf9556ab84c",
     "exchange_connectors": {
       "rest": {
         "url": "https://sui-mainnet.g.allthatnode.com/full/json_rpc",
         "comment_1": "The following header section is only required by ATN. Comment it out if using a different RPC service",
         "headers": {
           "x-allthatnode-api-key": "35278f2e995d4b13b7a4f00648b42410"
-        }
+        },
+        "_url": "https://fullnode.mainnet.sui.io:443"
       },
       "ws": {
         "url": "wss://sui-mainnet-rpc.allthatnode.com/jUaHO5Ln9iumZgs24kEbKPvxT2buRqLp",
@@ -28,11 +31,11 @@
       }
     },
     "gas_manager": {
-      "max_balance_per_instance_mist": "2,000,000,000",
-      "min_balance_per_instance_mist": "1,000,000,000",
+      "max_balance_per_instance_mist": "1,000,000,000",
+      "min_balance_per_instance_mist": "100,000,000",
       "gas_budget_mist": "100,000,000",
       "sync_interval_s": 30,
-      "gas_coin_expected_count": 6
+      "gas_coin_expected_count": 2
     },
     "order_cache": {
       "purge_interval_s": 600
