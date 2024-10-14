@@ -11,10 +11,26 @@
   - ```pip install .```
   - ```python dex_proxy.py -s -c dexes/paradex/paradex.config.json -n pdex_proxy```
 
-### Notes 
+#### Notes 
 - We are mounting our working directory directly to the image so you shouldn't need to rebuild the image to develop
 - We assume existence of valid ssh keys in the host ```ssh-agent``` and they are forwarded to the ```sshd``` inside the Docker image
 - If you are on MacOS you are probably using ```podman``` and want to replace ```docker``` accordingly
 - If you are having dns problems inside container, you should try running the container with ```--net=host``` to bridge the network interfaces
 
 
+
+### Verifying Exchange Whitelists in the resources directory
+- Checks to be performed by reviewers:
+  - Verify that ```token contract addresses``` are present in the ```token_contracts``` table in the ```prod TradingDB```.
+  ```postgresql
+  select  address, token_name, chain, added_timestamp from token_contracts where chain='<chain_name>' and address='<address>' and token_name='<token_name>';
+  ```
+  - Verify that ```pool adresses``` are present in the ```pools``` table in the ```prod TradingDB```.
+  ```postgresql
+  select id, address, dex_name, chain from pools where chain='<chain_name>' and dex_name='<dex_name>' and address='<address>';
+  ```
+  - Verify that the ```withdrawal_addresses``` are present in the ```exchange_addresses``` table in the ```prod TradingDB```.
+  ```postgresql
+  select account, token, address from exchange_addresses where token='<token_name>' and address='<address>';
+  ```
+  - Verify the existence and correctness of the addresses on chain using a ```block explorer```.
