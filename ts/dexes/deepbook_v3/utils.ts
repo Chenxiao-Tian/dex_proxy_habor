@@ -43,6 +43,12 @@ export const MAINNET_COINS_MAP: Record<string, Coin> = {
     type: "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
     scalar: 1000000000,
   },
+  USDC: {
+    address:
+      "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7",
+    type: "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+    scalar: 1000000,
+  },
 };
 
 export const TESTNET_COINS_MAP: Record<string, Coin> = {
@@ -78,6 +84,12 @@ export const MAINNET_POOLS_MAP: Record<string, Pool> = {
       "0xe9aecf5859310f8b596fbe8488222a7fb15a55003455c9f42d1b60fab9cca9ba",
     baseCoin: "DEEP",
     quoteCoin: "SUI",
+  },
+  DEEP_USDC: {
+    address:
+      "0xde096bb2c59538a25c89229127fe0bc8b63ecdbe52a3693099cc40a1d8a2cfd4",
+    baseCoin: "DEEP",
+    quoteCoin: "USDC",
   },
 };
 
