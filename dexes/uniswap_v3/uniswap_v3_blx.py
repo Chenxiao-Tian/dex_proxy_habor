@@ -3,17 +3,19 @@ import os
 import uuid
 
 import aiohttp
-from eth_account.signers.local import LocalAccount
-from hexbytes import HexBytes
-from pyutils.dex_helper.eth_rpc import EthRPCDexHelper
-from web3 import Web3
+import websockets
 from eth_account import Account, messages
+from eth_account.signers.local import LocalAccount
+from google.protobuf.json_format import ParseDict
+from hexbytes import HexBytes
 from web3.exceptions import BlockNotFound
 
 from pantheon.instruments_source import InstrumentLifecycle, InstrumentsLiveSource, InstrumentUsageExchanges
 from pantheon.market_data_types import InstrumentId
+from pyutils.dex_helper.eth_rpc import EthRPCDexHelper
 from pyutils.exchange_apis.uniswapV3_api import *
 from pyutils.exchange_connectors import ConnectorType
+from . import bundle_pb2
 from ..dex_common import DexCommon
 
 
@@ -60,6 +62,11 @@ class UniswapV3Bloxroute(DexCommon):
         self.__native_token = config['native_token']
         self.__targeted_block_info = BlockInfo()
         self.__tx_hash_to_order_info: Dict[str, OrderInfo] = {}
+
+        # WS connection
+        self._titan_ws = None
+        self._titan_ws_url = config['titan_ws']['ws_url']
+        self._titan_api_key = config['titan_ws']['api_key']
 
         # For RPC to builders
         self.__builders_rpc: list[str] = config['builders_rpc']
@@ -148,7 +155,7 @@ class UniswapV3Bloxroute(DexCommon):
         side = Side.BUY if params['side'] == 'BUY' else Side.SELL
         fee_rate = int(params['fee_rate'])
         gas_limit = 500000  # TODO: Check for the most suitable value
-        timeout_s = 0 # it will be set properly in further code before sending to builders
+        timeout_s = 0  # it will be set properly in further code before sending to builders
         order = OrderRequest(client_request_id, symbol, base_ccy_qty,
                              quote_ccy_qty, side, fee_rate, gas_limit, timeout_s, received_at_ms)
         return order
@@ -165,19 +172,16 @@ class UniswapV3Bloxroute(DexCommon):
             next_block_num, next_block_uuid, next_block_expected_time_s = self.__update_and_get_next_block_num()
             order.deadline_since_epoch_s = next_block_expected_time_s + self.__order_deadline_buffer_s
             base_ccy_symbol, quote_ccy_symbol, instrument = self.__split_symbol_to_base_quote_ccy(order.symbol)
-            self._logger.debug(
-                f'Inserting={order}, gas_price_wei={gas_price_wei}')
+            self._logger.debug(f'Inserting={order}, gas_price_wei={gas_price_wei}')
             self._request_cache.add(order)
 
-            if (not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol)):
-                self._request_cache.finalise_request(
-                    client_request_id, RequestStatus.FAILED)
+            if not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol):
+                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'message': 'unexpected instrument native code'}}
 
             targeted_block = params.get('targeted_block')
-            if ((targeted_block is not None) and (int(targeted_block) != next_block_num)):
-                self._request_cache.finalise_request(
-                    client_request_id, RequestStatus.FAILED)
+            if targeted_block is not None and int(targeted_block) != next_block_num:
+                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'message': f'targeted_block={targeted_block} != next_block={next_block_num}'}}
 
             nonce = self.__dex_helper.get_txs_count() + len(self.__targeted_block_info.raw_txs_in_targeted_block)
@@ -393,7 +397,7 @@ class UniswapV3Bloxroute(DexCommon):
 
         base_ccy_symbol, quote_ccy_symbol, instrument = self.__split_symbol_to_base_quote_ccy(request.symbol)
 
-        if (not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol)):
+        if not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol):
             return ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message='unexpected instrument native code')
 
         request.deadline_since_epoch_s = next_block_expected_time_s + self.__order_deadline_buffer_s
@@ -405,7 +409,7 @@ class UniswapV3Bloxroute(DexCommon):
         self.__tx_hash_to_order_info[tx_hash] = OrderInfo(gas_price_wei, request.base_ccy_qty, request.quote_ccy_qty)
 
         send_bundle_coroutine = self.__send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block, next_block_num,
-                                                  next_block_uuid)
+                                                   next_block_uuid)
 
         return ApiResult(nonce=request.nonce, tx_hash=tx_hash, pending_task=send_bundle_coroutine)
 
@@ -516,8 +520,8 @@ class UniswapV3Bloxroute(DexCommon):
                     token0_amount = int(swap_log[0]['args']['amount0'])
                     token1_amount = int(swap_log[0]['args']['amount1'])
 
-                    if (request.side == Side.BUY):
-                        if (token0_amount > 0):
+                    if request.side == Side.BUY:
+                        if token0_amount > 0:
                             base_ccy_amount = Decimal(
                                 self._api.from_native_amount(base_ccy_symbol, abs(token1_amount)))
                             quote_ccy_amount = Decimal(
@@ -528,7 +532,7 @@ class UniswapV3Bloxroute(DexCommon):
                             quote_ccy_amount = Decimal(
                                 self._api.from_native_amount(quote_ccy_symbol, token1_amount))
                     else:
-                        if (token0_amount > 0):
+                        if token0_amount > 0:
                             base_ccy_amount = Decimal(
                                 self._api.from_native_amount(base_ccy_symbol, token0_amount))
                             quote_ccy_amount = Decimal(
@@ -572,11 +576,11 @@ class UniswapV3Bloxroute(DexCommon):
                             continue
 
                         targeted_block_num = request.dex_specific.get('targeted_block_num')
-                        if targeted_block_num == None or targeted_block_num > curr_block_num:
+                        if targeted_block_num is None or targeted_block_num > curr_block_num:
                             continue
 
-                        if (targeted_block_num not in block_num_vs_block_data) or \
-                                (block_num_vs_block_data[targeted_block_num] == None):
+                        if targeted_block_num not in block_num_vs_block_data or block_num_vs_block_data[
+                            targeted_block_num] is None:
                             targeted_block_data = await self._api.get_block(targeted_block_num)
                             block_num_vs_block_data[targeted_block_num] = targeted_block_data
 
@@ -584,11 +588,12 @@ class UniswapV3Bloxroute(DexCommon):
                         else:
                             targeted_block_data = block_num_vs_block_data[targeted_block_num]
 
-                        if targeted_block_data == None:
+                        if targeted_block_data is None:
                             continue
 
                         if request.request_type == RequestType.ORDER and request.deadline_since_epoch_s <= targeted_block_data.timestamp:
-                            self._logger.error(f'Wrong order deadline might have been set. Please check. Request={request}')
+                            self._logger.error(
+                                f'Wrong order deadline might have been set. Please check. Request={request}')
 
                         request_mined = False
                         for tx_hash, _ in request.tx_hashes:
@@ -598,7 +603,7 @@ class UniswapV3Bloxroute(DexCommon):
                                 request_mined = True
                                 break
 
-                        if (not request_mined):
+                        if not request_mined:
                             await self.on_request_status_update(request.client_request_id, RequestStatus.FAILED, None)
                         # else:
                         #     transaction_status_poller will handle finalising the request
@@ -648,6 +653,8 @@ class UniswapV3Bloxroute(DexCommon):
             uniswap_router_address = Web3.to_checksum_address(contracts_address_json["uniswap_router_address"])
 
         await self._api.initialize(private_key, uniswap_router_address, self.__tokens_from_res_file.values())
+
+        self.pantheon.spawn(self._consume_titan_ws_msg())
 
         await super().start(private_key)
 
@@ -718,25 +725,46 @@ class UniswapV3Bloxroute(DexCommon):
     async def __send_bundle(self, txs_list, targeted_block: int, targeted_block_uuid: str):
         bundle_id = self.__bundle_id
         self.__bundle_id += 1
-        body = {
-            "jsonrpc": "2.0",
-            "id": bundle_id,
-            "method": "eth_sendBundle",
-            "params": [
+
+        titan_ws_body = {
+            "txs": txs_list,
+            "blockNumber": targeted_block,
+            "replacementUuid": targeted_block_uuid,
+            "sessionId": str(bundle_id),
+        }
+
+        self._logger.info(f'Sending {titan_ws_body} to Titan WS')
+
+        # message PWebsocketBundleArgs {
+        #     repeated bytes txs = 1;
+        #     uint64 block_number = 2;
+        #     repeated string reverting_tx_hashes = 3;
+        #     string replacement_uuid = 4;
+        #     string session_id = 5;
+        #     uint64 client_id = 6;
+        # }
+        ws_str = ParseDict(titan_ws_body, bundle_pb2.PWebsocketBundleArgs()).SerializeToString()
+        await self._shoot_bundle_ws(ws_str)
+
+        rest_body = {
+            'jsonrpc': '2.0',
+            'id': bundle_id,
+            'method': 'eth_sendBundle',
+            'params': [
                 {
-                    "txs": txs_list,
-                    "blockNumber": Web3.to_hex(targeted_block),
-                    "replacementUuid": targeted_block_uuid
+                    'txs': txs_list,
+                    'blockNumber': Web3.to_hex(targeted_block),
+                    'replacementUuid': targeted_block_uuid
                 }
             ]
         }
 
-        json_str = json.dumps(body)
-        self._logger.info(f"Sending {json_str} to builders")
+        rest_str = json.dumps(rest_body)
+        self._logger.info(f"Sending {rest_str} to builders")
 
         sign_begin_at_ms = int(time.time() * 1_000)
-        
-        message = messages.encode_defunct(text=Web3.keccak(text=json_str).hex())
+
+        message = messages.encode_defunct(text=Web3.keccak(text=rest_str).hex())
         public_key_address = self.__flashbot_signing_account.address
         signature = Account.sign_message(message, self.__flashbot_signing_account.key).signature.hex()
         flashbot_signature = f"{public_key_address}:{signature}"
@@ -744,18 +772,28 @@ class UniswapV3Bloxroute(DexCommon):
         signed_header["X-Flashbots-Signature"] = flashbot_signature
 
         signed_at_ms = int(time.time() * 1_000)
-        self._logger.info(f"stat=signBundleTelem, responseDelayMs={signed_at_ms - sign_begin_at_ms}")
+        self._logger.info(f'stat=signBundleTelem, responseDelayMs={signed_at_ms - sign_begin_at_ms}')
 
         bundle_jobs = []
         for builder_rpc_url in self.__builders_rpc:
-            if "flashbots" in builder_rpc_url or "titanbuilder" in builder_rpc_url:
-                bundle_jobs.append(self.__shoot_bundle(builder_rpc_url, signed_header, json_str))
+            if "flashbots" in builder_rpc_url:
+                bundle_jobs.append(self._shoot_bundle_rest(builder_rpc_url, signed_header, rest_str))
             else:
-                bundle_jobs.append(self.__shoot_bundle(builder_rpc_url, self.__builders_request_header, json_str))
+                bundle_jobs.append(self._shoot_bundle_rest(builder_rpc_url, self.__builders_request_header, rest_str))
 
         await asyncio.gather(*bundle_jobs)
 
-    async def __shoot_bundle(self, builder_url: str, header: dict, json_str: str):
+    async def _shoot_bundle_ws(self, ws_str: str):
+        if self._titan_ws is None:
+            return
+
+        try:
+            await self._titan_ws.send(ws_str)
+        except websockets.ConnectionClosed:
+            self._logger.info('Client disconnected')
+            self._titan_ws = None
+
+    async def _shoot_bundle_rest(self, builder_url: str, header: dict, json_str: str):
         try:
             send_at_ms = int(time.time() * 1_000)
             result = await self.__builders_session.post(builder_url, data=json_str, headers=header)
@@ -773,3 +811,16 @@ class UniswapV3Bloxroute(DexCommon):
             self._logger.info(f"stat=bundleTelem, builder={builder_url}, responseDelayMs={resp_rece_at_ms - send_at_ms}")
         except Exception as e:
             self._logger.error(f"Error posting bundle to {builder_url}: {e}")
+
+    async def _consume_titan_ws_msg(self):
+        async for ws in websockets.connect(self._titan_ws_url, extra_headers={'Authorization': self._titan_api_key}):
+            self._titan_ws = ws
+            try:
+                async for msg in self._titan_ws:
+                    self._logger.info(f'Received {msg}')
+            except websockets.ConnectionClosed:
+                self._logger.info('Client disconnected')
+                self._titan_ws = None
+            except Exception as e:
+                self._logger.warning(f'Something is wrong while handling subscription: {repr(e)}')
+                self._titan_ws = None
