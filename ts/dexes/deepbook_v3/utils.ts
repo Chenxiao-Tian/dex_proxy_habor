@@ -37,6 +37,12 @@ export const MAINNET_COINS_MAP: Record<string, Coin> = {
     type: "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
     scalar: 1000000,
   },
+  SBETH: {
+    address:
+      "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29",
+    type: "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
+    scalar: 100000000,
+  },
   SUI: {
     address:
       "0x0000000000000000000000000000000000000000000000000000000000000002",
@@ -60,6 +66,12 @@ export const MAINNET_COINS_MAP: Record<string, Coin> = {
       "0xaf8cd5edc19c4512f4259f0bee101a40d41ebed738ade5874359610ef8eeced5",
     type: "0xaf8cd5edc19c4512f4259f0bee101a40d41ebed738ade5874359610ef8eeced5::coin::COIN",
     scalar: 100000000,
+  },
+  WHUSDC: {
+    address:
+      "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf",
+    type: "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN",
+    scalar: 1000000,
   },
 };
 
@@ -101,6 +113,30 @@ export const MAINNET_POOLS_MAP: Record<string, Pool> = {
     address:
       "0xf948981b806057580f91622417534f491da5f61aeaf33d0ed8e69fd5691c95ce",
     baseCoin: "DEEP",
+    quoteCoin: "USDC",
+  },
+  SBETH_USDC: {
+    address:
+      "0x1109352b9112717bd2a7c3eb9a416fff1ba6951760f5bdd5424cf5e4e5b3e65c",
+    baseCoin: "SBETH",
+    quoteCoin: "USDC",
+  },
+  SUI_USDC: {
+    address:
+      "0xe05dafb5133bcffb8d59f4e12465dc0e9faeaa05e3e342a08fe135800e3e4407",
+    baseCoin: "SUI",
+    quoteCoin: "USDC",
+  },
+  USDT_USDC: {
+    address:
+      "0x52f9bf16d9e7eff79da73d5e3dea39fe1ef8c77684bf4ec2c6566b41396404d0",
+    baseCoin: "USDT",
+    quoteCoin: "USDC",
+  },
+  WHUSDC_USDC: {
+    address:
+      "0xc69f7755fec146583e276a104bcf91e0c9f0cab91dcdb1c202e8d76a5a5a1101",
+    baseCoin: "WHUSDC",
     quoteCoin: "USDC",
   },
 };
