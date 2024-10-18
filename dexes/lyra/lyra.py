@@ -1045,7 +1045,6 @@ class Lyra(DexCommon):
                 # Leaving this empty as the `address_to` is hardcoded in the
                 # pyutils api call and is our L1 wallet address
                 address_to="",
-                # Unused
                 gas_limit=gas_limit,
                 request_path=path,
                 received_at_ms=received_at_ms,
