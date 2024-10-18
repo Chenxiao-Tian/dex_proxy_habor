@@ -65,7 +65,7 @@
     "key_store_file_path": "./dexes/uniswap_v3/test/wallet.json",
     "dex": {
         "name": "chainArb-uni3",
-        "chain_name": "Arbitrum Mainnet For Testing",
+        "chain_name": "Arbitrum Sepolia",
         "connectors": {
             "uniswap_v3_arb": {
                 "web3": {
@@ -96,13 +96,13 @@
                 }
             }
         },
-        "gas_price_tracker": {
-            "http_url": "https://arbitrum-mainnet.infura.io/v3/7caed52cb5f943a6977f49447ab73e4d",
-            "ws_url": "wss://arbitrum-mainnet.infura.io/ws/v3/7caed52cb5f943a6977f49447ab73e4d",
-            "use_fee_history": true,
-            "percentile_priority_fee_fast": 10,
-            "percentile_priority_fee_med": 5,
-            "percentile_priority_fee_slow": 2
+        "fireblocks": {
+            "poll_interval_s": 600,
+            "native_asset": "ETH",
+            "token_types": [
+                "ERC20",
+                "BASE_ASSET"
+            ]
         },
         "max_allowed_gas_price_gwei": 50,
         "request_cache": {
