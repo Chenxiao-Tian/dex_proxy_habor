@@ -35,26 +35,38 @@
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
         "uniswap_router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564"
     },
-    "Arbitrum Sepolia": {
+    "Arbitrum Mainnet For Testing": {
+        "_comment_1": "Arbitrum Mainnet For Testing: it has valid arb mainnet tokens address but the withdrawal_addresses are of our internal test wallets, it is created for testing purposes",
         "tokens": [
             {
                 "symbol": "ETH",
                 "valid_withdrawal_addresses": [
-                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
-                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68",
-                    "0x194c851021ABc7f64B51D11b58e251A8370d54dc"
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+                ]
+            },
+            {
+                "symbol": "WETH",
+                "address": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+                "valid_withdrawal_addresses": [
+                    "0x27BFfB0f09C18539f9a47a39958Bb149Fe42A155"
                 ]
             },
             {
                 "symbol": "USDC",
-                "address": "0x1870Dc7A474e045026F9ef053d5bB20a250Cc084",
+                "address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
                 "valid_withdrawal_addresses": [
-                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
-                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68",
-                    "0x194c851021ABc7f64B51D11b58e251A8370d54dc"
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+                ]
+            },
+            {
+                "symbol": "USDT",
+                "address": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+                "valid_withdrawal_addresses": [
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
                 ]
             }
         ],
+        "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
         "uniswap_router_address": "0xE592427A0AEce92De3Edee1F18E0157C05861564"
     }
 }
