@@ -453,7 +453,7 @@ class UniswapV3Arb(DexCommon):
 
     def _on_fireblocks_tokens_whitelist_refresh(self, tokens_from_fireblocks: dict):
         for symbol, (_, address) in tokens_from_fireblocks.items():
-            if symbol == self._config["fireblocks"]["native_asset"]:
+            if symbol == 'ETHAETH':
                 symbol = self.__native_token
 
             if len(address) == 0:
