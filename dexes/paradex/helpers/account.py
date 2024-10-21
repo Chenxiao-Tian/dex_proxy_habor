@@ -9,7 +9,8 @@ from starknet_py.utils.typed_data import TypedData as TypedDataDataclass
 
 
 from .typed_data import TypedData
-from .utils import message_signature
+
+import libsigner
 
 import libsigner
 
@@ -47,5 +48,5 @@ class Account(StarknetAccount):
 
         typed_data_dataclass = TypedDataDataclass.from_dict(typed_data)
         msg_hash = typed_data_dataclass.message_hash(self.address)
-        r, s = message_signature(msg_hash=msg_hash, priv_key=self.signer.key_pair.private_key)
-        return [r, s]
+        r, s = libsigner.sign_message_hash(message_hash=hex(msg_hash), private_key=hex(self.signer.key_pair.private_key))
+        return [int(r, 16), int(s, 16)]
