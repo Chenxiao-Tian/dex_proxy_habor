@@ -41,27 +41,3 @@ def compute_hash_on_elements(data: Sequence) -> int:
     H([x,y,z]) = h(h(x,y),z) = H([w, z]) where w = h(x,y).
     """
     return functools.reduce(pedersen_hash, [*data, len(data)], 0)
-
-
-def message_signature(
-    msg_hash: int, priv_key: int, seed: Optional[int] = None
-) -> tuple[int, int]:
-    """
-    Signs the message with private key.
-    """
-    # k should be a strong cryptographical random
-    # See: https://tools.ietf.org/html/rfc6979
-    k = generate_k_rfc6979(msg_hash, priv_key, seed)
-    return rs_sign(private_key=priv_key, msg_hash=msg_hash, k=k)
-
-
-def verify_message_signature(
-    msg_hash: int, signature: List[int], public_key: int
-) -> bool:
-    """
-    Verifies ECDSA signature of a given message hash with a given public key.
-    Returns true if public_key signs the message.
-    """
-    sig_r, sig_s = signature
-    sig_w = pow(sig_s, -1, EC_ORDER)
-    return rs_verify(msg_hash=msg_hash, r=sig_r, s=sig_w, public_key=public_key)
