@@ -669,7 +669,7 @@
                 ]
             },
             {
-                "symbol:": "STETH",
+                "symbol": "STETH",
                 "address": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
                 "valid_withdrawal_addresses": [
                   "0xe71cab44917bf40b072b47138a76006558cb29c6",
