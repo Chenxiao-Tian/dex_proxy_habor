@@ -745,6 +745,9 @@ class UniswapV3Bloxroute(DexCommon):
 
         await self._shoot_bundle_ws(send_bundle_msg_bytes)
 
+        if len(self.__builders_rpc) == 0:
+            return
+
         rest_body = {
             'jsonrpc': '2.0',
             'id': bundle_id,
