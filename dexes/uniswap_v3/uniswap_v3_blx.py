@@ -726,15 +726,6 @@ class UniswapV3Bloxroute(DexCommon):
         bundle_id = self.__bundle_id
         self.__bundle_id += 1
 
-        titan_ws_body = {
-            "txs": txs_list,
-            "blockNumber": targeted_block,
-            "replacementUuid": targeted_block_uuid,
-            "sessionId": str(bundle_id),
-        }
-
-        self._logger.info(f'Sending {titan_ws_body} to Titan WS')
-
         # message PWebsocketBundleArgs {
         #     repeated bytes txs = 1;
         #     uint64 block_number = 2;
@@ -743,8 +734,16 @@ class UniswapV3Bloxroute(DexCommon):
         #     string session_id = 5;
         #     uint64 client_id = 6;
         # }
-        ws_str = ParseDict(titan_ws_body, bundle_pb2.PWebsocketBundleArgs()).SerializeToString()
-        await self._shoot_bundle_ws(ws_str)
+        send_bundle_msg_bytes = bundle_pb2.PWebsocketBundleArgs(
+            txs=[bytes.fromhex(tx[2:]) for tx in txs_list],
+            block_number=targeted_block,
+            reverting_tx_hashes=[],
+            replacement_uuid=targeted_block_uuid,
+            session_id="1",
+            client_id=0
+        ).SerializeToString()
+
+        await self._shoot_bundle_ws(send_bundle_msg_bytes)
 
         rest_body = {
             'jsonrpc': '2.0',
