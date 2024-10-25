@@ -14,6 +14,7 @@
     "subscribe_to_events": false,
     "wallet_address": "0x56f98ae294a565671cecc3604974863c0b3c6970eb631e12e3b1d4114885757b",
     "balance_manager_id": "0x79c283daf0fddb99f20d0a12cf26549d576a83f6b78c3353c9fbd1d4f6eda6b8",
+    "withdraw_settled_amounts_interval_s": 60,
     "exchange_connectors": {
       "rest": {
         "url": "https://fullnode.testnet.sui.io:443"

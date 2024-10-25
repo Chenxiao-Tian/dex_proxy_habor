@@ -125,6 +125,9 @@ export class DeepBookV3 implements DexInterface {
 
   private currentEpoch: string | undefined;
 
+  // pools for which we might need to call: withdraw settled amounts
+  private maybeWithdrawSettledAmounts: Set<string>;
+
   private environment: NetworkType;
   private deepbookPackageId: string;
 
@@ -139,6 +142,10 @@ export class DeepBookV3 implements DexInterface {
       ]),
     ],
     ["big_vector", new Map<string, string>([["5", "REMOVED_FROM_BOOK"]])],
+
+    // pool in which we haven't placed any order yet
+    ["dynamic_field", new Map<string, string>([["1", "UNUSED_POOL"]])],
+
     [
       "order_info",
       new Map<string, string>([
@@ -236,6 +243,8 @@ export class DeepBookV3 implements DexInterface {
         }),
       });
     }
+
+    this.maybeWithdrawSettledAmounts = new Set<string>();
 
     if (config.dex.env === undefined) {
       throw new Error("The key, `dex.env` must be present in the config");
@@ -495,6 +504,23 @@ export class DeepBookV3 implements DexInterface {
       // 5 minutes
       const trackEpochIntervalMs = 5 * 60 * 1000;
       setInterval(this.trackEpoch, trackEpochIntervalMs);
+
+      if (this.config.dex.withdraw_settled_amounts_interval_s === undefined) {
+        throw new Error(
+          "withdraw_settled_amounts_interval_s not set for read-write dex-proxy"
+        );
+      } else {
+        for (let poolName in this.poolsMap) {
+          this.maybeWithdrawSettledAmounts.add(poolName);
+        }
+
+        const withdrawSettledAmountsIntervalMs =
+          this.config.dex.withdraw_settled_amounts_interval_s * 1000;
+        setInterval(
+          this.withdrawSettledAmounts,
+          withdrawSettledAmountsIntervalMs
+        );
+      }
     }
 
     if (this.config.dex.subscribe_to_events) {
@@ -709,6 +735,86 @@ export class DeepBookV3 implements DexInterface {
       } else {
         this.gasManager!.logSkippedObjects();
       }
+    }
+  };
+
+  // Usage of this method: https://auros-group.slack.com/archives/C063QLURS9G/p1729331016525649
+  withdrawSettledAmounts = async () => {
+    let idx = 0;
+    for (let poolName in this.poolsMap) {
+      if (this.maybeWithdrawSettledAmounts.has(poolName)) {
+        try {
+          let lockedBalances = await this.getLockedBalance(
+            BigInt(idx),
+            poolName,
+            this.getPool(poolName)
+          );
+
+          if (
+            lockedBalances === null ||
+            (lockedBalances.base === BigInt(0) &&
+              lockedBalances.quote === BigInt(0) &&
+              lockedBalances.deep === BigInt(0))
+          ) {
+            this.logger.debug(
+              `[${idx}] Not calling withdraw settled amounts for ${poolName} as it has no locked balance`
+            );
+            idx++;
+            continue;
+          }
+
+          let txBlockGenerator = () => {
+            this.logger.debug(
+              `[${idx}] Withdrawing settled amounts from ${poolName}`
+            );
+
+            const tx = new Transaction();
+            tx.add(
+              this.mainDeepbookClient.deepBook.withdrawSettledAmounts(
+                poolName,
+                "MANAGER"
+              )
+            );
+
+            return tx;
+          };
+
+          let txBlockResponseOptions = { showEffects: true };
+
+          let response = await this.executor!.execute(
+            BigInt(idx),
+            txBlockGenerator,
+            txBlockResponseOptions
+          );
+
+          const digest: string = response.digest;
+          if (response.effects!.status.status === "success") {
+            this.logger.debug(
+              `[${idx}] Successfully withdrawn settled amounts from ${poolName}. Digest=${digest}`
+            );
+          } else {
+            const errorMsg = response.effects!.status.error!;
+            this.logger.error(
+              `[${idx}] Failed to withdraw settled amounts from ${poolName}. Error=${errorMsg.toString()}. Digest=${digest}`
+            );
+          }
+        } catch (error) {
+          this.logger.error(
+            `[${idx}] Error while withdrawing settled amounts  from ${poolName}: ${error}`
+          );
+        }
+      } else {
+        this.logger.debug(
+          `[${idx}] Ignoring to withdraw settled amounts from ${poolName} as the pool is actively traded so not required`
+        );
+      }
+      idx++;
+    }
+
+    // For next iteration:
+    // withdraw settled amounts from pools in which we are not actively placing orders
+    for (let poolName in this.poolsMap) {
+      this.maybeWithdrawSettledAmounts.add(poolName);
     }
   };
 
@@ -1008,7 +1114,7 @@ export class DeepBookV3 implements DexInterface {
 
     const order = this.orderCache.get(clientOrderId);
     if (order === undefined) {
-      this.logger.error(
+      this.logger.warn(
         `[${requestId}] client_order_id=${clientOrderId} does not exist`
       );
 
@@ -1063,7 +1169,6 @@ export class DeepBookV3 implements DexInterface {
       };
     }
 
-    // TODO: Check if orderStatus.status can be set to "expired" by inspecting the "expirationTs".
     let orderStatus: OrderStatus = {
       client_order_id: order.clientOrderId,
       exchange_order_id: order.exchangeOrderId,
@@ -1161,8 +1266,8 @@ export class DeepBookV3 implements DexInterface {
       target: `${this.deepbookPackageId}::pool::get_account_order_details`,
       arguments: [tx.object(pool.address), tx.object(this.balanceManagerId)],
       typeArguments: [
-        this.getCoinTypeId(pool.baseCoin),
-        this.getCoinTypeId(pool.quoteCoin),
+        this.getCoin(pool.baseCoin).type,
+        this.getCoin(pool.quoteCoin).type,
       ],
     });
 
@@ -1418,8 +1523,8 @@ export class DeepBookV3 implements DexInterface {
     const orderType = DeepBookV3.parseOrderType(order.type);
     const selfMatchingPrevention: number = 2; // CANCEL_MAKER
 
-    const baseCoinTypeId: string = this.getCoinTypeId(pool.baseCoin);
-    const quoteCoinTypeId: string = this.getCoinTypeId(pool.quoteCoin);
+    const baseCoinTypeId: string = this.getCoin(pool.baseCoin).type;
+    const quoteCoinTypeId: string = this.getCoin(pool.quoteCoin).type;
 
     this.logger.debug(
       `[${requestId}] Inserting order: params=${JSON.stringify(params)}`
@@ -1503,6 +1608,9 @@ export class DeepBookV3 implements DexInterface {
       this.logger.info(
         `[${requestId}] Order inserted for pool=${poolName}. Digest=${response.digest}`
       );
+
+      // we don't need to call withdraw settled amounts for this pool in the next iteration
+      this.maybeWithdrawSettledAmounts.delete(poolName);
     } else {
       this.logger.error(
         `[${requestId}] Failed to insert order for pool=${poolName}. Digest=${response.digest}`
@@ -1620,8 +1728,8 @@ export class DeepBookV3 implements DexInterface {
       clientOrderIds.push(order.clientOrderId);
     }
 
-    const baseCoinTypeId: string = this.getCoinTypeId(pool.baseCoin);
-    const quoteCoinTypeId: string = this.getCoinTypeId(pool.quoteCoin);
+    const baseCoinTypeId: string = this.getCoin(pool.baseCoin).type;
+    const quoteCoinTypeId: string = this.getCoin(pool.quoteCoin).type;
 
     let response = null;
     try {
@@ -1701,6 +1809,9 @@ export class DeepBookV3 implements DexInterface {
       this.logger.info(
         `[${requestId}] Bulk orders inserted for pool=${poolName}. Digest=${response.digest}`
       );
+
+      // we don't need to call withdraw settled amounts for this pool in the next iteration
+      this.maybeWithdrawSettledAmounts.delete(poolName);
     } else {
       this.logger.error(
         `[${requestId}] Failed to bulk insert orders for pool=${poolName}. Digest=${response.digest}`
@@ -2699,7 +2810,7 @@ export class DeepBookV3 implements DexInterface {
           coin === pool.baseCoin ||
           coin === pool.quoteCoin
         ) {
-          tasks.push(this.getLockedBalance(requestId, coin, poolName, pool));
+          tasks.push(this.getCoinLockedAmount(requestId, coin, poolName, pool));
         }
       }
 
@@ -2719,17 +2830,13 @@ export class DeepBookV3 implements DexInterface {
       }
     }
 
-    let jsonString = JSON.stringify(posInfo, (_, value) =>
-      typeof value === "bigint" ? value.toString() : value
-    );
-
     return {
       statusCode: 200,
-      payload: JSON.parse(jsonString),
+      payload: posInfo,
     };
   };
 
-  getLockedBalance = async (
+  getCoinLockedAmount = async (
     requestId: bigint,
     coin: string,
     poolName: string,
@@ -2737,39 +2844,101 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<number> => {
     let lockedBalance: number = 0;
 
-    let response = null;
-    try {
-      response = await this.mainDeepbookClient.lockedBalance(
-        poolName,
-        "MANAGER"
-      );
-
+    let response = await this.getLockedBalance(requestId, poolName, pool);
+    if (response) {
+      const baseCoin = this.getCoin(pool.baseCoin);
+      const quoteCoin = this.getCoin(pool.quoteCoin);
+      const deep = this.getCoin("DEEP");
       if (coin === pool.baseCoin) {
-        lockedBalance += response.base;
+        lockedBalance += Number(
+          (Number(response.base) / baseCoin.scalar).toFixed(9)
+        );
       } else if (coin === pool.quoteCoin) {
-        lockedBalance += response.quote;
+        lockedBalance += Number(
+          (Number(response.quote) / quoteCoin.scalar).toFixed(9)
+        );
       }
 
       if (coin === "DEEP") {
-        lockedBalance += response.deep;
-      }
-    } catch (error) {
-      // Return lockedBalance = 0 on getting exception because the SDK throws exception
-      // if we haven't yet traded at that pool
-      //
-      // TODO: implement our own method to get locked balance from on-chain instead of
-      // using the SDK to differentiate between exception due not traded pool or a general exception
-    } finally {
-      if (this.log_responses) {
-        this.logger.debug(
-          `[${requestId}] getLockedBalance coin=${coin}, pool=${poolName}: response: ${JSON.stringify(
-            response
-          )}`
+        lockedBalance += Number(
+          (Number(response.deep) / deep.scalar).toFixed(9)
         );
       }
     }
 
+    this.logger.debug(
+      `[${requestId}] Locked balance for ${coin} in ${poolName} is ${lockedBalance}.`
+    );
     return lockedBalance;
+  };
+
+  getLockedBalance = async (
+    requestId: bigint,
+    poolName: string,
+    pool: Pool
+  ): Promise<{
+    base: bigint;
+    quote: bigint;
+    deep: bigint;
+  } | null> => {
+    const baseCoin = this.getCoin(pool.baseCoin);
+    const quoteCoin = this.getCoin(pool.quoteCoin);
+
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${this.deepbookPackageId}::pool::locked_balance`,
+      arguments: [tx.object(pool.address), tx.object(this.balanceManagerId)],
+      typeArguments: [baseCoin.type, quoteCoin.type],
+    });
+
+    let response = await this.suiClient.devInspectTransactionBlock({
+      sender: normalizeSuiAddress(this.walletAddress),
+      transactionBlock: tx,
+    });
+
+    if (response.effects!.status.status === "success") {
+      let result = {
+        base: BigInt(
+          bcs.U64.parse(
+            new Uint8Array(response.results![0].returnValues![0][0])
+          )
+        ),
+        quote: BigInt(
+          bcs.U64.parse(
+            new Uint8Array(response.results![0].returnValues![1][0])
+          )
+        ),
+        deep: BigInt(
+          bcs.U64.parse(
+            new Uint8Array(response.results![0].returnValues![2][0])
+          )
+        ),
+      };
+
+      this.logger.debug(
+        `[${requestId}] Successfully got locked balance for ${poolName}. Result = ${JSON.stringify(
+          result,
+          (_, value) => (typeof value === "bigint" ? value.toString() : value)
+        )}`
+      );
+
+      return result;
+    } else {
+      const error = response.effects!.status.error!;
+      let parsedError = DeepBookV3.tryParseError(error.toString());
+      if (parsedError.type && parsedError.type === "UNUSED_POOL") {
+        this.logger.debug(
+          `[${requestId}] ${poolName} is not traded yet by us, thus no locked balance`
+        );
+
+        return null;
+      } else {
+        let msg = `Failed to get locked balance for ${poolName}. Error=${error.toString()}`;
+        this.logger.error(`[${requestId}] ${msg}.`);
+
+        throw new Error(msg);
+      }
+    }
   };
 
   depositIntoBalanceManager = async (
@@ -3052,13 +3221,13 @@ export class DeepBookV3 implements DexInterface {
     return parts[0];
   }
 
-  getCoinTypeId(coinName: string): string {
+  getCoin(coinName: string): Coin {
     const coin = this.coinsMap[coinName];
     if (coin === undefined) {
       throw new Error(`Coin ${coinName} not added in dex-proxy resources file`);
     }
 
-    return coin.type;
+    return coin;
   }
 
   getPool(poolName: string): Pool {
