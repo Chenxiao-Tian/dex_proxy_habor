@@ -93,10 +93,8 @@ class Paradex(DexCommon):
         await self.__gas_price_tracker.start()
         await self.__gas_price_tracker.wait_gas_price_ready()
 
-        await self.__get_jwt_from_exchange()
-
         # Periodically refresh JWT from the exchange
-        self.pantheon.spawn(self.__refresh_jwt(self.__exchange_token_refresh_interval_s))
+        self.pantheon.spawn(self.__refresh_jwt())
 
         max_nonce_cached = self._request_cache.get_max_nonce()
         self._api.initialize_starting_nonce(max_nonce_cached + 1)
@@ -139,13 +137,24 @@ class Paradex(DexCommon):
 
         return response
 
-    async def __refresh_jwt(self, refresh_interval_s: int) -> None:
+    async def __refresh_jwt(self) -> None:
+        retries = 0
         while True:
-            await self.pantheon.sleep(refresh_interval_s)
             self._logger.debug("Refreshing JWT from exchange")
-            await self.__get_jwt_from_exchange()
+            if await self.__get_jwt_from_exchange():
+                retries = 0
+                await self.pantheon.sleep(self.__exchange_token_refresh_interval_s)
+            else:
+                # In case the token refresh fails due to a rate limit error
+                # or any exchange server issue,
+                # don't allow dex_proxy to aggressively repeat the request.
+                # Adding sleep of 5s as a bit of a delay before retying.
+                retries += 1
+                if retries % 3 == 0:
+                    self._logger.error(f"Failed to refresh JWT after {retries} tries.")
+                await self.pantheon.sleep(5)
 
-    async def __get_jwt_from_exchange(self,) -> None:
+    async def __get_jwt_from_exchange(self,) -> bool:
         now = int(time.time())
         pdex_signature_expiry = now + 24 * 60 * 60
         msg = StarknetMessages.authentication(self.__pdex_config.starknet_chain_id, now, pdex_signature_expiry)
@@ -170,11 +179,14 @@ class Paradex(DexCommon):
 
                     if status_code == 200:
                         self.__jwt = JWT.from_string(response["jwt_token"])
+                        return True
                     else:
                         self.__jwt = None
-                        self._logger.error(f"Unable to refresh JWT. Exchange returned status_code({status_code}), error({response['error']}), details({response['message']})")
+                        self._logger.info(f"Unable to refresh JWT. Exchange returned status_code({status_code}), error({response['error']}), details({response['message']})")
         except Exception as ex:
-            self._logger.error(f"Unable to refresh JWT. Error[{str(ex)}]")
+            self._logger.info(f"Unable to refresh JWT. Error[{str(ex)}]")
+
+        return False
 
     def __assert_order_request_schema(self, received_keys: list) -> None:
         expected_keys = [
