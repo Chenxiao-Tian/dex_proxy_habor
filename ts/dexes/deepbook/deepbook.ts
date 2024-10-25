@@ -268,7 +268,7 @@ export class DeepBook implements DexInterface {
 
     fetchWithdrawalAddresses = (): void => {
         const filePrefix = dirname(process.argv[1]);
-        const filename = `${filePrefix}/../../resources/deep_withdrawal_addresses.json`;
+        const filename = `${filePrefix}/resources/deep_withdrawal_addresses.json`;
         try {
             let contents = JSON.parse(readFileSync(filename, "utf8"));
             this.logger.info(`Looking up configured withdrawal addresses for chainName=${this.chainName} from ${filename}`);
