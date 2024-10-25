@@ -56,7 +56,7 @@
         "url": "amqp://dev-sng-rmq.kdev"
     },
     "Redis": {
-        "host": "localhost",
+        "host": "dev-sng-red0.kdev",
         "port": 6379
     },
     "server": {
