@@ -14,6 +14,7 @@
     "subscribe_to_events": false,
     "wallet_address": "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c",
     "balance_manager_id": "0x1fe5a96fb4510de480663b1f9a14307d4e584e309d560c1dd36dcdf9556ab84c",
+    "withdraw_settled_amounts_interval_s": 300,
     "exchange_connectors": {
       "rest": {
         "url": "https://sui-mainnet.g.allthatnode.com/full/json_rpc",
