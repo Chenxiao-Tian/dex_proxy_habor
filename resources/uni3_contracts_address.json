@@ -683,6 +683,15 @@
                   "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
                   "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
                 ]
+            },
+            {
+                "symbol": "LBTC",
+                "address": "0x8236a87084f8b84306f72007f36f2618a5634494",
+                "valid_withdrawal_addresses": [
+                  "0xFF0CEfDbd6bf757cc0CC361ddfBdE432186Ccaa6",
+                  "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974",
+                  "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+                ]
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
