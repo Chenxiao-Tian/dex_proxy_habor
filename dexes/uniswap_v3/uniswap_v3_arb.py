@@ -33,7 +33,7 @@ class UniswapV3Arb(DexCommon):
         self._server.register('POST', '/private/insert-order', self.__insert_order)
 
         self.__instruments: InstrumentsLiveSource = None
-        self.__exchange_name = "uav3"
+        self.__exchange_name = "chainArb-uni3"
         self.__chain_name = config["chain_name"]
         self.__native_token = "ETH"
         self.__contract_addresses_file_path = "/../../resources/uni3_arb_contracts_address.json"
