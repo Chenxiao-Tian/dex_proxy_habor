@@ -699,10 +699,16 @@ class UniswapV3Bloxroute(DexCommon):
             if curr_block_time_s + self.__block_time_s > self.__targeted_block_info.next_block_expected_time_s:
                 self._logger.debug('Deducted chain re-organisation')
                 self.__targeted_block_info.next_block_expected_time_s = curr_block_time_s + self.__block_time_s
-            elif curr_block_time_s + self.__block_time_s < self.__targeted_block_info.next_block_expected_time_s:
-                self._logger.error("Expected block time has decreased")
+
+        self.__handle_skipped_slots()
 
         return self.__targeted_block_info.next_block_num, self.__targeted_block_info.next_block_uuid, self.__targeted_block_info.next_block_expected_time_s
+
+    def __handle_skipped_slots(self):
+        now_s = int(time.time())
+        while now_s > self.__targeted_block_info.next_block_expected_time_s:
+            self.__targeted_block_info.next_block_expected_time_s += self.__block_time_s
+            self._logger.debug(f"Deducted skipped slots for targeted_block={self.__targeted_block_info.next_block_num}")
 
     def __validate_tokens_address(self, instr_native_code: str, base_ccy: str, quote_ccy: str) -> bool:
         base_ccy_address = self._api.get_erc20_contract(base_ccy).address
