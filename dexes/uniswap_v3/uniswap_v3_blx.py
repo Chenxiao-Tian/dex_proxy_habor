@@ -257,8 +257,7 @@ class UniswapV3Bloxroute(DexCommon):
             return 400, {'error': {'message': repr(e)}}
 
     async def _cancel_all(self, path, params, received_at_ms):
-        return 400, {'error': {'message': repr(Exception('Cancel all request not supported by uni3 dex-proxy with '
-                                                         'Bloxroute integrated'))}}
+        return await super()._cancel_all(path, params, received_at_ms)
 
     async def _get_all_open_requests(self, path, params, received_at_ms):
         return await super()._get_all_open_requests(path, params, received_at_ms)
@@ -796,6 +795,7 @@ class UniswapV3Bloxroute(DexCommon):
             return
 
         try:
+            self._logger.debug(f"Sending to titan {ws_str}")
             await self._titan_ws.send(ws_str)
         except websockets.ConnectionClosed:
             self._logger.info('Client disconnected')
