@@ -310,6 +310,8 @@ class UniswapV3Arb(DexCommon):
             order_request.dex_specific["mined_tx_gas_price_wei"] = order_info.gas_price_wei
             order_request.dex_specific["mined_tx_base_ccy_qty"] = str(order_info.base_ccy_qty)
             order_request.dex_specific["mined_tx_quote_ccy_qty"] = str(order_info.quote_ccy_qty)
+        else:
+            self._logger.error(f"Did not find order_info for {mined_tx_hash}")
 
     async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict,
                                        mined_tx_hash: str = None):
