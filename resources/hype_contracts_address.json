@@ -21,6 +21,7 @@
                 "address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
                 "valid_withdrawal_addresses": [
                     "0x52c5233d3d12e9d5522759ace8b551d926b797d1",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
                     "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
                     "0xe71cab44917bf40b072b47138a76006558cb29c6",
                     "0xFF0CEfDbd6bf757cc0CC361ddfBdE432186Ccaa6",
@@ -28,7 +29,10 @@
                     "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
                     "0x86B8B24C4e2c15E6Be786b6E1d95012866F27d34",
                     "0x9d07dd295726ade4680fe5249fd7b9bdc15af480",
-                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155"
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x159cB15043485DfbFBab866c61F8851671575b1A",
+                    "0x8c19E9AD4D2c3db1a0966b1b91DE325274E233cf",
+                    "0x023A3D058020fB76cCa98f01b3c48C8938A22355"
                 ]
             }
         ],
