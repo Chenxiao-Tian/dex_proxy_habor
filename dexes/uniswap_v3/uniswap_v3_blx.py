@@ -346,11 +346,17 @@ class UniswapV3Bloxroute(DexCommon):
                     new_raw_tx, new_tx_hash = self.__get_signed_transaction_from_client_info(request_of_client_id,
                                                                                              existing_gas_price)
                     request_of_client_id.used_gas_prices_wei.append(existing_gas_price)
-                    new_raw_txns_in_block.append(new_raw_tx)
                     request_of_client_id.tx_hashes.append((new_tx_hash, request_of_client_id.request_type.name))
+
+                    if request_of_client_id.request_type == RequestType.ORDER:
+                        self.__tx_hash_to_order_info[new_tx_hash] = OrderInfo(
+                            existing_gas_price, request_of_client_id.base_ccy_qty, request_of_client_id.quote_ccy_qty
+                        )
+
+                    new_raw_txns_in_block.append(new_raw_tx)
+                    self._transactions_status_poller.add_for_polling(new_tx_hash, client_id_for_tx, request_of_client_id.request_type)
+                    self._logger.debug(f"Amended {request_of_client_id}. Decreased nonce by 1.")
                     self._request_cache.add_or_update_request_in_redis(client_id_for_tx)
-                    self._transactions_status_poller.add_for_polling(new_tx_hash, client_id_for_tx,
-                                                                     request_of_client_id.request_type)
                 else:
                     # transactions before cancelled transaction.
                     new_raw_txns_in_block.append(raw_tx)
@@ -590,7 +596,11 @@ class UniswapV3Bloxroute(DexCommon):
                         if targeted_block_data is None:
                             continue
 
-                        if request.request_type == RequestType.ORDER and request.deadline_since_epoch_s <= targeted_block_data.timestamp:
+                        if (
+                            request.request_type == RequestType.ORDER
+                            and request.request_status != RequestStatus.CANCEL_REQUESTED
+                            and request.deadline_since_epoch_s <= targeted_block_data.timestamp
+                        ):
                             self._logger.error(
                                 f'Wrong order deadline might have been set. Please check. Request={request}')
 
@@ -722,6 +732,8 @@ class UniswapV3Bloxroute(DexCommon):
             order_request.dex_specific["mined_tx_gas_price_wei"] = order_info.gas_price_wei
             order_request.dex_specific["mined_tx_base_ccy_qty"] = str(order_info.base_ccy_qty)
             order_request.dex_specific["mined_tx_quote_ccy_qty"] = str(order_info.quote_ccy_qty)
+        else:
+            self._logger.error(f"Did not find order_info for {mined_tx_hash}")
 
     def __orders_pre_finalisation_clean_up(self, order_request: OrderRequest):
         for tx_hash, _ in order_request.tx_hashes:
@@ -745,8 +757,12 @@ class UniswapV3Bloxroute(DexCommon):
             reverting_tx_hashes=[],
             replacement_uuid=targeted_block_uuid,
             session_id="1",
-            client_id=0
+            client_id=bundle_id
         ).SerializeToString()
+
+        self._logger.debug(
+            f"Sending bundle_id={bundle_id}, txs_list={txs_list}, target_block_num={targeted_block}, target_block_uuid={targeted_block_uuid} to builders."
+        )
 
         await self._shoot_bundle_ws(send_bundle_msg_bytes)
 
@@ -767,8 +783,6 @@ class UniswapV3Bloxroute(DexCommon):
         }
 
         rest_str = json.dumps(rest_body)
-        self._logger.info(f"Sending {rest_str} to builders")
-
         sign_begin_at_ms = int(time.time() * 1_000)
 
         message = messages.encode_defunct(text=Web3.keccak(text=rest_str).hex())
@@ -783,7 +797,7 @@ class UniswapV3Bloxroute(DexCommon):
 
         bundle_jobs = []
         for builder_rpc_url in self.__builders_rpc:
-            if "flashbots" in builder_rpc_url:
+            if "flashbots" in builder_rpc_url or "titanbuilder" in builder_rpc_url:
                 bundle_jobs.append(self._shoot_bundle_rest(builder_rpc_url, signed_header, rest_str))
             else:
                 bundle_jobs.append(self._shoot_bundle_rest(builder_rpc_url, self.__builders_request_header, rest_str))
@@ -795,7 +809,6 @@ class UniswapV3Bloxroute(DexCommon):
             return
 
         try:
-            self._logger.debug(f"Sending to titan {ws_str}")
             await self._titan_ws.send(ws_str)
         except websockets.ConnectionClosed:
             self._logger.info('Client disconnected')
@@ -825,7 +838,11 @@ class UniswapV3Bloxroute(DexCommon):
             self._titan_ws = ws
             try:
                 async for msg in self._titan_ws:
-                    self._logger.info(f'Received {msg}')
+                    response = json.loads(msg)
+                    if "result" in response and "bundleHash" in response["result"] and "error" in response and response["error"] is None:
+                        self._logger.info(f"Successfully sent to Titan via ws: {response}")
+                    else:
+                        self._logger.error(f"Failed to send to Titan via ws: {response}")
             except websockets.ConnectionClosed:
                 self._logger.info('Client disconnected')
                 self._titan_ws = None

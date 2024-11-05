@@ -145,6 +145,7 @@
       ]
     },
     "builders_rpc": [
+      "https://rpc.titanbuilder.xyz",
       "https://rsync-builder.xyz",
       "https://relay.flashbots.net/",
       "https://rpc.lokibuilder.xyz",
@@ -156,7 +157,7 @@
     ],
     "titan_ws": {
       "ws_url": "ws://rpc-priv.titanbuilder.xyz/ws/ethsendbundle",
-      "api_key": "IqZs8cUS1NuQHmaDcQlL557rJgug4pNn"
+      "api_key": "M6vdHmhNmC5tCVi38oyf0d1cJtfYRqvM"
     },
     "flashbot_signing_key": "0xe81e556a84ffe1a2ca012ecd639e221e27321ee5aeaafc312c056aaf44f280c5"
   }
