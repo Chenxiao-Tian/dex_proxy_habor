@@ -1349,7 +1349,7 @@ export class DeepBookV3 implements DexInterface {
 
       this.logger.error(`[${requestId}] Transaction failure: ${error}`);
 
-      let type = "UNKNOWN";
+      let type = "FAILED";
       if (error == "InsufficientGas") {
         type = "INSUFFICIENT_GAS";
       } else {
