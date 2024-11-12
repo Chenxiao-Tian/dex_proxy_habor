@@ -154,10 +154,10 @@ class Hype(DexCommon):
         return await self._api.get_transaction_receipt(tx_hash)
 
     def _get_gas_price(self, request, priority_fee: PriorityFee):
-        # No matter what gas price we specify in our request Arbitrum always charge only base gas fees which is almost always fixed to 0.01 GWei.
+        # No matter what gas price we specify in our request Arbitrum always charge only base gas fees which is usually 0.01 GWei.
         # https://auros-group.slack.com/archives/C04258ZMMMF/p1726555641110039?thread_ts=1725590960.960719&cid=C04258ZMMMF
-        # return 0.05 GWei
-        return 50_000_000
+        # return 10 GWei
+        return 10_000_000_000
 
     async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict, mined_tx_hash: str = None):
         await super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
@@ -267,7 +267,6 @@ class Hype(DexCommon):
 
         assert len(received_keys) == len(expected_keys), f"Request does not contain the correct set of fields. Expected [{', '.join(expected_keys)}]"
         for key in expected_keys: assert key in received_keys, f"Missing field({key}) in the request"
-
 
     def __create_cancel_by_ex_oid_action(self, orders: list[dict]) -> dict:
         return {

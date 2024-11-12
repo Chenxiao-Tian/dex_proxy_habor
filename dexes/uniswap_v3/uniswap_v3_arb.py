@@ -11,7 +11,7 @@ from pantheon.market_data_types import InstrumentId
 from pyutils.exchange_apis.uniswapV3_api import *
 from pyutils.exchange_apis.erc20web3_api import ErrorType
 from pyutils.exchange_connectors import ConnectorType
-from pyutils.gas_pricing.eth import GasPriceTracker, PriorityFee
+from pyutils.gas_pricing.eth import PriorityFee
 
 from ..dex_common import DexCommon
 
@@ -38,8 +38,9 @@ class UniswapV3Arb(DexCommon):
         self.__native_token = "ETH"
         self.__contract_addresses_file_path = "/../../resources/uni3_arb_contracts_address.json"
         self.__txn_gas_limit = 1000000
+
         # 0.01 GWEI usually.
-        self.__base_block_gas_price = 20_000_000
+        self.__base_block_gas_price = 10_000_000_000
         self.__tx_hash_to_order_info: Dict[str, OrderInfo] = {}
 
     def __split_symbol_to_base_quote_ccy(self, symbol):
