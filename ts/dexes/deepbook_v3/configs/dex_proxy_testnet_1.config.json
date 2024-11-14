@@ -15,10 +15,18 @@
     "wallet_address": "0x56f98ae294a565671cecc3604974863c0b3c6970eb631e12e3b1d4114885757b",
     "balance_manager_id": "0x79c283daf0fddb99f20d0a12cf26549d576a83f6b78c3353c9fbd1d4f6eda6b8",
     "withdraw_settled_amounts_interval_s": 60,
+    "track_leading_client_poll_interval_s": 10,
     "exchange_connectors": {
-      "rest": {
-        "url": "https://fullnode.testnet.sui.io:443"
-      },
+      "rest": [
+        {
+          "name": "public_fullnode",
+          "url": "https://fullnode.testnet.sui.io:443"
+        },
+        {
+          "name": "mysten_labs",
+          "url": "https://mysten-rpc.testnet.sui.io:443"
+        }
+      ],
       "ws": {
         "url": "wss://rpc.ankr.com/sui/ws/5bcaecaab6d6d910804b8eac4b9654fa66334afe065c137abe6b5f1da35448cc",
         "rpc_call_timeout_s": 30,

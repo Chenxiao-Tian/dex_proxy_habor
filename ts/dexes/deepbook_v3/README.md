@@ -5,7 +5,7 @@
         curl \
         -X GET \
         -H "Content-Type: application/json" \
-        "http://localhost:3000/status
+        "http://localhost:3000/status"
 ```
 
 ```
@@ -306,14 +306,14 @@
         }
 ```
 
-13. Delete an order:
+13. Delete orders:
     Request:
 
 ```
         curl \
         -X DELETE \
         -H "Content-Type: application/json" \
-        "http://localhost:3000/order?pool=DEEP_SUI&client_order_id=11"
+        "http://localhost:3000/orders?pool=DEEP_SUI&client_order_ids=11"
 ```
 
     Response:

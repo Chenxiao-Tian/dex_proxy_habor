@@ -1,5 +1,6 @@
 import { LoggerFactory } from "../../logger.js";
 import { WebServer, RestResult, RestRequestHandler } from "../../web_server.js";
+import { ClientPool } from "./client_pool.js";
 import { GasManager, GasCoinStatus } from "./gas_manager.js";
 import { Executor } from "./executor.js";
 import { DexProxy } from "../../dex_proxy.js";
@@ -21,25 +22,22 @@ import {
   OrderCancelledEvent,
   OrderFilledEvent,
 } from "../../order_cache.js";
-import { Coin, DeepBookClient, Pool } from "@mysten/deepbook-v3";
+import { Coin, Pool } from "@mysten/deepbook-v3";
 import { ORDER_MAX_EXPIRE_TIMESTAMP_MS } from "./utils.js";
 import type { NetworkType } from "./types.js";
 import { bcs } from "@mysten/sui/bcs";
 import {
-  TransactionFilter,
+  EventId,
+  JsonRpcError,
+  PaginatedEvents,
   QueryTransactionBlocksParams,
   QueryEventsParams,
-  SuiHTTPTransport,
+  SuiClient,
   SuiEvent,
   SuiEventFilter,
-  JsonRpcError,
-  EventId,
   SuiHTTPStatusError,
-} from "@mysten/sui/client";
-import {
-  SuiClient,
   SuiTransactionBlockResponse,
-  PaginatedEvents,
+  TransactionFilter,
 } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import {
@@ -52,7 +50,6 @@ import { readFileSync } from "fs";
 import { dirname } from "path";
 import { Logger } from "winston";
 import { SuiTxBlock } from "./sui_tx_block.js";
-import { WebSocket } from "ws";
 import { ParsedOrderError, DexInterface, Mode } from "../../types.js";
 import { assertFields } from "../../utils.js";
 
@@ -102,13 +99,12 @@ export class DeepBookV3 implements DexInterface {
   private orderCache: OrderCache;
 
   private keyPair: Ed25519Keypair | undefined;
-  private suiClient: SuiClient;
 
   private walletAddress: string;
 
   private balanceManagerId: string;
-  private mainDeepbookClient: DeepBookClient;
 
+  private clientPool: ClientPool;
   private gasManager: GasManager | undefined;
   private executor: Executor | undefined;
 
@@ -205,39 +201,6 @@ export class DeepBookV3 implements DexInterface {
     }
     this.logger.info(`wallet=${this.walletAddress}`);
 
-    let connectors = this.parseExchangeConnectorConfig();
-    this.logger.info(`RPC node rest api url=${connectors.rest.url}`);
-    this.logger.info(`RPC node websocket url=${connectors.ws.url}`);
-
-    if (config.dex.subscribe_to_events) {
-      this.logger.info("Subscribing to events");
-      this.suiClient = new SuiClient({
-        transport: new SuiHTTPTransport({
-          url: connectors.rest.url,
-          rpc: {
-            headers: connectors.rest.headers,
-          },
-          WebSocketConstructor: WebSocket as never,
-          websocket: {
-            url: connectors.ws.url,
-            callTimeout: connectors.ws.callTimeoutMs,
-            reconnectTimeout: connectors.ws.reconnectTimeoutMs,
-            maxReconnects: connectors.ws.maxReconnects,
-          },
-        }),
-      });
-    } else {
-      this.logger.info("Not subscribing to events");
-      this.suiClient = new SuiClient({
-        transport: new SuiHTTPTransport({
-          url: connectors.rest.url,
-          rpc: {
-            headers: connectors.rest.headers,
-          },
-        }),
-      });
-    }
-
     this.maybeWithdrawSettledAmounts = new Set<string>();
 
     if (config.dex.env === undefined) {
@@ -268,31 +231,15 @@ export class DeepBookV3 implements DexInterface {
       );
     }
 
-    if (this.balanceManagerId) {
-      let balanceManagers = {
-        MANAGER: {
-          address: this.balanceManagerId,
-          tradeCap: "",
-        },
-      };
-
-      this.mainDeepbookClient = new DeepBookClient({
-        client: this.suiClient,
-        address: this.walletAddress,
-        env: this.environment,
-        balanceManagers: balanceManagers,
-        coins: this.coinsMap,
-        pools: this.poolsMap,
-      });
-    } else {
-      this.mainDeepbookClient = new DeepBookClient({
-        client: this.suiClient,
-        address: this.walletAddress,
-        env: this.environment,
-        coins: this.coinsMap,
-        pools: this.poolsMap,
-      });
-    }
+    this.clientPool = new ClientPool(
+      lf,
+      config.dex,
+      this.balanceManagerId,
+      this.walletAddress,
+      this.environment,
+      this.coinsMap,
+      this.poolsMap
+    );
 
     if (this.mode === "read-write") {
       const maxBalancePerInstanceMist = BigInt(
@@ -312,7 +259,7 @@ export class DeepBookV3 implements DexInterface {
 
       this.gasManager = new GasManager(
         lf,
-        this.suiClient,
+        this.clientPool,
         this.walletAddress,
         this.keyPair!,
         config.dex.gas_manager.gas_coin_expected_count,
@@ -328,7 +275,6 @@ export class DeepBookV3 implements DexInterface {
 
       this.executor = new Executor(
         lf,
-        this.suiClient,
         this.keyPair!,
         this.gasManager,
         gasBudgetMist
@@ -383,57 +329,6 @@ export class DeepBookV3 implements DexInterface {
         this.withdrawalAddresses.set(coinType, withdrawalAddresses);
       }
     }
-  };
-
-  parseExchangeConnectorConfig = (): any => {
-    if (this.config.dex.exchange_connectors === undefined) {
-      throw new Error(
-        "The section, `dex.exchange_connectors` must be present in the config"
-      );
-    }
-
-    let connectors = this.config.dex.exchange_connectors;
-    if (connectors.rest === undefined) {
-      throw new Error(
-        "The sections `dex.exchange_connectors.rest` must be present in the config"
-      );
-    }
-
-    const headers: Map<String, String> = connectors.rest.headers
-      ? connectors.rest.headers
-      : new Map<String, String>();
-
-    let parsedConfig = {
-      rest: {
-        url: connectors.rest.url,
-        headers: headers,
-      },
-      ws: {},
-    };
-
-    if (connectors.ws) {
-      const wsCallTimeoutMs =
-        connectors.ws.call_timeout_s !== undefined
-          ? connectors.ws.call_timeout_s * 1_000
-          : 30_000;
-      const wsReconnectTimeoutMs =
-        connectors.ws.reconnect_timeout_s !== undefined
-          ? connectors.ws.reconnect_timeout_s * 1_000
-          : 3_000;
-      const wsMaxReconnects =
-        connectors.ws.max_reconnects !== undefined
-          ? connectors.ws.max_reconnects
-          : 5;
-
-      parsedConfig.ws = {
-        url: connectors.ws.url,
-        callTimeoutMs: wsCallTimeoutMs,
-        reconnectTimeoutMs: wsReconnectTimeoutMs,
-        maxReconnects: wsMaxReconnects,
-      };
-    }
-
-    return parsedConfig;
   };
 
   registerEndpoints = () => {
@@ -491,10 +386,14 @@ export class DeepBookV3 implements DexInterface {
   };
 
   start = async () => {
+    await this.clientPool.start();
+
     if (this.mode === "read-write") {
       await this.gasManager!.start();
 
-      this.currentEpoch = await this.queryEpoch();
+      let client = this.clientPool.getClient();
+      this.logger.debug(`Using ${client.name} client to query epoch`);
+      this.currentEpoch = await this.queryEpoch(client.suiClient);
       if (this.currentEpoch === undefined) {
         throw new Error("Unable to fetch current epoch on startup. Exiting");
       } else {
@@ -602,7 +501,12 @@ export class DeepBookV3 implements DexInterface {
         `Subscribing to events stream with filter: ${filterAsString}`
       );
       try {
-        await this.suiClient.subscribeEvent({
+        // TODO: ideally we should make WS subsciptions from all sui clients
+        // But since we are not using it currently, this is ok for now.
+        let client = this.clientPool.getClient();
+        this.logger.debug(`Using ${client.name} client to subscribe events`);
+
+        await client.suiClient.subscribeEvent({
           filter: filter,
           onMessage: async (event) => {
             await this.handleEvent(event);
@@ -622,7 +526,6 @@ export class DeepBookV3 implements DexInterface {
           await delay();
           await subscribe();
         } else if (error instanceof Error) {
-          let error_ = error as Error;
           this.logger.error(
             `Failed to subscribe to events stream with filter=${filterAsString}. Error=${error}`
           );
@@ -666,7 +569,7 @@ export class DeepBookV3 implements DexInterface {
     return parsedError;
   };
 
-  queryEpoch = async (): Promise<string | undefined> => {
+  queryEpoch = async (suiClient: SuiClient): Promise<string | undefined> => {
     const retryIntervalMs: number = 5_000;
     let delay = () => {
       return new Promise((resolve) => setTimeout(resolve, retryIntervalMs));
@@ -679,7 +582,7 @@ export class DeepBookV3 implements DexInterface {
       let attemptFailed = false;
 
       try {
-        let state = await this.suiClient.getLatestSuiSystemState();
+        let state = await suiClient.getLatestSuiSystemState();
         this.logger.debug(`epoch from chain=${state.epoch}`);
         return state.epoch;
       } catch (error: unknown) {
@@ -718,7 +621,9 @@ export class DeepBookV3 implements DexInterface {
   };
 
   trackEpoch = async () => {
-    const epoch = await this.queryEpoch();
+    let client = this.clientPool.getClient();
+    this.logger.debug(`Using ${client.name} client to query epoch`);
+    const epoch = await this.queryEpoch(client.suiClient);
 
     if (epoch === undefined) {
       this.logger.error(
@@ -731,7 +636,7 @@ export class DeepBookV3 implements DexInterface {
         );
         this.currentEpoch = epoch;
         this.logger.info(`Updated currentEpoch to ${this.currentEpoch}`);
-        await this.gasManager!.onEpochChange();
+        await this.gasManager!.onEpochChange(client.suiClient);
       } else {
         this.gasManager!.logSkippedObjects();
       }
@@ -740,12 +645,18 @@ export class DeepBookV3 implements DexInterface {
 
   // Usage of this method: https://auros-group.slack.com/archives/C063QLURS9G/p1729331016525649
   withdrawSettledAmounts = async () => {
+    let client = this.clientPool.getClient();
+    this.logger.debug(
+      `Using ${client.name} client for withdrawing settled amounts`
+    );
+
     let idx = 0;
     for (let poolName in this.poolsMap) {
       if (this.maybeWithdrawSettledAmounts.has(poolName)) {
         try {
           let lockedBalances = await this.getLockedBalance(
             BigInt(idx),
+            client.suiClient,
             poolName,
             this.getPool(poolName)
           );
@@ -770,7 +681,7 @@ export class DeepBookV3 implements DexInterface {
 
             const tx = new Transaction();
             tx.add(
-              this.mainDeepbookClient.deepBook.withdrawSettledAmounts(
+              client.deepBookClient.deepBook.withdrawSettledAmounts(
                 poolName,
                 "MANAGER"
               )
@@ -783,6 +694,7 @@ export class DeepBookV3 implements DexInterface {
 
           let response = await this.executor!.execute(
             BigInt(idx),
+            client.suiClient,
             txBlockGenerator,
             txBlockResponseOptions
           );
@@ -868,7 +780,10 @@ export class DeepBookV3 implements DexInterface {
 
     let txBlocks = null;
     try {
-      txBlocks = await this.suiClient.queryTransactionBlocks(queryParams);
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
+      txBlocks = await client.suiClient.queryTransactionBlocks(queryParams);
     } catch (error) {
       this.logger.error(`[${requestId}]: ${error}`);
       throw error;
@@ -893,7 +808,10 @@ export class DeepBookV3 implements DexInterface {
 
     let txBlock = null;
     try {
-      txBlock = await this.suiClient.getTransactionBlock({
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
+      txBlock = await client.suiClient.getTransactionBlock({
         digest: digest,
         options: {
           showBalanceChanges: true,
@@ -928,12 +846,14 @@ export class DeepBookV3 implements DexInterface {
       `[${requestId}] Getting events for digests: ${requestedDigests}`
     );
 
-    let events = new Array<Event>();
+    let client = this.clientPool.getClient();
+    this.logger.debug(`[${requestId}] using ${client.name} client`);
 
+    let events = new Array<Event>();
     for (let digest of txDigests) {
       let response = null;
       try {
-        response = await this.suiClient.getTransactionBlock({
+        response = await client.suiClient.getTransactionBlock({
           digest: digest,
           options: { showEvents: true },
         });
@@ -1042,6 +962,9 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<RestResult> => {
     let response: SuiTransactionBlockResponse | null = null;
     try {
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
       let txBlockGenerator = () => {
         this.logger.debug(
           `[${requestId}] Creating balance-manager: ${JSON.stringify(params)}`
@@ -1049,7 +972,7 @@ export class DeepBookV3 implements DexInterface {
 
         const tx = new Transaction();
         tx.add(
-          this.mainDeepbookClient.balanceManager.createAndShareBalanceManager()
+          client.deepBookClient.balanceManager.createAndShareBalanceManager()
         );
 
         return tx;
@@ -1059,6 +982,7 @@ export class DeepBookV3 implements DexInterface {
 
       response = await this.executor!.execute(
         requestId,
+        client.suiClient,
         txBlockGenerator,
         txBlockResponseOptions
       );
@@ -1131,7 +1055,10 @@ export class DeepBookV3 implements DexInterface {
     let exchangeOrderStatus: any = null;
     if (exchangeOrderId) {
       try {
-        exchangeOrderStatus = await this.mainDeepbookClient.getOrder(
+        let client = this.clientPool.getClient();
+        this.logger.debug(`[${requestId}] using ${client.name} client`);
+
+        exchangeOrderStatus = await client.deepBookClient.getOrder(
           pool,
           exchangeOrderId
         );
@@ -1271,7 +1198,10 @@ export class DeepBookV3 implements DexInterface {
       ],
     });
 
-    const response = await this.suiClient.devInspectTransactionBlock({
+    let client = this.clientPool.getClient();
+    this.logger.debug(`[${requestId}] using ${client.name} client`);
+
+    const response = await client.suiClient.devInspectTransactionBlock({
       sender: normalizeSuiAddress(this.walletAddress),
       transactionBlock: tx,
     });
@@ -1568,8 +1498,12 @@ export class DeepBookV3 implements DexInterface {
 
       let txBlockResponseOptions = { showEffects: true, showEvents: true };
 
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
       response = await this.executor!.execute(
         requestId,
+        client.suiClient,
         txBlockGenerator,
         txBlockResponseOptions
       );
@@ -1773,8 +1707,12 @@ export class DeepBookV3 implements DexInterface {
 
       let txBlockResponseOptions = { showEffects: true, showEvents: true };
 
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
       response = await this.executor!.execute(
         requestId,
+        client.suiClient,
         txBlockGenerator,
         txBlockResponseOptions
       );
@@ -1906,6 +1844,9 @@ export class DeepBookV3 implements DexInterface {
 
     let response = null;
     try {
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
       let txBlockGenerator = () => {
         this.logger.debug(
           `[${requestId}] Cancelling order with exchangeOrderId=${order!
@@ -1914,7 +1855,7 @@ export class DeepBookV3 implements DexInterface {
 
         const tx = new Transaction();
         tx.add(
-          this.mainDeepbookClient.deepBook.cancelOrder(
+          client.deepBookClient.deepBook.cancelOrder(
             pool,
             "MANAGER",
             order!.exchangeOrderId!
@@ -1928,6 +1869,7 @@ export class DeepBookV3 implements DexInterface {
 
       response = await this.executor!.execute(
         requestId,
+        client.suiClient,
         txBlockGenerator,
         txBlockResponseOptions
       );
@@ -2023,13 +1965,14 @@ export class DeepBookV3 implements DexInterface {
 
     let response = null;
     try {
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
       let txBlockGenerator = () => {
         this.logger.debug(`[${requestId}] Cancelling all orders. pool=${pool}`);
 
         const tx = new Transaction();
-        tx.add(
-          this.mainDeepbookClient.deepBook.cancelAllOrders(pool, "MANAGER")
-        );
+        tx.add(client.deepBookClient.deepBook.cancelAllOrders(pool, "MANAGER"));
         return tx;
       };
 
@@ -2041,6 +1984,7 @@ export class DeepBookV3 implements DexInterface {
 
       response = await this.executor!.execute(
         requestId,
+        client.suiClient,
         txBlockGenerator,
         txBlockResponseOptions
       );
@@ -2124,16 +2068,18 @@ export class DeepBookV3 implements DexInterface {
 
     let response = null;
     try {
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
       let txBlockGenerator = () => {
         this.logger.debug(
           `[${requestId}] Cancelling orders. Pool=${pool} exchangeOrderIds=${exchangeOrderIds}`
         );
 
         const tx = new Transaction();
-
         for (let exchangeOrderId of exchangeOrderIds) {
           tx.add(
-            this.mainDeepbookClient.deepBook.cancelOrder(
+            client.deepBookClient.deepBook.cancelOrder(
               pool,
               "MANAGER",
               exchangeOrderId
@@ -2148,6 +2094,7 @@ export class DeepBookV3 implements DexInterface {
 
       response = await this.executor!.execute(
         requestId,
+        client.suiClient,
         txBlockGenerator,
         txBlockResponseOptions
       );
@@ -2210,28 +2157,37 @@ export class DeepBookV3 implements DexInterface {
     params: any,
     receivedAtMs: number
   ): Promise<RestResult> => {
+    let client = this.clientPool.getClient();
+    this.logger.debug(`[${requestId}] using ${client.name} client`);
+
     if (params.get("tx_digests_list") !== null) {
       return await this.getTradesByDigest(
         requestId,
+        client.suiClient,
         path,
         params,
         receivedAtMs
       );
     } else {
-      return await this.getTradesByTime(requestId, path, params, receivedAtMs);
+      return await this.getTradesByTime(
+        requestId,
+        client.suiClient,
+        path,
+        params,
+        receivedAtMs
+      );
     }
   };
 
   getTradesByTimeImpl = async (
     requestId: bigint,
+    suiClient: SuiClient,
     queryParams: QueryEventsParams,
     requestedStartTs: number
   ) => {
     let response = null;
     try {
-      response = (await this.suiClient.queryEvents(
-        queryParams
-      )) as PaginatedEvents;
+      response = (await suiClient.queryEvents(queryParams)) as PaginatedEvents;
     } catch (error) {
       this.logger.error(`[${requestId}] ${error}`);
       throw error;
@@ -2278,6 +2234,7 @@ export class DeepBookV3 implements DexInterface {
 
   getTradesByTime = async (
     requestId: bigint,
+    suiClient: SuiClient,
     path: string,
     params: any,
     receivedAtMs: number
@@ -2339,6 +2296,7 @@ export class DeepBookV3 implements DexInterface {
 
     let response = await this.getTradesByTimeImpl(
       requestId,
+      suiClient,
       queryParams,
       startTs
     );
@@ -2354,6 +2312,7 @@ export class DeepBookV3 implements DexInterface {
       };
       response = await this.getTradesByTimeImpl(
         requestId,
+        suiClient,
         queryParams,
         startTs
       );
@@ -2381,13 +2340,12 @@ export class DeepBookV3 implements DexInterface {
 
   getTradesByDigestImpl = async (
     requestId: bigint,
+    suiClient: SuiClient,
     queryParams: QueryEventsParams
   ) => {
     let response = null;
     try {
-      response = (await this.suiClient.queryEvents(
-        queryParams
-      )) as PaginatedEvents;
+      response = (await suiClient.queryEvents(queryParams)) as PaginatedEvents;
     } catch (error) {
       this.logger.error(`[${requestId}] ${error}`);
       throw error;
@@ -2415,6 +2373,7 @@ export class DeepBookV3 implements DexInterface {
 
   getTradesByDigest = async (
     requestId: bigint,
+    suiClient: SuiClient,
     path: string,
     params: any,
     receivedAtMs: number
@@ -2439,7 +2398,11 @@ export class DeepBookV3 implements DexInterface {
         order: "descending",
       };
 
-      let response = await this.getTradesByDigestImpl(requestId, queryParams);
+      let response = await this.getTradesByDigestImpl(
+        requestId,
+        suiClient,
+        queryParams
+      );
       for (let event of response.orderFilledEvents) {
         orderFilledEvents.push(event);
       }
@@ -2450,7 +2413,11 @@ export class DeepBookV3 implements DexInterface {
           txDigest: response.nextCursor!.txDigest,
           eventSeq: response.nextCursor!.eventSeq,
         };
-        response = await this.getTradesByDigestImpl(requestId, queryParams);
+        response = await this.getTradesByDigestImpl(
+          requestId,
+          suiClient,
+          queryParams
+        );
         for (let event of response.orderFilledEvents) {
           orderFilledEvents.push(event);
         }
@@ -2504,19 +2471,21 @@ export class DeepBookV3 implements DexInterface {
       throw new Error(msg);
     }
 
+    let client = this.clientPool.getClient();
+    this.logger.debug(`[${requestId}] using ${client.name} client`);
+
     let response = null;
     let status: string | undefined = undefined;
     let mainGasCoin = null;
     try {
-      mainGasCoin = await this.gasManager!.getMainGasCoin();
+      mainGasCoin = await this.gasManager!.getMainGasCoin(client.suiClient);
       if (mainGasCoin === null) {
         throw new Error(
           "The mainGasCoin is being used in a concurrent transaction. Please retry"
         );
       }
 
-      await this.gasManager!.mergeUntrackedGasCoinsInto(mainGasCoin);
-
+      await this.gasManager!.mergeUntrackedGasCoinsInto(mainGasCoin, client.suiClient);
       if (mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate) {
         throw new Error(
           "Unable to update the version of the mainGasCoin after merging untracked gasCoins into it. Please retry this request"
@@ -2530,7 +2499,7 @@ export class DeepBookV3 implements DexInterface {
         BigInt(quantity * FLOAT_SCALING_FACTOR)
       );
 
-      response = await this.suiClient.signAndExecuteTransaction({
+      response = await client.suiClient.signAndExecuteTransaction({
         signer: this.keyPair!,
         transaction: transaction,
         options: {
@@ -2564,14 +2533,15 @@ export class DeepBookV3 implements DexInterface {
             response,
             mainGasCoin
           );
-          if (!gasCoinVersionUpdated) {
-            gasCoinVersionUpdated =
-              await this.gasManager!.tryUpdateGasCoinVersion(mainGasCoin);
-          }
-        } else {
-          gasCoinVersionUpdated =
-            await this.gasManager!.tryUpdateGasCoinVersion(mainGasCoin);
         }
+        if (!gasCoinVersionUpdated) {
+          gasCoinVersionUpdated =
+            await this.gasManager!.tryUpdateGasCoinVersion(
+              mainGasCoin,
+              client.suiClient
+            );
+        }
+
         if (gasCoinVersionUpdated) {
           mainGasCoin.status = GasCoinStatus.Free;
         } else {
@@ -2616,7 +2586,10 @@ export class DeepBookV3 implements DexInterface {
       throw new Error(msg);
     }
 
-    const decimals = await this.getCoinDecimals(coinTypeId);
+    let client = this.clientPool.getClient();
+    this.logger.debug(`[${requestId}] using ${client.name} client`);
+
+    const decimals = await this.getCoinDecimals(client.suiClient, coinTypeId);
 
     const nativeAmount = BigInt(quantity * 10 ** decimals);
 
@@ -2625,6 +2598,8 @@ export class DeepBookV3 implements DexInterface {
     );
 
     const coinInstances: Array<string> = await this.getCoinInstances(
+      requestId,
+      client.suiClient,
       coinTypeId
     );
 
@@ -2652,6 +2627,7 @@ export class DeepBookV3 implements DexInterface {
 
       response = await this.executor!.execute(
         requestId,
+        client.suiClient,
         txBlockGenerator,
         txBlockResponseOptions
       );
@@ -2692,7 +2668,10 @@ export class DeepBookV3 implements DexInterface {
 
     let objectInfo = null;
     try {
-      objectInfo = await this.suiClient.getObject({
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
+      objectInfo = await client.suiClient.getObject({
         id: objectId,
         options: { showContent: true, showOwner: true, showType: true },
       });
@@ -2721,10 +2700,13 @@ export class DeepBookV3 implements DexInterface {
 
     let response = null;
     try {
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
       const [poolInfo, whitelisted, poolParamsInfo] = await Promise.all([
-        this.mainDeepbookClient.poolTradeParams(pool),
-        this.mainDeepbookClient.whitelisted(pool),
-        this.mainDeepbookClient.poolBookParams(pool),
+        client.deepBookClient.poolTradeParams(pool),
+        client.deepBookClient.whitelisted(pool),
+        client.deepBookClient.poolBookParams(pool),
       ]);
 
       response = {
@@ -2761,7 +2743,10 @@ export class DeepBookV3 implements DexInterface {
     this.logger.debug(`[${requestId}] Querying wallet balance`);
     let balanceInfo = null;
     try {
-      balanceInfo = await this.suiClient.getAllBalances({
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
+      balanceInfo = await client.suiClient.getAllBalances({
         owner: this.walletAddress,
       });
     } catch (error) {
@@ -2791,7 +2776,10 @@ export class DeepBookV3 implements DexInterface {
 
     let posInfo = null;
     try {
-      let response = await this.mainDeepbookClient.checkManagerBalance(
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
+      let response = await client.deepBookClient.checkManagerBalance(
         "MANAGER",
         coin
       );
@@ -2810,7 +2798,15 @@ export class DeepBookV3 implements DexInterface {
           coin === pool.baseCoin ||
           coin === pool.quoteCoin
         ) {
-          tasks.push(this.getCoinLockedAmount(requestId, coin, poolName, pool));
+          tasks.push(
+            this.getCoinLockedAmount(
+              requestId,
+              client.suiClient,
+              coin,
+              poolName,
+              pool
+            )
+          );
         }
       }
 
@@ -2838,13 +2834,19 @@ export class DeepBookV3 implements DexInterface {
 
   getCoinLockedAmount = async (
     requestId: bigint,
+    suiClient: SuiClient,
     coin: string,
     poolName: string,
     pool: Pool
   ): Promise<number> => {
     let lockedBalance: number = 0;
 
-    let response = await this.getLockedBalance(requestId, poolName, pool);
+    let response = await this.getLockedBalance(
+      requestId,
+      suiClient,
+      poolName,
+      pool
+    );
     if (response) {
       const baseCoin = this.getCoin(pool.baseCoin);
       const quoteCoin = this.getCoin(pool.quoteCoin);
@@ -2874,6 +2876,7 @@ export class DeepBookV3 implements DexInterface {
 
   getLockedBalance = async (
     requestId: bigint,
+    suiClient: SuiClient,
     poolName: string,
     pool: Pool
   ): Promise<{
@@ -2891,7 +2894,7 @@ export class DeepBookV3 implements DexInterface {
       typeArguments: [baseCoin.type, quoteCoin.type],
     });
 
-    let response = await this.suiClient.devInspectTransactionBlock({
+    let response = await suiClient.devInspectTransactionBlock({
       sender: normalizeSuiAddress(this.walletAddress),
       transactionBlock: tx,
     });
@@ -2959,6 +2962,9 @@ export class DeepBookV3 implements DexInterface {
     let response = null;
     let status: string | undefined = undefined;
     try {
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
       let txBlockGenerator = () => {
         this.logger.debug(
           `[${requestId}] Depositing into balance_manager_id=${this.balanceManagerId}: coin=${coin}, quantity=${quantity} `
@@ -2966,7 +2972,7 @@ export class DeepBookV3 implements DexInterface {
 
         const tx = new Transaction();
         tx.add(
-          this.mainDeepbookClient.balanceManager.depositIntoManager(
+          client.deepBookClient.balanceManager.depositIntoManager(
             "MANAGER",
             coin,
             quantity
@@ -2985,6 +2991,7 @@ export class DeepBookV3 implements DexInterface {
 
       response = await this.executor!.execute(
         requestId,
+        client.suiClient,
         txBlockGenerator,
         txBlockResponseOptions
       );
@@ -3020,12 +3027,14 @@ export class DeepBookV3 implements DexInterface {
     this.logger.debug(
       `[${requestId}] Depositing SUI into balance_manager_id=${this.balanceManagerId}: quantity=${quantity} `
     );
+    let client = this.clientPool.getClient();
+    this.logger.debug(`[${requestId}] using ${client.name} client`);
+
     let mainGasCoin = null;
     let response = null;
     let status: string | undefined = undefined;
-
     try {
-      mainGasCoin = await this.gasManager!.getMainGasCoin();
+      mainGasCoin = await this.gasManager!.getMainGasCoin(client.suiClient);
 
       if (mainGasCoin === null) {
         throw new Error(
@@ -3033,8 +3042,7 @@ export class DeepBookV3 implements DexInterface {
         );
       }
 
-      await this.gasManager!.mergeUntrackedGasCoinsInto(mainGasCoin);
-
+      await this.gasManager!.mergeUntrackedGasCoinsInto(mainGasCoin, client.suiClient);
       if (mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate) {
         throw new Error(
           "Unable to update the version of the mainGasCoin after merging untracked gasCoins into it. Please retry this request"
@@ -3043,7 +3051,7 @@ export class DeepBookV3 implements DexInterface {
 
       const tx = new Transaction();
       tx.add(
-        this.mainDeepbookClient.balanceManager.depositIntoManager(
+        client.deepBookClient.balanceManager.depositIntoManager(
           "MANAGER",
           "SUI",
           quantity
@@ -3051,7 +3059,7 @@ export class DeepBookV3 implements DexInterface {
       );
       tx.setGasPayment([mainGasCoin]);
 
-      response = await this.suiClient.signAndExecuteTransaction({
+      response = await client.suiClient.signAndExecuteTransaction({
         signer: this.keyPair!,
         transaction: tx,
         options: {
@@ -3088,14 +3096,15 @@ export class DeepBookV3 implements DexInterface {
             response,
             mainGasCoin
           );
-          if (!gasCoinVersionUpdated) {
-            gasCoinVersionUpdated =
-              await this.gasManager!.tryUpdateGasCoinVersion(mainGasCoin);
-          }
-        } else {
-          gasCoinVersionUpdated =
-            await this.gasManager!.tryUpdateGasCoinVersion(mainGasCoin);
         }
+        if (!gasCoinVersionUpdated) {
+          gasCoinVersionUpdated =
+            await this.gasManager!.tryUpdateGasCoinVersion(
+              mainGasCoin,
+              client.suiClient
+            );
+        }
+
         if (gasCoinVersionUpdated) {
           mainGasCoin.status = GasCoinStatus.Free;
         } else {
@@ -3124,6 +3133,9 @@ export class DeepBookV3 implements DexInterface {
     let response = null;
     let status: string | undefined = undefined;
     try {
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
       let txBlockGenerator = () => {
         this.logger.debug(
           `[${requestId}] Withdrawing from balance_manager_id=${this.balanceManagerId}: coin=${coin}, quantity=${quantity}`
@@ -3131,7 +3143,7 @@ export class DeepBookV3 implements DexInterface {
 
         const tx = new Transaction();
         tx.add(
-          this.mainDeepbookClient.balanceManager.withdrawFromManager(
+          client.deepBookClient.balanceManager.withdrawFromManager(
             "MANAGER",
             coin,
             quantity,
@@ -3151,6 +3163,7 @@ export class DeepBookV3 implements DexInterface {
 
       response = await this.executor!.execute(
         requestId,
+        client.suiClient,
         txBlockGenerator,
         txBlockResponseOptions
       );
@@ -3179,10 +3192,14 @@ export class DeepBookV3 implements DexInterface {
     };
   };
 
-  getCoinInstances = async (coinTypeId: string): Promise<Array<string>> => {
-    this.logger.info(`Getting instances of ${coinTypeId}`);
+  getCoinInstances = async (
+    requestId: bigint,
+    suiClient: SuiClient,
+    coinTypeId: string
+  ): Promise<Array<string>> => {
+    this.logger.info(`[${requestId}] Getting instances of ${coinTypeId}`);
 
-    const response = await this.suiClient.getCoins({
+    const response = await suiClient.getCoins({
       owner: this.walletAddress,
       coinType: coinTypeId,
     });
@@ -3200,8 +3217,11 @@ export class DeepBookV3 implements DexInterface {
     return instancesOfType;
   };
 
-  getCoinDecimals = async (coinTypeId: string): Promise<number> => {
-    const response = await this.suiClient.getCoinMetadata({
+  getCoinDecimals = async (
+    suiClient: SuiClient,
+    coinTypeId: string
+  ): Promise<number> => {
+    const response = await suiClient.getCoinMetadata({
       coinType: coinTypeId,
     });
 

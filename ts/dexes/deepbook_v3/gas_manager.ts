@@ -1,4 +1,5 @@
 import { LoggerFactory } from "../../logger";
+import { ClientPool } from "./client_pool.js";
 
 import { Logger } from "winston";
 import { SuiClient } from "@mysten/sui/client";
@@ -252,7 +253,7 @@ export class GasManager {
 
   #loggerFactory: LoggerFactory;
   #logger: Logger;
-  #suiClient: SuiClient;
+  #clientPool: ClientPool;
   #walletAddress: string;
   #keyPair: Ed25519Keypair;
   #expectedCount: number;
@@ -265,7 +266,7 @@ export class GasManager {
 
   constructor(
     lf: LoggerFactory,
-    suiClient: SuiClient,
+    clientPool: ClientPool,
     walletAddress: string,
     keyPair: Ed25519Keypair,
     expectedCount: number,
@@ -276,7 +277,7 @@ export class GasManager {
   ) {
     this.#loggerFactory = lf;
     this.#logger = this.#loggerFactory.createLogger("gas_mgr");
-    this.#suiClient = suiClient;
+    this.#clientPool = clientPool;
     this.#walletAddress = walletAddress;
     this.#keyPair = keyPair;
     this.#expectedCount = expectedCount;
@@ -307,12 +308,14 @@ export class GasManager {
     }
   };
 
-  #getSuiCoins = async (): Promise<Array<SuiObjectData>> => {
+  #getSuiCoins = async (
+    suiClient: SuiClient
+  ): Promise<Array<SuiObjectData>> => {
     this.#logger.debug(`Fetching SUI coins owned by the wallet`);
 
     let request = async (cursor: string | null) => {
       try {
-        return await this.#suiClient.getOwnedObjects({
+        return await suiClient.getOwnedObjects({
           owner: this.#walletAddress,
           filter: { StructType: GasManager.#suiCoinStructType },
           options: { showContent: true },
@@ -356,7 +359,7 @@ export class GasManager {
     return result;
   };
 
-  #trackInstances = async () => {
+  #trackInstances = async (suiClient: SuiClient) => {
     // So that we retry and not just fail at dex-proxy startup.
     let delay = (retryIntervalMs: number) => {
       return new Promise((resolve) => setTimeout(resolve, retryIntervalMs));
@@ -364,7 +367,7 @@ export class GasManager {
 
     while (true) {
       try {
-        let coins = await this.#getSuiCoins();
+        let coins = await this.#getSuiCoins(suiClient);
         this.#logger.debug(`SUI Coins: ${JSON.stringify(coins)}`);
 
         for (let coin of coins) {
@@ -397,7 +400,10 @@ export class GasManager {
     }
   };
 
-  tryUpdateGasCoinVersion = async (gasCoin: GasCoin): Promise<boolean> => {
+  tryUpdateGasCoinVersion = async (
+    gasCoin: GasCoin,
+    suiClient: SuiClient
+  ): Promise<boolean> => {
     try {
       if (gasCoin == undefined) return false;
 
@@ -405,7 +411,7 @@ export class GasManager {
 
       let versionUpdated = false;
       for (let attempt = 0; attempt < attempts; ++attempt) {
-        versionUpdated = await gasCoin.updateInstance(this.#suiClient);
+        versionUpdated = await gasCoin.updateInstance(suiClient);
         if (versionUpdated) break;
 
         this.#logger.warn(
@@ -426,7 +432,10 @@ export class GasManager {
     }
   };
 
-  #tryConsolidateGasCoins = async (coinsToMerge: Array<string>) => {
+  #tryConsolidateGasCoins = async (
+    coinsToMerge: Array<string>,
+    suiClient: SuiClient
+  ) => {
     if (this.#mainGasCoin == undefined) return;
     if (coinsToMerge.length == 0) return;
 
@@ -438,7 +447,11 @@ export class GasManager {
 
     let gasCoinVersionUpdated: boolean = false;
     try {
-      let response = await this.#mergeCoins(this.#mainGasCoin, coinsToMerge);
+      let response = await this.#mergeCoins(
+        this.#mainGasCoin,
+        coinsToMerge,
+        suiClient
+      );
       if (response.txSuceeded) {
         for (let coinId of response.coinsDeleted) {
           this.#gasCoins.remove(coinId);
@@ -450,7 +463,7 @@ export class GasManager {
       // operation.
       if (
         !gasCoinVersionUpdated &&
-        !(await this.tryUpdateGasCoinVersion(this.#mainGasCoin))
+        !(await this.tryUpdateGasCoinVersion(this.#mainGasCoin, suiClient))
       ) {
         this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
         throw new Error(
@@ -460,7 +473,7 @@ export class GasManager {
     }
   };
 
-  #splitIntoRequiredInstances = async () => {
+  #splitIntoRequiredInstances = async (suiClient: SuiClient) => {
     if (this.#mainGasCoin == undefined) return;
     if (this.#gasCoins.size() >= this.#expectedCount) return;
 
@@ -477,13 +490,14 @@ export class GasManager {
     try {
       gasCoinVersionUpdated = await this.#createChildInstances(
         instancesNeeded,
-        instanceToSplit
+        instanceToSplit,
+        suiClient
       );
     } finally {
       // Free the gas coin at the call site
       if (
         !gasCoinVersionUpdated &&
-        !(await this.tryUpdateGasCoinVersion(this.#mainGasCoin))
+        !(await this.tryUpdateGasCoinVersion(this.#mainGasCoin, suiClient))
       ) {
         this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
         throw new Error(
@@ -495,7 +509,11 @@ export class GasManager {
 
   #setupCoinInstances = async () => {
     try {
-      await this.#trackInstances();
+      let client = this.#clientPool.getClient();
+      this.#logger.debug(
+        `Using ${client.name} client for setting up gas coins`
+      );
+      await this.#trackInstances(client.suiClient);
 
       this.#setMainGasCoin();
 
@@ -506,9 +524,9 @@ export class GasManager {
       this.#mainGasCoin.status = GasCoinStatus.InUse;
 
       let trackedCoinsToMerge = this.#trackedCoinsToMerge();
-      await this.#tryConsolidateGasCoins(trackedCoinsToMerge);
+      await this.#tryConsolidateGasCoins(trackedCoinsToMerge, client.suiClient);
 
-      await this.#splitIntoRequiredInstances();
+      await this.#splitIntoRequiredInstances(client.suiClient);
     } finally {
       if (
         this.#mainGasCoin &&
@@ -519,11 +537,13 @@ export class GasManager {
     }
   };
 
-  #untrackedCoinsToMerge = async (): Promise<Array<string>> => {
+  #untrackedCoinsToMerge = async (
+    suiClient: SuiClient
+  ): Promise<Array<string>> => {
     let untrackedCoinsToMerge = new Array<string>();
 
     try {
-      let coins = await this.#getSuiCoins();
+      let coins = await this.#getSuiCoins(suiClient);
       this.#logger.debug(`SUI Coins: ${JSON.stringify(coins)}`);
 
       for (let coin of coins) {
@@ -555,18 +575,18 @@ export class GasManager {
     );
   };
 
-  #handleCoinsNeedingVersionUpdate = async () => {
+  #handleCoinsNeedingVersionUpdate = async (suiClient: SuiClient) => {
     if (
       this.#mainGasCoin &&
       this.#mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate
     ) {
-      if (await this.tryUpdateGasCoinVersion(this.#mainGasCoin)) {
+      if (await this.tryUpdateGasCoinVersion(this.#mainGasCoin, suiClient)) {
         this.#mainGasCoin.status = GasCoinStatus.Free;
       }
     }
 
     for (let coin of this.#gasCoins.needVersionUpdate()) {
-      if (await this.tryUpdateGasCoinVersion(coin)) {
+      if (await this.tryUpdateGasCoinVersion(coin, suiClient)) {
         coin.status = GasCoinStatus.Free;
       }
     }
@@ -601,8 +621,12 @@ export class GasManager {
     let untrackedCoinsToMerge = Array<string>();
     let mergeResponse = new MergeCoinsResult();
     let gasCoinVersionUpdated = false;
+
+    let client = this.#clientPool.getClient();
+    this.#logger.debug(`Using ${client.name} client for gas coins sync`);
+
     try {
-      await this.#handleCoinsNeedingVersionUpdate();
+      await this.#handleCoinsNeedingVersionUpdate(client.suiClient);
 
       if (!this.#canRunPeriodicTask()) return;
 
@@ -611,7 +635,9 @@ export class GasManager {
       // Check for untracked SUI coins in the wallet and merge them into
       // the main gas coin.
       // Merge coins with balance < minBalancePerInstanceMist or balance > maxBalancePerinstanceMist into the mainGasCoin
-      untrackedCoinsToMerge = await this.#untrackedCoinsToMerge();
+      untrackedCoinsToMerge = await this.#untrackedCoinsToMerge(
+        client.suiClient
+      );
       trackedCoinsToMerge = this.#trackedCoinsToMerge();
 
       if (trackedCoinsToMerge.length + untrackedCoinsToMerge.length > 0) {
@@ -619,10 +645,11 @@ export class GasManager {
           `Scanning found ${untrackedCoinsToMerge.length} untracked, ${trackedCoinsToMerge.length} tracked gas coins to merge`
         );
 
-        mergeResponse = await this.#mergeCoins(this.#mainGasCoin!, [
-          ...untrackedCoinsToMerge,
-          ...trackedCoinsToMerge,
-        ]);
+        mergeResponse = await this.#mergeCoins(
+          this.#mainGasCoin!,
+          [...untrackedCoinsToMerge, ...trackedCoinsToMerge],
+          client.suiClient
+        );
         gasCoinVersionUpdated = mergeResponse.gasCoinVersionUpdated;
       }
     } finally {
@@ -642,7 +669,8 @@ export class GasManager {
 
           if (!gasCoinVersionUpdated) {
             gasCoinVersionUpdated = await this.tryUpdateGasCoinVersion(
-              this.#mainGasCoin
+              this.#mainGasCoin,
+              client.suiClient
             );
             if (!gasCoinVersionUpdated) {
               this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
@@ -663,14 +691,15 @@ export class GasManager {
             );
             gasCoinVersionUpdated = await this.#createChildInstances(
               instancesNeeded,
-              instanceToSplit
+              instanceToSplit,
+              client.suiClient
             );
           }
         } else {
           for (let coinId of trackedCoinsToMerge) {
             let coin = this.#gasCoins.get(coinId);
             if (coin) {
-              if (await this.tryUpdateGasCoinVersion(coin)) {
+              if (await this.tryUpdateGasCoinVersion(coin, client.suiClient)) {
                 coin.status = GasCoinStatus.Free;
               } else {
                 coin.status = GasCoinStatus.NeedsVersionUpdate;
@@ -681,7 +710,10 @@ export class GasManager {
 
         if (
           !gasCoinVersionUpdated &&
-          !(await this.tryUpdateGasCoinVersion(this.#mainGasCoin))
+          !(await this.tryUpdateGasCoinVersion(
+            this.#mainGasCoin,
+            client.suiClient
+          ))
         ) {
           this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
           this.#logger.error(
@@ -697,7 +729,10 @@ export class GasManager {
       ) {
         if (
           !gasCoinVersionUpdated &&
-          !(await this.tryUpdateGasCoinVersion(this.#mainGasCoin))
+          !(await this.tryUpdateGasCoinVersion(
+            this.#mainGasCoin,
+            client.suiClient
+          ))
         ) {
           this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
           this.#logger.error(
@@ -720,12 +755,13 @@ export class GasManager {
 
         gasCoinVersionUpdated = await this.#createChildInstances(
           instancesNeeded,
-          instanceToSplit
+          instanceToSplit,
+          client.suiClient
         );
 
         if (
           !gasCoinVersionUpdated &&
-          !this.tryUpdateGasCoinVersion(this.#mainGasCoin)
+          !this.tryUpdateGasCoinVersion(this.#mainGasCoin, client.suiClient)
         ) {
           this.#mainGasCoin.status = GasCoinStatus.NeedsVersionUpdate;
           this.#logger.error(
@@ -741,14 +777,16 @@ export class GasManager {
 
   #createChildInstances = async (
     instancesNeeded: number,
-    instanceToSplit: GasCoin
+    instanceToSplit: GasCoin,
+    suiClient: SuiClient
   ): Promise<boolean> => {
     let gasCoinVersionUpdated = false;
     try {
       let response = await this.#splitCoins(
         instanceToSplit!,
         instancesNeeded,
-        this.#maxBalancePerInstanceMist
+        this.#maxBalancePerInstanceMist,
+        suiClient
       );
 
       gasCoinVersionUpdated = response.gasCoinVersionUpdated;
@@ -830,7 +868,8 @@ export class GasManager {
   #splitCoins = async (
     instanceToSplit: GasCoin,
     count: number,
-    balancePerCoin: bigint
+    balancePerCoin: bigint,
+    suiClient: SuiClient
   ): Promise<SplitCoinsResult> => {
     const txBlock = new Transaction();
     let parsedResponse = new SplitCoinsResult();
@@ -847,7 +886,7 @@ export class GasManager {
 
       txBlock.setGasPayment([instanceToSplit]);
 
-      let response = await this.#suiClient.signAndExecuteTransaction({
+      let response = await suiClient.signAndExecuteTransaction({
         signer: this.#keyPair,
         transaction: txBlock,
         options: { showEffects: true },
@@ -939,7 +978,8 @@ export class GasManager {
 
   #mergeCoins = async (
     parentInstance: GasCoin,
-    instancesToMerge: Array<string>
+    instancesToMerge: Array<string>,
+    suiClient: SuiClient
   ) => {
     this.#logger.info(
       `Merging ${
@@ -956,7 +996,7 @@ export class GasManager {
       txBlock.mergeCoins(txBlock.gas, instancesToMerge);
       txBlock.setGasPayment([parentInstance]);
 
-      let response = await this.#suiClient.signAndExecuteTransaction({
+      let response = await suiClient.signAndExecuteTransaction({
         signer: this.#keyPair,
         transaction: txBlock,
         options: { showEffects: true },
@@ -992,13 +1032,16 @@ export class GasManager {
 
   // The caller is responsible for obtaining the gasCoin before calling this
   // and freeing it afterwards
-  mergeUntrackedGasCoinsInto = async (gasCoin: GasCoin) => {
+  mergeUntrackedGasCoinsInto = async (
+    gasCoin: GasCoin,
+    suiClient: SuiClient
+  ) => {
     let untrackedCoinsToMerge = new Array<string>();
     let parsedResponse = new MergeCoinsResult();
     let foundUntrackedCoinsToMerge = false;
 
     try {
-      untrackedCoinsToMerge = await this.#untrackedCoinsToMerge();
+      untrackedCoinsToMerge = await this.#untrackedCoinsToMerge(suiClient);
 
       this.#logger.info(
         `mergeUntrackedGasCoinsInto: Found ${untrackedCoinsToMerge.length} untracked gas coin(s)`
@@ -1011,14 +1054,18 @@ export class GasManager {
       }
 
       foundUntrackedCoinsToMerge = true;
-      parsedResponse = await this.#mergeCoins(gasCoin, untrackedCoinsToMerge);
+      parsedResponse = await this.#mergeCoins(
+        gasCoin,
+        untrackedCoinsToMerge,
+        suiClient
+      );
     } catch (error) {
       this.#logger.error(
         `mergeUntrackedGasCoinsInto: Failed to merge untracked coins into gasCoin=${gasCoin.repr()}. Error=${error}`
       );
     } finally {
       if (foundUntrackedCoinsToMerge && !parsedResponse.gasCoinVersionUpdated) {
-        if (!(await this.tryUpdateGasCoinVersion(gasCoin))) {
+        if (!(await this.tryUpdateGasCoinVersion(gasCoin, suiClient))) {
           gasCoin.status = GasCoinStatus.NeedsVersionUpdate;
         }
       }
@@ -1029,13 +1076,13 @@ export class GasManager {
     return this.#gasCoins.getFreeCoin();
   };
 
-  getMainGasCoin = async (): Promise<GasCoin | null> => {
+  getMainGasCoin = async (suiClient: SuiClient): Promise<GasCoin | null> => {
     if (this.#mainGasCoin === undefined) {
       throw new Error("The main gas coin has not been allocated yet");
     }
 
     if (this.#mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate) {
-      if (await this.tryUpdateGasCoinVersion(this.#mainGasCoin)) {
+      if (await this.tryUpdateGasCoinVersion(this.#mainGasCoin, suiClient)) {
         this.#mainGasCoin.status = GasCoinStatus.Free;
       } else {
         this.#logger.error(
@@ -1054,12 +1101,12 @@ export class GasManager {
     return this.#mainGasCoin;
   };
 
-  onEpochChange = async () => {
+  onEpochChange = async (suiClient: SuiClient) => {
     for (let gasCoin of this.#gasCoins.toSkip()) {
       this.#logger.info(
         `Freeing gasCoin=${gasCoin.objectId} skipped for last epoch`
       );
-      if (await this.tryUpdateGasCoinVersion(gasCoin)) {
+      if (await this.tryUpdateGasCoinVersion(gasCoin, suiClient)) {
         gasCoin.status = GasCoinStatus.Free;
       } else {
         gasCoin.status = GasCoinStatus.NeedsVersionUpdate;
