@@ -1,0 +1,18 @@
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  dex_proxy:
+    image: dex_proxy
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    depends_on:
+      - redis
+    volumes:
+      - ./:/app/auros
+    ports:
+      - 127.0.0.1:22222:22
+      - 127.0.0.1:1958:1958

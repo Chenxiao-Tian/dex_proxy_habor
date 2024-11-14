@@ -117,6 +117,7 @@
             }
         },
         "exchange_token_refresh_interval_s": 240,
+        "reload_coin_definitions_interval_s": 600,
         "max_signature_generators": 2,
         "gas_price_tracker": {
             "http_url": "https://arbitrum-sepolia.infura.io/v3/12a345a0a065429f9aec1a06ba94373e",

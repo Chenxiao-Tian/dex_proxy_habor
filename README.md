@@ -34,3 +34,4 @@
   select account, token, address from exchange_addresses where token='<token_name>' and address='<address>';
   ```
   - Verify the existence and correctness of the addresses on chain using a ```block explorer```.
+

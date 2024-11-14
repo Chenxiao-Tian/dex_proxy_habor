@@ -44,6 +44,7 @@ class Hype(DexCommon):
         self.__set_exchange_url_prefix(config)
 
         self.__exchange_token_refresh_interval_s: int = config["exchange_token_refresh_interval_s"]
+        self.__reload_coin_definitions_interval_s: int = config["reload_coin_definitions_interval_s"]
 
         self.__chain_name = config['chain_name']
         self.__native_token = config['native_token']
@@ -73,8 +74,8 @@ class Hype(DexCommon):
 
         self._logger.info(f"wallet_address={self._api._wallet_address}")
 
-        meta_info = await self._api.get_swaps_meta_info()
-        self.coin_to_asset = {asset_info["name"]: asset for (asset, asset_info) in enumerate(meta_info['universe'])}
+        await self.coin_definitions()
+        self.pantheon.spawn(self.reload_coin_definitions_loop())
 
         await super().start(eth_private_key)
 
@@ -82,6 +83,20 @@ class Hype(DexCommon):
         self._api.initialize_starting_nonce(max_nonce_cached + 1)
 
         self.started = True
+
+    async def coin_definitions(self):
+        meta_info = await self._api.get_swaps_meta_info()
+        previous_coin_definitions_count = len(self.coin_to_asset) if self.coin_to_asset is not None else 0
+        self.coin_to_asset = {asset_info["name"]: asset for (asset, asset_info) in enumerate(meta_info['universe'])}
+        self._logger.debug(f'Loaded {len(self.coin_to_asset)} definitions')
+        if previous_coin_definitions_count != 0 and previous_coin_definitions_count != len(self.coin_to_asset):
+            self._logger.debug(f'Coin definitions count changed: old value {previous_coin_definitions_count}')
+
+    async def reload_coin_definitions_loop(self):
+        while True:
+            await self.pantheon.sleep(self.__reload_coin_definitions_interval_s)
+            await self.coin_definitions()
+            self._logger.debug('Coin definitions reloaded')
 
     def __load_whitelist(self):
         file_prefix = os.path.dirname(os.path.realpath(__file__))
