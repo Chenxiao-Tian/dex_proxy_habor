@@ -6,6 +6,11 @@
         "type": "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
         "scalar": 1000000
       },
+      "NS": {
+        "address": "0x5145494a5f5100e645e4b0aa950fa6b68f614e8c59e17bc5ded3495123a79178",
+        "type": "0x5145494a5f5100e645e4b0aa950fa6b68f614e8c59e17bc5ded3495123a79178::ns::NS",
+        "scalar": 1000000
+      },
       "SBETH": {
         "address": "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29",
         "type": "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
@@ -46,6 +51,16 @@
       "DEEP_USDC": {
         "address": "0xf948981b806057580f91622417534f491da5f61aeaf33d0ed8e69fd5691c95ce",
         "baseCoin": "DEEP",
+        "quoteCoin": "USDC"
+      },
+      "NS_SUI": {
+        "address": "0x27c4fdb3b846aa3ae4a65ef5127a309aa3c1f466671471a806d8912a18b253e8",
+        "baseCoin": "NS",
+        "quoteCoin": "SUI"
+      },
+      "NS_USDC": {
+        "address": "0x0c0fdd4008740d81a8a7d4281322aee71a1b62c449eb5b142656753d89ebc060",
+        "baseCoin": "NS",
         "quoteCoin": "USDC"
       },
       "SBETH_USDC": {
@@ -86,6 +101,15 @@
         ]
       },
       {
+        "coin_type": "0x5145494a5f5100e645e4b0aa950fa6b68f614e8c59e17bc5ded3495123a79178::ns::NS",
+        "valid_withdrawal_addresses": [
+          "0x402d13cb9cac1c7a4c8115bb81869ad147447953759a1b7bb832913270162110",
+          "0x07f7817923726f43430002ea7bfea1cbfc1b389f84d7877769efc67e83007275",
+          "0x8feb43c930f6041df75e2d1f50aa172c83903b7fe7ca0ca665f75c1a9bebf4ed",
+          "0x607fd67c24fbd09154ab60b0f049cca51635bcc2d4d1306bc793b08d8e4091f1"
+        ]
+      },
+      {
         "coin_type": "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
         "valid_withdrawal_addresses": [
           "0x908e3e49a06a6c52648ad2ff70ec2ac12e84af8c8c1bfe8870f50404f214ced0",
@@ -118,6 +142,11 @@
       "DEEP": {
         "address": "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270",
         "type": "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
+        "scalar": 1000000
+      },
+      "NS": {
+        "address": "0x5145494a5f5100e645e4b0aa950fa6b68f614e8c59e17bc5ded3495123a79178",
+        "type": "0x5145494a5f5100e645e4b0aa950fa6b68f614e8c59e17bc5ded3495123a79178::ns::NS",
         "scalar": 1000000
       },
       "SBETH": {
@@ -162,6 +191,16 @@
         "baseCoin": "DEEP",
         "quoteCoin": "USDC"
       },
+      "NS_SUI": {
+        "address": "0x27c4fdb3b846aa3ae4a65ef5127a309aa3c1f466671471a806d8912a18b253e8",
+        "baseCoin": "NS",
+        "quoteCoin": "SUI"
+      },
+      "NS_USDC": {
+        "address": "0x0c0fdd4008740d81a8a7d4281322aee71a1b62c449eb5b142656753d89ebc060",
+        "baseCoin": "NS",
+        "quoteCoin": "USDC"
+      },
       "SBETH_USDC": {
         "address": "0x1109352b9112717bd2a7c3eb9a416fff1ba6951760f5bdd5424cf5e4e5b3e65c",
         "baseCoin": "SBETH",
@@ -181,6 +220,14 @@
     "tokens": [
       {
         "coin_type": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "valid_withdrawal_addresses": [
+          "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
+          "0x56f98ae294a565671cecc3604974863c0b3c6970eb631e12e3b1d4114885757b",
+          "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c"
+        ]
+      },
+      {
+        "coin_type": "0x5145494a5f5100e645e4b0aa950fa6b68f614e8c59e17bc5ded3495123a79178::ns::NS",
         "valid_withdrawal_addresses": [
           "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
           "0x56f98ae294a565671cecc3604974863c0b3c6970eb631e12e3b1d4114885757b",
