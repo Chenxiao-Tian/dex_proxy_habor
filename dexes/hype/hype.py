@@ -12,13 +12,15 @@ from web3 import Web3
 from ..dex_common import DexCommon
 
 from pyutils.exchange_connectors import ConnectorType
-from pyutils.gas_pricing.eth import GasPriceTracker, PriorityFee
+from pyutils.gas_pricing.eth import PriorityFee
+
+from eth_account import Account
 
 from pantheon import Pantheon
 
 # For type annotations
 from decimal import Decimal
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Union
 
 from web_server import WebServer
 
@@ -67,17 +69,31 @@ class Hype(DexCommon):
         server.register("POST", "/private/deposit-into-exchange", self.__deposit_into_exchange)
         server.register("POST", "/private/update-leverage", self.__update_leverage)
 
-    async def start(self, eth_private_key: str):
+    async def start(self, eth_private_key: Union[str, list]):
         self.__load_whitelist()
 
-        await self._api.initialize(private_key_or_mnemonic=eth_private_key, bridge_address=self.bridge_address, tokens_list=self.__tokens_from_res_file.values())
+        def key_generator(keys_list):
+            accounts = [Account.from_key(key) for key in keys_list]
+            while True:
+                for account in accounts:
+                    yield account
+
+        if isinstance(eth_private_key, list):
+            default_key = eth_private_key[0]
+
+            self.rotating_key = key_generator(eth_private_key)
+        else:
+            default_key = eth_private_key
+            self.rotating_key = key_generator([eth_private_key])
+
+        await self._api.initialize(private_key_or_mnemonic=default_key, bridge_address=self.bridge_address, tokens_list=self.__tokens_from_res_file.values())
 
         self._logger.info(f"wallet_address={self._api._wallet_address}")
 
         await self.coin_definitions()
         self.pantheon.spawn(self.reload_coin_definitions_loop())
 
-        await super().start(eth_private_key)
+        await super().start(default_key)
 
         max_nonce_cached = self._request_cache.get_max_nonce()
         self._api.initialize_starting_nonce(max_nonce_cached + 1)
@@ -337,7 +353,7 @@ class Hype(DexCommon):
             signature = await self.pantheon.loop.run_in_executor(
                 self.__process_pool,
                 sign_l1_action,
-                self._api._account,
+                next(self.rotating_key),
                 cancel_action,
                 self.vault_address,
                 params['nonce'],
@@ -436,7 +452,7 @@ class Hype(DexCommon):
             signature = await self.pantheon.loop.run_in_executor(
                 self.__process_pool,
                 sign_l1_action,
-                self._api._account,
+                next(self.rotating_key),
                 order_action,
                 self.vault_address,
                 params['order_creation_ts_ms'],

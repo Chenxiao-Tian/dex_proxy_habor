@@ -67,10 +67,17 @@ class DexProxy:
 
     def __get_private_key(self):
         key_store_file_path = self.pantheon.config['key_store_file_path']
-        with open(key_store_file_path) as keyfile:
-            encrypted_key = keyfile.read()
-            private_key = Account.decrypt(encrypted_key, '')
-            return private_key.hex()
+
+        def get_private_key_from_file(file_path):
+            with open(file_path) as keyfile:
+                encrypted_key = keyfile.read()
+                private_key = Account.decrypt(encrypted_key, '')
+                return private_key.hex()
+
+        if isinstance(key_store_file_path, list):
+            return [get_private_key_from_file(file_path) for file_path in key_store_file_path]
+
+        return get_private_key_from_file(key_store_file_path)
 
     async def on_new_connection(self, ws):
         await self.__exchange.on_new_connection(ws)

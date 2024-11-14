@@ -56,13 +56,20 @@
         "url": "amqp://dev-sng-rmq.kdev"
     },
     "Redis": {
-        "host": "localhost",
+        "host": "redis",
         "port": 6379
     },
     "server": {
         "port": 1958
     },
-    "key_store_file_path": "./dexes/hype/test/wallet.json",
+    "key_store_file_path": [
+      "./dexes/hype/test/wallet.json",
+      "./dexes/hype/test/api_wallet_1.json",
+      "./dexes/hype/test/api_wallet_2.json",
+      "./dexes/hype/test/api_wallet_3.json",
+      "./dexes/hype/test/api_wallet_4.json",
+      "./dexes/hype/test/api_wallet_5.json"
+    ],
     "dex": {
         "name": "hype",
         "chain_name": "Arbitrum Sepolia",
