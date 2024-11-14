@@ -3,6 +3,8 @@ import { DeepBookClient } from "@mysten/deepbook-v3";
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { fromHex } from "@mysten/sui/utils";
+import { dirname } from "path";
+import { readFileSync } from "fs";
 
 const wallet_address =
   "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c";
@@ -13,11 +15,21 @@ const secretKey =
 const keypair = Ed25519Keypair.fromSecretKey(fromHex(secretKey));
 const address = keypair.toSuiAddress();
 
+const filePrefix = dirname(process.argv[1]);
+let contents = JSON.parse(
+  readFileSync(`${filePrefix}/../../../resources/dbv3_withdrawal_addresses.json`, "utf8")
+);
+let coinsMap = contents["Sui Testnet"].coins_map;
+let poolsMap = contents["Sui Testnet"].pools_map;
+
 const suiClient = new SuiClient({ url: getFullnodeUrl("testnet") });
 const deepBookClient = new DeepBookClient({
   client: suiClient,
   address: address,
   env: "testnet",
+  // to read coins and pool map from resources file - uncomment following
+  // coins: coinsMap,
+  // pools: poolsMap,
 });
 
 const priceLow = 0.001;

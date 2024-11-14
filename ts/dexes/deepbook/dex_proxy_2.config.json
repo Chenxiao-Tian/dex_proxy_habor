@@ -15,7 +15,7 @@
         "url": "https://sui-mainnet.g.allthatnode.com/full/json_rpc",
         "comment_1": "The following header section is only required by ATN. Comment it out if using a different RPC service",
         "headers": {
-          "x-allthatnode-api-key": "35278f2e995d4b13b7a4f00648b42410"
+          "x-allthatnode-api-key": "8c39945f254f431e9d0911db789dbe78"
         }
      },
       "ws": {

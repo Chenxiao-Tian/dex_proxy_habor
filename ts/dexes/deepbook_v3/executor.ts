@@ -3,26 +3,26 @@ import { GasManager, GasCoin, GasCoinStatus } from "./gas_manager.js";
 import type { TransactionGenerator } from "./types.js";
 
 import { Logger } from "winston";
-import { SuiTransactionBlockResponseOptions } from "@mysten/sui.js/client";
-import { SuiClient, SuiTransactionBlockResponse } from "@mysten/sui/client";
+import {
+  SuiClient,
+  SuiTransactionBlockResponse,
+  SuiTransactionBlockResponseOptions,
+} from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 
 export class Executor {
   #logger: Logger;
-  #suiClient: SuiClient;
   #keyPair: Ed25519Keypair;
   #gasManager: GasManager;
   #gasBudgetMist: bigint;
 
   constructor(
     lf: LoggerFactory,
-    suiClient: SuiClient,
     keyPair: Ed25519Keypair,
     gasManager: GasManager,
     gasBudgetMist: bigint
   ) {
     this.#logger = lf.createLogger("executor");
-    this.#suiClient = suiClient;
     this.#keyPair = keyPair;
     this.#gasManager = gasManager;
     this.#gasBudgetMist = gasBudgetMist;
@@ -62,6 +62,7 @@ export class Executor {
 
   execute = async (
     requestId: bigint,
+    suiClient: SuiClient,
     txGenerator: TransactionGenerator,
     txBlockResponseOptions: SuiTransactionBlockResponseOptions
   ): Promise<SuiTransactionBlockResponse> => {
@@ -77,7 +78,7 @@ export class Executor {
       tx.setGasPayment([gasCoin]);
       tx.setGasBudget(this.#gasBudgetMist);
 
-      response = await this.#suiClient.signAndExecuteTransaction({
+      response = await suiClient.signAndExecuteTransaction({
         signer: this.#keyPair,
         transaction: tx,
         options: txBlockResponseOptions,
@@ -108,14 +109,15 @@ export class Executor {
               response,
               gasCoin
             );
-            if (!gasCoinVersionUpdated) {
-              gasCoinVersionUpdated =
-                await this.#gasManager.tryUpdateGasCoinVersion(gasCoin);
-            }
-          } else {
-            gasCoinVersionUpdated =
-              await this.#gasManager.tryUpdateGasCoinVersion(gasCoin);
           }
+          if (!gasCoinVersionUpdated) {
+            gasCoinVersionUpdated =
+              await this.#gasManager.tryUpdateGasCoinVersion(
+                gasCoin,
+                suiClient
+              );
+          }
+
           if (gasCoinVersionUpdated) {
             gasCoin.status = GasCoinStatus.Free;
           } else {
