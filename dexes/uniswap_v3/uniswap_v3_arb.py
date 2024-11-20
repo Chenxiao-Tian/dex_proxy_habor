@@ -138,7 +138,7 @@ class UniswapV3Arb(DexCommon):
 
         except Exception as e:
             self._logger.exception(f'Failed to insert order: %r', e)
-            if len(e.args) and ('nonce too low' in e.args[0]['message']):
+            if len(e.args) and ('message' in e.args[0] and 'nonce too low' in e.args[0]['message']):
                 # Means a cancel/amend for this txn reached arbitrum sequencer first
                 # Not finalising order here as finalisation will happen in subsequent cancel/amend block
                 return 200, {'error': {'message': repr(e)}}
@@ -289,7 +289,7 @@ class UniswapV3Arb(DexCommon):
                     self._api.update_next_nonce_to_use(request.nonce+1)
                 return result
             except Exception as e:
-                if len(e.args) and ('nonce too low' in e.args[0]['message']):
+                if len(e.args) and ("message" in e.args[0] and "nonce too low" in e.args[0]["message"]):
                     return ApiResult(error_type=ErrorType.TRANSACTION_FAILED,
                                      error_message=f"{request} already mined!")
                 raise e
