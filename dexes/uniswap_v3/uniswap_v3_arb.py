@@ -31,6 +31,8 @@ class UniswapV3Arb(DexCommon):
         self.msg_queue = asyncio.Queue()
 
         self._server.register('POST', '/private/insert-order', self.__insert_order)
+        self._server.register(
+            'POST', '/private/wrap-unwrap-eth', self.__wrap_unwrap_eth)
 
         self.__instruments: InstrumentsLiveSource = None
         self.__exchange_name = "chainArb-uni3"
@@ -38,7 +40,6 @@ class UniswapV3Arb(DexCommon):
         self.__native_token = "ETH"
         self.__contract_addresses_file_path = "/../../resources/uni3_arb_contracts_address.json"
         self.__txn_gas_limit = 1000000
-
         # 0.01 GWEI usually.
         self.__base_block_gas_price = 10_000_000_000
         self.__tx_hash_to_order_info: Dict[str, OrderInfo] = {}
@@ -74,7 +75,7 @@ class UniswapV3Arb(DexCommon):
                     deadline=request.deadline_since_epoch_s,
                     gas_limit=request.gas_limit, gas_price=gas_price_wei, nonce=nonce)
             if result.error_type == ErrorType.NO_ERROR:
-                self._api.update_next_nonce_to_use(nonce+1)
+                self._api.update_next_nonce_to_use(nonce + 1)
         finally:
             self._api.nonce_lock_release()
 
@@ -271,7 +272,7 @@ class UniswapV3Arb(DexCommon):
 
         if result is not None:
             if result.error_type == ErrorType.NO_ERROR:
-                self._api.update_next_nonce_to_use(request.nonce+1)
+                self._api.update_next_nonce_to_use(request.nonce + 1)
         return result
 
     async def _cancel_transaction(self, request, gas_price_wei):
@@ -286,7 +287,7 @@ class UniswapV3Arb(DexCommon):
 
                 result = await self._api.cancel_transaction(request.nonce, gas_price_wei)
                 if result.error_type == ErrorType.NO_ERROR:
-                    self._api.update_next_nonce_to_use(request.nonce+1)
+                    self._api.update_next_nonce_to_use(request.nonce + 1)
                 return result
             except Exception as e:
                 if len(e.args) and ("message" in e.args[0] and "nonce too low" in e.args[0]["message"]):
@@ -453,6 +454,38 @@ class UniswapV3Arb(DexCommon):
         self.pantheon.spawn(self.__get_tx_status_ws())
 
         self.started = True
+
+    async def __wrap_unwrap_eth(self, path, params: dict, received_at_ms):
+        client_request_id = ''
+        try:
+            client_request_id = params['client_request_id']
+            request = params['request']
+            assert request == 'wrap' or request == 'unwrap', 'Unknown request, should be either wrap or unwrap'
+            amount = Decimal(params['amount'])
+            gas_price_wei = int(params['gas_price_wei'])
+            gas_limit = int(params['gas_limit'])
+            wrap_unwrap = WrapUnwrapRequest(client_request_id, request, amount, gas_limit, received_at_ms)
+            self._logger.debug(
+                f'{"Wrapping" if wrap_unwrap.request == "wrap" else "Unwrapping"}={wrap_unwrap}, gas_price_wei={gas_price_wei}')
+            self._request_cache.add(wrap_unwrap)
+            if request == "wrap":
+                result = await self._api.wrap('WETH', amount, gas_limit, gas_price_wei)
+            else:
+                result = await self._api.unwrap('WETH', amount, gas_limit, gas_price_wei)
+
+            if result.error_type == ErrorType.NO_ERROR:
+                wrap_unwrap.tx_hashes.append((result.tx_hash, RequestType.WRAP_UNWRAP.name))
+                wrap_unwrap.used_gas_prices_wei.append(gas_price_wei)
+                self._transactions_status_poller.add_for_polling(
+                    result.tx_hash, client_request_id, RequestType.WRAP_UNWRAP)
+                self._request_cache.add_or_update_request_in_redis(client_request_id)
+                return 200, {'tx_hash': result.tx_hash}
+            else:
+                return 400, {'error': {'message': result.error_message}}
+        except Exception as ex:
+            self._logger.exception(f'Failed to handle wrap_unwrap request %r: %r', client_request_id, ex)
+            self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+            return 400, {'error': {'message': repr(ex)}}
 
     def _on_fireblocks_tokens_whitelist_refresh(self, tokens_from_fireblocks: dict):
         for symbol, (_, address) in tokens_from_fireblocks.items():
