@@ -39,7 +39,7 @@ class UniswapV3Arb(DexCommon):
         self.__chain_name = config["chain_name"]
         self.__native_token = "ETH"
         self.__contract_addresses_file_path = "/../../resources/uni3_arb_contracts_address.json"
-        self.__txn_gas_limit = 1000000
+        self.__txn_gas_limit = 10000000
         # 0.01 GWEI usually.
         self.__base_block_gas_price = 10_000_000_000
         self.__tx_hash_to_order_info: Dict[str, OrderInfo] = {}
