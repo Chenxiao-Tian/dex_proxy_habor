@@ -1499,10 +1499,6 @@ export class DeepBookV3 implements DexInterface {
     const baseCoinTypeId: string = this.getCoin(pool.baseCoin).type;
     const quoteCoinTypeId: string = this.getCoin(pool.quoteCoin).type;
 
-    this.logger.debug(
-      `[${requestId}] Inserting order: params=${JSON.stringify(params)}`
-    );
-
     let response = null;
     try {
       let txBlockGenerator = () => {

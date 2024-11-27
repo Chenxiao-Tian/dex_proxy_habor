@@ -1027,3 +1027,32 @@
             "confirmedLocalExecution": false
         }
 ```
+
+20. Get transaction block:
+    Request:
+
+```
+        curl \
+        -X GET \
+        -H "Content-Type: application/json" \
+        "http://localhost:3000/transactions?cutOffTime=1732687202000&limit=50"
+```
+
+```
+        {
+            "data": [
+                { "digest": "8tSEv4K8q4qPRbQH4RqagNAJTQXR656vvsFbFX7mdCcJ" },
+                { "digest": "45auJ2SquFNYvXFL3SS2CURTEoYvbTpwY2sHF77eem1y" },
+                { "digest": "Fv4zQfYwRynStuGWbbzfQNeYknDX4ukoYh8TS792T9Gi" },
+                { "digest": "GACqFQWKM6GRDUjT2qY8kmEKGKNHsq76nVkJYbSih5vh" },
+                { "digest": "EH9V1SFvLu5LaQaUSR5MAk91w7R7S4UeBSWaNn7DLMM6" },
+                { "digest": "H7FbAhAZmTtePtBcujdMVGjJEVLVzC5xb8Pa5wQUo1VC" },
+                { "digest": "9Vhc1pnN6mG2k2Sos3YsnrJWe7duJYpgSUmnECXt7KoY" },
+                { "digest": "CiVv3XMNruQBbjhvbeUxgtw42d4NVM3ErCEEtdECTBTf" },
+                { "digest": "Gqn8mfHET8dy27Dyzfm6a1y8Y5CwnkKjgv2tQoXQHzq9" },
+                { "digest": "GSUkqv2fct13GQ8hHNUFtk1HB3dmGxaMJr3QFjW8zjYG" }
+            ],
+            "nextCursor": "iCMCTCsPDRwSvnGR5AVkTAEe3QrrBHirqEt7b6vu2jt",
+            "hasNextPage": false
+        }
+```
