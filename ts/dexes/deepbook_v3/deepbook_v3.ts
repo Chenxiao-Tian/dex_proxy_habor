@@ -22,7 +22,7 @@ import {
   OrderCancelledEvent,
   OrderFilledEvent,
 } from "../../order_cache.js";
-import { Coin, Pool } from "@mysten/deepbook-v3";
+import { Coin, Pool, DeepBookClient } from "@mysten/deepbook-v3";
 import { ORDER_MAX_EXPIRE_TIMESTAMP_MS } from "./utils.js";
 import type { NetworkType } from "./types.js";
 import { bcs } from "@mysten/sui/bcs";
@@ -746,6 +746,41 @@ export class DeepBookV3 implements DexInterface {
     };
   };
 
+  // Function to fetch transaction block details
+  hasNextPage = async (client:{
+    name: string;
+    suiClient: SuiClient;
+    deepBookClient: DeepBookClient
+  }, txBlocks: any, cutOffTime: number | null, requestId: bigint): Promise<boolean> => {
+    if (cutOffTime == null){
+      return true;  // If no cut-off time, we always want to fetch the next page
+    }
+    // Retrieve the last transaction digest from the txBlocks
+    if (txBlocks.length === 0) {
+      return false;
+    }
+    const lastTxDigest = txBlocks.data?.[txBlocks.data.length - 1]?.digest;
+
+    if (!lastTxDigest) {
+      return false;
+    }
+
+    // Fetch the transaction block details using the digest
+    this.logger.debug(`[${requestId}] Querying txDigest ${lastTxDigest}`)
+    const transactionBlockDetails = await client.suiClient.getTransactionBlock({
+      digest: lastTxDigest
+    });
+
+    // Check if the cut-off time and transaction timestamp are valid and compare
+    if (
+      transactionBlockDetails.timestampMs &&
+      cutOffTime > parseInt(transactionBlockDetails.timestampMs)
+    ) {
+      return false;
+    }
+    return true;
+  };
+
   getTransactionBlocks = async (
     requestId: bigint,
     path: string,
@@ -759,6 +794,11 @@ export class DeepBookV3 implements DexInterface {
     } else {
       filter = { FromAddress: this.walletAddress };
     }
+
+    const cutOffTimeStr = params.get("cutOffTime");
+    const cutOffTimeInt: number | null = cutOffTimeStr
+      ? parseInt(cutOffTimeStr)
+      : null;
 
     const cursor: string | null = params.get("cursor");
 
@@ -784,6 +824,9 @@ export class DeepBookV3 implements DexInterface {
       this.logger.debug(`[${requestId}] using ${client.name} client`);
 
       txBlocks = await client.suiClient.queryTransactionBlocks(queryParams);
+      if (txBlocks.hasNextPage){
+        txBlocks.hasNextPage = await this.hasNextPage(client, txBlocks,  cutOffTimeInt, requestId);
+      }
     } catch (error) {
       this.logger.error(`[${requestId}]: ${error}`);
       throw error;
