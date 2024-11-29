@@ -820,7 +820,7 @@ export class DeepBookV3 implements DexInterface {
 
     let txBlocks = null;
     try {
-      let client = this.clientPool.getClient();
+      let client = this.clientPool.getInternalClient();
       this.logger.debug(`[${requestId}] using ${client.name} client`);
 
       txBlocks = await client.suiClient.queryTransactionBlocks(queryParams);
