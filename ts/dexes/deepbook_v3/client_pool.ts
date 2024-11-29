@@ -13,8 +13,15 @@ export class ClientPool {
     deepBookClient: DeepBookClient;
   }>;
   private clientIdxToUse: number = 0;
+
+  // not setting as default 0 to avoid conflicts
+  private internalClientIdxToUse: number = -1;
+
   private trackLeadingClientPollIntervalMs: number;
   private latestSequenceNumberFound: bigint = BigInt(0);
+
+  // a separate variable to avoid conflict with existing functionality
+  private latestInternalNodeSequenceNumberFound: bigint = BigInt(0);
 
   constructor(
     lf: LoggerFactory,
@@ -110,6 +117,20 @@ export class ClientPool {
           }
           this.latestSequenceNumberFound = sequenceNumber;
         }
+
+        //separate if block to avoid mixing of conditions
+        if (client.name.startsWith("internal_sui")) {
+          this.logger.debug(`Internal Sui client is ${client.name} at idx ${idx}`);
+
+          // Update if this client has the highest sequence number
+          if (sequenceNumber > this.latestInternalNodeSequenceNumberFound) {
+            if (this.internalClientIdxToUse !== idx) {
+              this.internalClientIdxToUse = idx;
+              this.logger.debug(`${client.name} is leading internal node now`);
+            }
+            this.latestInternalNodeSequenceNumberFound = sequenceNumber;
+          }
+        }
       } catch (error) {
         this.logger.error(
           `${client.name} error while querying sequence number: ${error}`
@@ -120,6 +141,17 @@ export class ClientPool {
 
   getClient = (): { name: string; suiClient: SuiClient, deepBookClient: DeepBookClient } => {
     return this.clients.at(this.clientIdxToUse)!;
+  };
+
+  getInternalClient = (): { name: string; suiClient: SuiClient, deepBookClient: DeepBookClient } => {
+    if (this.internalClientIdxToUse !== -1){
+      return this.clients.at(this.internalClientIdxToUse)!;
+    } else {
+
+      //fall back to default client if the functionality fails
+      this.logger.warn(`Internal leading client not set, current value ${this.internalClientIdxToUse}, falling back to default client`);
+      return this.clients.at(this.clientIdxToUse)!;
+    }
   };
 
   parseExchangeConnectorConfig = (config: any): any => {
