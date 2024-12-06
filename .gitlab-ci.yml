@@ -73,6 +73,10 @@ stages:
     ENVIRONMENT: dev
   - PROCESS_NAME: dex_proxy-hype-1
     ENVIRONMENT: prod
+  - PROCESS_NAME: dex_proxy-hype-2
+    ENVIRONMENT: prod
+  - PROCESS_NAME: dex_proxy-hype-3
+    ENVIRONMENT: prod
   - PROCESS_NAME: flip-lp-main
     ENVIRONMENT: prod
     DOCKERFILE: Dockerfile.fliplp
