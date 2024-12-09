@@ -111,8 +111,11 @@ class Hype(DexCommon):
     async def reload_coin_definitions_loop(self):
         while True:
             await self.pantheon.sleep(self.__reload_coin_definitions_interval_s)
-            await self.coin_definitions()
-            self._logger.debug('Coin definitions reloaded')
+            try:
+                await self.coin_definitions()
+                self._logger.debug('Coin definitions reloaded')
+            except Exception as ex:
+                self._logger.exception(f'Failed to reload coin definitions: %r', ex)
 
     def __load_whitelist(self):
         file_prefix = os.path.dirname(os.path.realpath(__file__))
