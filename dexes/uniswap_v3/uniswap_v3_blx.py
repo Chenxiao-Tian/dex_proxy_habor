@@ -199,7 +199,7 @@ class UniswapV3Bloxroute(DexCommon):
             await self.__send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block, next_block_num,
                                      next_block_uuid)
 
-            self._request_cache.add_or_update_request_in_redis(client_request_id)
+            self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
 
             return 200, {"result": {"tx_hash": tx_hash, "nonce": nonce}}
 
@@ -246,7 +246,7 @@ class UniswapV3Bloxroute(DexCommon):
             await self.__send_bundle(self.__targeted_block_info.raw_txs_in_targeted_block, next_block_num,
                                      next_block_uuid)
 
-            self._request_cache.add_or_update_request_in_redis(client_request_id)
+            self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
 
             return 200, {'tx_hash': tx_hash}
 
@@ -356,7 +356,7 @@ class UniswapV3Bloxroute(DexCommon):
                     new_raw_txns_in_block.append(new_raw_tx)
                     self._transactions_status_poller.add_for_polling(new_tx_hash, client_id_for_tx, request_of_client_id.request_type)
                     self._logger.debug(f"Amended {request_of_client_id}. Decreased nonce by 1.")
-                    self._request_cache.add_or_update_request_in_redis(client_id_for_tx)
+                    self._request_cache.maybe_add_or_update_request_in_redis(client_id_for_tx)
                 else:
                     # transactions before cancelled transaction.
                     new_raw_txns_in_block.append(raw_tx)

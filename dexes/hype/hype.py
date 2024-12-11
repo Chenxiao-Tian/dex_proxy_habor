@@ -245,7 +245,7 @@ class Hype(DexCommon):
 
                         self._transactions_status_poller.add_for_polling(
                             result.tx_hash, request.client_request_id, RequestType.CANCEL)
-                        self._request_cache.add_or_update_request_in_redis(request.client_request_id)
+                        self._request_cache.maybe_add_or_update_request_in_redis(request.client_request_id)
                     else:
                         failed_cancels.append(request.client_request_id)
                 except Exception as ex:
@@ -578,7 +578,7 @@ class Hype(DexCommon):
 
                 self._transactions_status_poller.add_for_polling(
                     result.tx_hash, client_request_id, RequestType.TRANSFER)
-                self._request_cache.add_or_update_request_in_redis(client_request_id)
+                self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
                 return 200, {'tx_hash': result.tx_hash}
             else:
                 self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)

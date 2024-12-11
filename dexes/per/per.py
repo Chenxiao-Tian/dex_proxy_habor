@@ -190,7 +190,7 @@ class Per(DexCommon):
                 f'{"Wrapping" if wrap_unwrap.request == "wrap" else "Unwrapping"}={wrap_unwrap}, gas_price_wei={gas_price_wei}')
             self._request_cache.add(wrap_unwrap)
 
-            self._request_cache.add_or_update_request_in_redis(client_request_id)
+            self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
 
             if wrap_unwrap.request == "wrap":
                 result = await self._api.wrap(wrapped_token_symbol='WETH', amount=wrap_unwrap.amount,
@@ -208,7 +208,7 @@ class Per(DexCommon):
 
                 self._transactions_status_poller.add_for_polling(
                     result.tx_hash, client_request_id, RequestType.TRANSFER)
-                self._request_cache.add_or_update_request_in_redis(client_request_id)
+                self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
 
                 return 200, {'tx_hash': result.tx_hash}
             else:
@@ -383,7 +383,7 @@ class Per(DexCommon):
 
                         self._transactions_status_poller.add_for_polling(
                             result.tx_hash, request.client_request_id, RequestType.CANCEL)
-                        self._request_cache.add_or_update_request_in_redis(request.client_request_id)
+                        self._request_cache.maybe_add_or_update_request_in_redis(request.client_request_id)
                     else:
                         failed_cancels.append(request.client_request_id)
                 except Exception as ex:

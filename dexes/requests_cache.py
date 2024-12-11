@@ -34,22 +34,26 @@ class RequestsCache:
             config['finalised_requests_cleanup_after_s'])
         self.__pending_add_in_redis = deque()
 
-    async def start(self, transactions_status_poller: TransactionsStatusPoller):
-        self.__redis = self.pantheon.get_aioredis_connection()
-        self.__redis_batch_executor = RedisBatchExecutor(self.pantheon, self.__logger, self.__redis,
-                                                         write_interval=timedelta(seconds=5), write_callback=None)
+        # TODO: probably switch default to False in future
+        self.__store_in_redis: bool = config.get("store_in_redis", True)
 
-        await self.__load_requests(transactions_status_poller)
+    async def start(self, transactions_status_poller: TransactionsStatusPoller):
+        if self.__store_in_redis:
+            self.__redis = self.pantheon.get_aioredis_connection()
+            self.__redis_batch_executor = RedisBatchExecutor(self.pantheon, self.__logger, self.__redis,
+                                                            write_interval=timedelta(seconds=5), write_callback=None)
+
+            await self.__load_requests(transactions_status_poller)
+            self.pantheon.spawn(self.__retry_failed_add_in_redis())
 
         self.pantheon.spawn(self.__finalised_requests_cleanup())
-        self.pantheon.spawn(self.__retry_failed_add_in_redis())
 
     def add(self, request: Request):
         if request.client_request_id in self.__requests:
             raise RuntimeError(
                 f'{request.client_request_id} already exists in request cache')
         self.__requests[request.client_request_id] = request
-        self.add_or_update_request_in_redis(request.client_request_id)
+        self.maybe_add_or_update_request_in_redis(request.client_request_id)
 
     def get(self, client_request_id: str) -> Optional[Request]:
         return self.__requests.get(client_request_id, None)
@@ -72,12 +76,15 @@ class RequestsCache:
         request = self.get(client_request_id)
         if request:
             request.finalise_request(request_status)
-            self.add_or_update_request_in_redis(client_request_id)
+            self.maybe_add_or_update_request_in_redis(client_request_id)
         else:
             self.__logger.error(
                 f'Not finalising request with client_request_id={client_request_id} as not found')
 
-    def add_or_update_request_in_redis(self, client_request_id: str):
+    def maybe_add_or_update_request_in_redis(self, client_request_id: str):
+        if not self.__store_in_redis:
+            return
+
         request = self.get(client_request_id)
         if request:
             try:
@@ -93,8 +100,10 @@ class RequestsCache:
 
     def __delete_request(self, client_request_id: str):
         try:
-            self.__redis_batch_executor.execute(
-                'HDEL', self.__redis_request_key, client_request_id)
+            if self.__store_in_redis:
+                self.__redis_batch_executor.execute(
+                    'HDEL', self.__redis_request_key, client_request_id)
+
             self.__requests.pop(client_request_id)
         except Exception as ex:
             self.__logger.exception(
@@ -172,7 +181,7 @@ class RequestsCache:
                 client_request_id = temp.pop()
                 request = self.get(client_request_id)
                 if request and not self.__can_delete_request_now(request):
-                    self.add_or_update_request_in_redis(client_request_id)
+                    self.maybe_add_or_update_request_in_redis(client_request_id)
 
             await self.pantheon.sleep(10)
 
