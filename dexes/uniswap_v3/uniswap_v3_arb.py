@@ -130,7 +130,7 @@ class UniswapV3Arb(DexCommon):
                 self._transactions_status_poller.add_for_polling(result.tx_hash, client_request_id, RequestType.ORDER)
                 self.__tx_hash_to_order_info[result.tx_hash] = OrderInfo(gas_price_wei, order.base_ccy_qty,
                                                                          order.quote_ccy_qty)
-                self._request_cache.add_or_update_request_in_redis(client_request_id)
+                self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
 
                 return 200, {'result': {'tx_hash': result.tx_hash, 'nonce': result.nonce}}
             else:
@@ -189,7 +189,7 @@ class UniswapV3Arb(DexCommon):
                         request.request_status = RequestStatus.CANCEL_REQUESTED
                         self._transactions_status_poller.add_for_polling(result.tx_hash, request.client_request_id,
                                                                          RequestType.CANCEL)
-                        self._request_cache.add_or_update_request_in_redis(request.client_request_id)
+                        self._request_cache.maybe_add_or_update_request_in_redis(request.client_request_id)
                         cancel_requested.append(request.client_request_id)
                     else:
                         failed_cancels.append(request.client_request_id)
@@ -478,7 +478,7 @@ class UniswapV3Arb(DexCommon):
                 wrap_unwrap.used_gas_prices_wei.append(gas_price_wei)
                 self._transactions_status_poller.add_for_polling(
                     result.tx_hash, client_request_id, RequestType.WRAP_UNWRAP)
-                self._request_cache.add_or_update_request_in_redis(client_request_id)
+                self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
                 return 200, {'tx_hash': result.tx_hash}
             else:
                 return 400, {'error': {'message': result.error_message}}

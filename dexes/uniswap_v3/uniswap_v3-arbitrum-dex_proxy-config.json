@@ -109,7 +109,8 @@
             "finalised_requests_cleanup_after_s": 1000
         },
         "transactions_status_poller": {
-            "poll_interval_s": 0.2
+          "poll_interval_s": 0.2,
+          "store_in_redis": false
         }
     }
 }

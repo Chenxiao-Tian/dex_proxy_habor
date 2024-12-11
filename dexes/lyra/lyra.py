@@ -673,7 +673,7 @@ class Lyra(DexCommon):
                 tx_hash = result.get("transaction_id")
                 transfer.tx_hashes.append((tx_hash, RequestType.TRANSFER.name))
                 self._transactions_status_poller.add_for_polling(tx_hash, client_request_id, RequestType.TRANSFER)
-                self._request_cache.add_or_update_request_in_redis(client_request_id)
+                self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
                 return 200, {"tx_hash": tx_hash}
             else:
                 self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
@@ -777,7 +777,7 @@ class Lyra(DexCommon):
                 tx_hash = result.get("transaction_id")
                 transfer.tx_hashes.append((tx_hash, RequestType.TRANSFER.name))
                 self._transactions_status_poller.add_for_polling(tx_hash, client_request_id, RequestType.TRANSFER)
-                self._request_cache.add_or_update_request_in_redis(client_request_id)
+                self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
                 return 200, {"tx_hash": tx_hash}
             else:
                 self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
@@ -925,7 +925,7 @@ class Lyra(DexCommon):
                         cancel_requested.append(request.client_request_id)
 
                         self._transactions_status_poller.add_for_polling(result.tx_hash, request.client_request_id, RequestType.CANCEL)
-                        self._request_cache.add_or_update_request_in_redis(request.client_request_id)
+                        self._request_cache.maybe_add_or_update_request_in_redis(request.client_request_id)
                     else:
                         failed_cancels.append(request.client_request_id)
                 except Exception as ex:
@@ -1016,7 +1016,7 @@ class Lyra(DexCommon):
                 transfer.tx_hashes.append((result.tx_hash, RequestType.TRANSFER.name))
 
                 self._transactions_status_poller.add_for_polling(result.tx_hash, client_request_id, RequestType.TRANSFER)
-                self._request_cache.add_or_update_request_in_redis(client_request_id)
+                self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
                 return 200, {"tx_hash": result.tx_hash}
             else:
                 self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
@@ -1062,7 +1062,7 @@ class Lyra(DexCommon):
                 transfer.nonce = result.nonce
                 transfer.tx_hashes.append((result.tx_hash, RequestType.TRANSFER.name))
                 self._transactions_status_poller.add_for_polling(result.tx_hash, client_request_id, RequestType.TRANSFER)
-                self._request_cache.add_or_update_request_in_redis(client_request_id)
+                self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
 
                 return 200, {"tx_hash": result.tx_hash}
             else:
@@ -1224,7 +1224,7 @@ class Lyra(DexCommon):
             approve.nonce = result.nonce
             approve.tx_hashes.append((result.tx_hash, RequestType.APPROVE.name))
             self._transactions_status_poller.add_for_polling(result.tx_hash, approve.client_request_id, RequestType.APPROVE)
-            self._request_cache.add_or_update_request_in_redis(approve.client_request_id)
+            self._request_cache.maybe_add_or_update_request_in_redis(approve.client_request_id)
             return 200, {"tx_hash": result.tx_hash}
         else:
             self._request_cache.finalise_request(approve.client_request_id, RequestStatus.FAILED)
@@ -1252,7 +1252,7 @@ class Lyra(DexCommon):
     #     result = await self._api.withdraw_from_l2_prove(tx_hash)
 
     #     if result.error_type == ErrorType.NO_ERROR:
-    #         self._request_cache.add_or_update_request_in_redis(client_request_id)
+    #         self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
 
     #         return 200, {"tx_hash": result.tx_hash}
     #     else:
@@ -1266,7 +1266,7 @@ class Lyra(DexCommon):
     #     result = await self._api.withdraw_from_l2_prove(tx_hash)
 
     #     if result.error_type == ErrorType.NO_ERROR:
-    #         self._request_cache.add_or_update_request_in_redis(client_request_id)
+    #         self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
     #         return 200, {"tx_hash": result.tx_hash}
     #     else:
     #         self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
