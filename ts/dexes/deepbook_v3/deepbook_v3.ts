@@ -1124,6 +1124,11 @@ export class DeepBookV3 implements DexInterface {
     } catch (error) {
       this.logger.error(`[${requestId}] ${error}`);
       throw error;
+    } finally {
+      if (this.log_responses) {
+        const dump = JSON.stringify(response);
+        this.logger.debug(`[${requestId}] stake deep response: ${dump}`);
+      }
     }
 
     let statusCode: number = 200;
@@ -1191,6 +1196,11 @@ export class DeepBookV3 implements DexInterface {
     } catch (error) {
       this.logger.error(`[${requestId}] ${error}`);
       throw error;
+    } finally {
+      if (this.log_responses) {
+        const dump = JSON.stringify(response);
+        this.logger.debug(`[${requestId}] unstake deep response: ${dump}`);
+      }
     }
 
     let statusCode: number = 200;
