@@ -86,6 +86,8 @@ class MandatoryFields {
   static WithdrawFromBalanceManagerRequest = ["coin", "quantity"];
   static TradesByTimeRequest = ["start_ts", "max_pages"];
   static TradesByDigestRequest = ["tx_digests_list"];
+  static StakeRequest = ["pool", "amount"];
+  static UnstakeRequest = ["pool"];
 }
 
 export class DeepBookV3 implements DexInterface {
@@ -383,6 +385,9 @@ export class DeepBookV3 implements DexInterface {
     POST("/deposit-into-balance-manager", this.depositIntoBalanceManager);
 
     POST("/create-balance-manager", this.createBalanceManager);
+
+    POST("/stake-deep", this.stakeDeep);
+    POST("/unstake-deep", this.unstakeDeep);
   };
 
   start = async () => {
@@ -747,13 +752,18 @@ export class DeepBookV3 implements DexInterface {
   };
 
   // Function to fetch transaction block details
-  hasNextPage = async (client:{
-    name: string;
-    suiClient: SuiClient;
-    deepBookClient: DeepBookClient
-  }, txBlocks: any, cutOffTime: number | null, requestId: bigint): Promise<boolean> => {
-    if (cutOffTime == null){
-      return true;  // If no cut-off time, we always want to fetch the next page
+  hasNextPage = async (
+    client: {
+      name: string;
+      suiClient: SuiClient;
+      deepBookClient: DeepBookClient;
+    },
+    txBlocks: any,
+    cutOffTime: number | null,
+    requestId: bigint
+  ): Promise<boolean> => {
+    if (cutOffTime == null) {
+      return true; // If no cut-off time, we always want to fetch the next page
     }
     // Retrieve the last transaction digest from the txBlocks
     if (txBlocks.length === 0) {
@@ -766,9 +776,9 @@ export class DeepBookV3 implements DexInterface {
     }
 
     // Fetch the transaction block details using the digest
-    this.logger.debug(`[${requestId}] Querying txDigest ${lastTxDigest}`)
+    this.logger.debug(`[${requestId}] Querying txDigest ${lastTxDigest}`);
     const transactionBlockDetails = await client.suiClient.getTransactionBlock({
-      digest: lastTxDigest
+      digest: lastTxDigest,
     });
 
     // Check if the cut-off time and transaction timestamp are valid and compare
@@ -824,8 +834,13 @@ export class DeepBookV3 implements DexInterface {
       this.logger.debug(`[${requestId}] using ${client.name} client`);
 
       txBlocks = await client.suiClient.queryTransactionBlocks(queryParams);
-      if (txBlocks.hasNextPage){
-        txBlocks.hasNextPage = await this.hasNextPage(client, txBlocks,  cutOffTimeInt, requestId);
+      if (txBlocks.hasNextPage) {
+        txBlocks.hasNextPage = await this.hasNextPage(
+          client,
+          txBlocks,
+          cutOffTimeInt,
+          requestId
+        );
       }
     } catch (error) {
       this.logger.error(`[${requestId}]: ${error}`);
@@ -1060,6 +1075,143 @@ export class DeepBookV3 implements DexInterface {
         tx_digest: digest,
         status: response.effects!.status.status,
         balance_manager_id: balanceManagerId,
+      },
+    };
+  };
+
+  stakeDeep = async (
+    requestId: bigint,
+    path: string,
+    params: any,
+    receivedAtMs: number
+  ): Promise<RestResult> => {
+    assertFields(params, MandatoryFields.StakeRequest);
+
+    const poolName: string = params.pool;
+    const amount: number = Number(params.amount);
+
+    let response: SuiTransactionBlockResponse | null = null;
+    try {
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
+      let txBlockGenerator = () => {
+        this.logger.debug(
+          `[${requestId}] Staking ${amount} DEEP to the pool: ${poolName}`
+        );
+
+        const tx = new Transaction();
+        tx.add(
+          client.deepBookClient.governance.stake(poolName, "MANAGER", amount)
+        );
+
+        return tx;
+      };
+
+      let txBlockResponseOptions = {
+        showEffects: true,
+        showEvents: true,
+        showBalanceChanges: true,
+        showObjectChanges: true,
+      };
+
+      response = await this.executor!.execute(
+        requestId,
+        client.suiClient,
+        txBlockGenerator,
+        txBlockResponseOptions
+      );
+    } catch (error) {
+      this.logger.error(`[${requestId}] ${error}`);
+      throw error;
+    }
+
+    let statusCode: number = 200;
+    const digest: string = response.digest;
+
+    if (response.effects!.status.status === "success") {
+      this.logger.debug(
+        `[${requestId}] Successfully staked ${amount} DEEP to the pool: ${poolName}. Digest=${digest}`
+      );
+    } else {
+      this.logger.error(
+        `[${requestId}] Failed to stake ${amount} DEEP to the pool: ${poolName}. Digest=${digest}`
+      );
+      statusCode = 400;
+    }
+
+    return {
+      statusCode: statusCode,
+      payload: {
+        tx_digest: digest,
+        status: response.effects!.status.status,
+      },
+    };
+  };
+
+  unstakeDeep = async (
+    requestId: bigint,
+    path: string,
+    params: any,
+    receivedAtMs: number
+  ): Promise<RestResult> => {
+    assertFields(params, MandatoryFields.UnstakeRequest);
+
+    const poolName: string = params.pool;
+
+    let response: SuiTransactionBlockResponse | null = null;
+    try {
+      let client = this.clientPool.getClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
+      let txBlockGenerator = () => {
+        this.logger.debug(
+          `[${requestId}] Unstaking all DEEP from the pool: ${poolName}`
+        );
+
+        const tx = new Transaction();
+        tx.add(client.deepBookClient.governance.unstake(poolName, "MANAGER"));
+
+        return tx;
+      };
+
+      let txBlockResponseOptions = {
+        showEffects: true,
+        showEvents: true,
+        showBalanceChanges: true,
+        showObjectChanges: true,
+      };
+
+      response = await this.executor!.execute(
+        requestId,
+        client.suiClient,
+        txBlockGenerator,
+        txBlockResponseOptions
+      );
+    } catch (error) {
+      this.logger.error(`[${requestId}] ${error}`);
+      throw error;
+    }
+
+    let statusCode: number = 200;
+    const digest: string = response.digest;
+
+    if (response.effects!.status.status === "success") {
+      this.logger.debug(
+        `[${requestId}] Successfully unstaked all DEEP from the pool: ${poolName}. Digest=${digest}`
+      );
+    } else {
+      this.logger.error(
+        `[${requestId}] Failed to unstake DEEP from the pool: ${poolName}. Digest=${digest}`
+      );
+      statusCode = 400;
+    }
+
+    return {
+      statusCode: statusCode,
+      payload: {
+        tx_digest: digest,
+        status: response.effects!.status.status,
       },
     };
   };
@@ -2524,7 +2676,10 @@ export class DeepBookV3 implements DexInterface {
         );
       }
 
-      await this.gasManager!.mergeUntrackedGasCoinsInto(mainGasCoin, client.suiClient);
+      await this.gasManager!.mergeUntrackedGasCoinsInto(
+        mainGasCoin,
+        client.suiClient
+      );
       if (mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate) {
         throw new Error(
           "Unable to update the version of the mainGasCoin after merging untracked gasCoins into it. Please retry this request"
@@ -3081,7 +3236,10 @@ export class DeepBookV3 implements DexInterface {
         );
       }
 
-      await this.gasManager!.mergeUntrackedGasCoinsInto(mainGasCoin, client.suiClient);
+      await this.gasManager!.mergeUntrackedGasCoinsInto(
+        mainGasCoin,
+        client.suiClient
+      );
       if (mainGasCoin.status == GasCoinStatus.NeedsVersionUpdate) {
         throw new Error(
           "Unable to update the version of the mainGasCoin after merging untracked gasCoins into it. Please retry this request"

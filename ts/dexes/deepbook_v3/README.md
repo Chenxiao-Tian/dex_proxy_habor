@@ -1056,3 +1056,39 @@
             "hasNextPage": false
         }
 ```
+
+21. Stake DEEP into pool:
+    Request:
+
+```
+        curl \
+        -X POST \
+        -H "Content-Type: application/json" \
+        http://localhost:3000/stake-deep \
+        -d '{"jsonrpc":"2.0","pool":"SUI_DBUSDC", "amount":"1"}'
+```
+
+```
+        {
+            "tx_digest": "FRauPV5DpmETPj3B29yrdsg5Zjj44rMhJK7kK4CkUugM",
+            "status": "success"
+        }
+```
+
+22. Unstake all DEEP from pool:
+    Request:
+
+```
+        curl \
+        -X POST \
+        -H "Content-Type: application/json" \
+        http://localhost:3000/unstake-deep \
+        -d '{"jsonrpc":"2.0","pool":"SUI_DBUSDC"}'
+```
+
+```
+        {
+            "tx_digest": "2gAWxK7dsV1MSdccab6xhmjk8z1jubrAc64CdZsCFrru",
+            "status": "success"
+        }
+```
