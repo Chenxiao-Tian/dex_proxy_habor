@@ -68,7 +68,7 @@ export class Executor {
   ): Promise<SuiTransactionBlockResponse> => {
     let response: SuiTransactionBlockResponse | null = null;
     let gasCoin: GasCoin | null = null;
-    let transactionTimedOutBeforeReachingFinality: boolean = false;
+    let skipGasCoinUntilNextEpoch: boolean = false;
 
     try {
       gasCoin = this.#gasManager.getFreeGasCoin();
@@ -89,17 +89,20 @@ export class Executor {
       let error_ = error as any;
       let errorStr = error_.toString();
 
-      if (errorStr.includes("Transaction timed out before reaching finality")) {
-        transactionTimedOutBeforeReachingFinality = true;
+      if (
+        errorStr.includes("Transaction timed out before reaching finality") ||
+        errorStr.includes("equivocated until the next epoch")
+      ) {
+        skipGasCoinUntilNextEpoch = true;
       }
 
       throw error;
     } finally {
       if (gasCoin) {
         let gasCoinVersionUpdated = false;
-        if (transactionTimedOutBeforeReachingFinality) {
+        if (skipGasCoinUntilNextEpoch) {
           this.#logger.warn(
-            `[${requestId}] Transaction timed out. Will skip using gasCoin=${gasCoin.repr()} for remainder of current epoch`
+            `[${requestId}] Will skip using gasCoin=${gasCoin.repr()} for remainder of current epoch`
           );
           gasCoin.status = GasCoinStatus.SkipForRemainderOfEpoch;
         } else {
