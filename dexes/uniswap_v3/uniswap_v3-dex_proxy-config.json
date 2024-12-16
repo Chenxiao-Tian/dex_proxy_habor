@@ -132,18 +132,15 @@
     },
     "max_allowed_gas_price_gwei": 500,
     "request_cache": {
-      "finalised_requests_cleanup_after_s": 600
+      "finalised_requests_cleanup_after_s": 600,
+      "store_in_redis": false
     },
     "transactions_status_poller": {
-      "poll_interval_s": 15,
-      "store_in_redis": false
+      "poll_interval_s": 15
     },
     "fireblocks": {
       "native_asset": "ETH",
-      "token_types": [
-        "ERC20",
-        "BASE_ASSET"
-      ]
+      "token_types": ["ERC20", "BASE_ASSET"]
     },
     "builders_rpc": [
       "https://rpc.titanbuilder.xyz",

@@ -106,11 +106,11 @@
         },
         "max_allowed_gas_price_gwei": 50,
         "request_cache": {
-            "finalised_requests_cleanup_after_s": 1000
+            "finalised_requests_cleanup_after_s": 1000,
+            "store_in_redis": false
         },
         "transactions_status_poller": {
-          "poll_interval_s": 0.2,
-          "store_in_redis": false
+            "poll_interval_s": 0.2
         }
     }
 }

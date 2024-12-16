@@ -125,11 +125,11 @@
             "percentile_priority_fee_slow": 2
         },
         "request_cache": {
-            "finalised_requests_cleanup_after_s": 600
+            "finalised_requests_cleanup_after_s": 600,
+            "store_in_redis": false
         },
         "transactions_status_poller": {
-          "poll_interval_s": 15,
-          "store_in_redis": false
+            "poll_interval_s": 15
         },
         "fireblocks": {
             "native_asset": "ETH",
@@ -160,11 +160,11 @@
             "percentile_priority_fee_slow": 2
         },
         "request_cache": {
-          "finalised_requests_cleanup_after_s": 600
+            "finalised_requests_cleanup_after_s": 600,
+            "store_in_redis": false
         },
         "transactions_status_poller": {
-          "poll_interval_s": 15,
-          "store_in_redis": false
+            "poll_interval_s": 15
         }
     },
     "__dex": {
@@ -206,11 +206,11 @@
           "percentile_priority_fee_slow": 2
         },
         "request_cache": {
-          "finalised_requests_cleanup_after_s": 600
+          "finalised_requests_cleanup_after_s": 600,
+          "store_in_redis": false
         },
         "transactions_status_poller": {
-          "poll_interval_s": 15,
-          "store_in_redis": false
+          "poll_interval_s": 15
         }
     }
 }
