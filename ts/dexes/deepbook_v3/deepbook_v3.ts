@@ -425,6 +425,10 @@ export class DeepBookV3 implements DexInterface {
           withdrawSettledAmountsIntervalMs
         );
       }
+
+      // 5 minutes
+      const claimRebatesIntervalMs = 5 * 60 * 1000;
+      setInterval(this.claimMakerRebates, claimRebatesIntervalMs);
     }
 
     if (this.config.dex.subscribe_to_events) {
@@ -717,7 +721,7 @@ export class DeepBookV3 implements DexInterface {
           }
         } catch (error) {
           this.logger.error(
-            `[${idx}] Error while withdrawing settled amounts  from ${poolName}: ${error}`
+            `[${idx}] Error while withdrawing settled amounts from ${poolName}: ${error}`
           );
         }
       } else {
@@ -732,6 +736,75 @@ export class DeepBookV3 implements DexInterface {
     // withdraw settled amounts from pools in which we are not actively placing orders
     for (let poolName in this.poolsMap) {
       this.maybeWithdrawSettledAmounts.add(poolName);
+    }
+  };
+
+  claimMakerRebates = async () => {
+    let client = this.clientPool.getClient();
+    this.logger.debug(`Using ${client.name} client for claiming maker rebates`);
+
+    let idx = 0;
+    for (let poolName in this.poolsMap) {
+      try {
+        const accountInfo = await this.getAccountInfo(
+          BigInt(idx),
+          client.suiClient,
+          poolName
+        );
+        this.logger.debug(
+          `[${idx}] Account response for ${poolName} is ${JSON.stringify(
+            accountInfo
+          )}`
+        );
+
+        if (
+          accountInfo === null ||
+          (accountInfo.unclaimed_rebates.base === "0" &&
+            accountInfo.unclaimed_rebates.quote === "0" &&
+            accountInfo.unclaimed_rebates.deep === "0")
+        ) {
+          this.logger.debug(`[${idx}] No rebates to claim for ${poolName}`);
+        } else {
+          let txBlockGenerator = () => {
+            this.logger.debug(
+              `[${idx}] Claiming maker rebates from ${poolName}`
+            );
+
+            const tx = new Transaction();
+            tx.add(
+              client.deepBookClient.deepBook.claimRebates(poolName, "MANAGER")
+            );
+
+            return tx;
+          };
+
+          let txBlockResponseOptions = { showEffects: true };
+
+          let response = await this.executor!.execute(
+            BigInt(idx),
+            client.suiClient,
+            txBlockGenerator,
+            txBlockResponseOptions
+          );
+
+          const digest: string = response.digest;
+          if (response.effects!.status.status === "success") {
+            this.logger.debug(
+              `[${idx}] Successfully claimed maker rebates from ${poolName}. Digest=${digest}`
+            );
+          } else {
+            const errorMsg = response.effects!.status.error!;
+            this.logger.error(
+              `[${idx}] Failed to claim maker rebates from ${poolName}. Error=${errorMsg.toString()}. Digest=${digest}`
+            );
+          }
+        }
+      } catch (error) {
+        this.logger.error(
+          `[${idx}] Error while claiming rebates from ${poolName}: ${error}`
+        );
+      }
+      idx++;
     }
   };
 
@@ -3397,6 +3470,75 @@ export class DeepBookV3 implements DexInterface {
       statusCode: status === "success" ? 200 : 400,
       payload: response,
     };
+  };
+
+  getAccountInfo = async (
+    requestId: bigint,
+    suiClient: SuiClient,
+    poolName: string
+  ) => {
+    let pool: Pool = this.getPool(poolName);
+    let baseCoin: Coin = this.getCoin(pool.baseCoin);
+    let quoteCoin: Coin = this.getCoin(pool.quoteCoin);
+
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${this.deepbookPackageId}::pool::account`,
+      arguments: [tx.object(pool.address), tx.object(this.balanceManagerId)],
+      typeArguments: [baseCoin.type, quoteCoin.type],
+    });
+
+    let response = await suiClient.devInspectTransactionBlock({
+      sender: normalizeSuiAddress(this.walletAddress),
+      transactionBlock: tx,
+    });
+
+    if (response.effects!.status.status === "success") {
+      const ID = bcs.struct("ID", {
+        bytes: bcs.Address,
+      });
+
+      const Balances = bcs.struct("Balances", {
+        base: bcs.u64(),
+        quote: bcs.u64(),
+        deep: bcs.u64(),
+      });
+
+      const VecSet = bcs.struct("VecSet", {
+        constants: bcs.vector(bcs.U128),
+      });
+
+      const Account = bcs.struct("Account", {
+        epoch: bcs.u64(),
+        open_orders: VecSet,
+        taker_volume: bcs.u128(),
+        maker_volume: bcs.u128(),
+        active_stake: bcs.u64(),
+        inactive_stake: bcs.u64(),
+        created_proposal: bcs.bool(),
+        voted_proposal: bcs.option(ID),
+        unclaimed_rebates: Balances,
+        settled_balances: Balances,
+        owed_balances: Balances,
+      });
+
+      const accountInformation = response.results![0].returnValues![0][0];
+      return Account.parse(new Uint8Array(accountInformation));
+    } else {
+      const error = response.effects!.status.error!;
+      let parsedError = DeepBookV3.tryParseError(error.toString());
+      if (parsedError.type && parsedError.type === "UNUSED_POOL") {
+        this.logger.debug(
+          `[${requestId}] ${poolName} is not traded yet by us, thus no maker rebates to claim`
+        );
+
+        return null;
+      } else {
+        throw new Error(
+          `Failed to get account info for ${poolName}. Error=${error.toString()}`
+        );
+      }
+    }
   };
 
   getCoinInstances = async (
