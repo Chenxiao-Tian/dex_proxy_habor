@@ -35,7 +35,7 @@ RUN curl -L --fail-with-body -o /tmp/libsigner.tar.gz --user "gitlab-com-auros-s
 
 
 # SHASUM pin of registry.gitlab.com/auros/baseimg/ubuntu:22.04-enclave
-FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:efeb440100b9bd4b3b6b29f2ba7e10f33c211731579a37d2e72d0a77dacf4825
+FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:dac8be3948044c73554f72ab170a06f9a8c75698782e846fd644fcf2dc6930b9
 
 # Valet/authentication/enclave configuration
 # Context ID is unique to this enclave.
