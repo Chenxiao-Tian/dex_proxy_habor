@@ -88,6 +88,7 @@ class MandatoryFields {
   static TradesByDigestRequest = ["tx_digests_list"];
   static StakeRequest = ["pool", "amount"];
   static UnstakeRequest = ["pool"];
+  static TransactionDigestsInfoRequest = ["digests"];
 }
 
 export class DeepBookV3 implements DexInterface {
@@ -388,6 +389,8 @@ export class DeepBookV3 implements DexInterface {
 
     POST("/stake-deep", this.stakeDeep);
     POST("/unstake-deep", this.unstakeDeep);
+
+    GET("/digests/info", this.getTransactionDigestsInfo);
   };
 
   start = async () => {
@@ -3579,6 +3582,46 @@ export class DeepBookV3 implements DexInterface {
     } else {
       throw new Error("Could not find decimals for coin " + coinTypeId);
     }
+  };
+
+  getTransactionDigestsInfo = async (
+    requestId: bigint,
+    path: string,
+    params: any,
+    receivedAtMs: number
+  ): Promise<RestResult> => {
+    assertFields(params, MandatoryFields.TransactionDigestsInfoRequest);
+
+    const digests: string[] = params.get("digests")?.split(',') || [];
+
+    this.logger.debug(`[${requestId}] Querying txDigest ${digests}`);
+
+    let txBlocks = null;
+    try {
+      let client = this.clientPool.getInternalClient();
+      this.logger.debug(`[${requestId}] using ${client.name} client`);
+
+      txBlocks = await client.suiClient.multiGetTransactionBlocks({
+        digests: digests,
+        options: {
+          showBalanceChanges: true,
+          showEvents: true,
+          showObjectChanges: false,
+          showEffects: true,
+          showInput: true,
+          showRawInput: true,
+          showRawEffects: true
+        },
+      });
+    } catch (error) {
+      this.logger.error(`[${requestId}]: ${error}`);
+      throw error;
+    }
+
+    return {
+      statusCode: 200,
+      payload: txBlocks,
+    };
   };
 
   getCoinTypeAddress(coinTypeId: string): string {
