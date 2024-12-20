@@ -254,7 +254,7 @@
             }
         ],
         "whitelisted_bidding_wallets": [ "0xb4c4BbD9974D7F4D6e0814A7f9aA1f018F032818" ],
-        "whitelisted_bidding_subaccount_ids": [ 252, 253, 5303, 5304 ]
+        "whitelisted_bidding_subaccount_ids": [ 252, 253, 5303, 5304, 23711 ]
     },
     "Ethereum Sepolia Testnet": {
         "bridge_details": {
