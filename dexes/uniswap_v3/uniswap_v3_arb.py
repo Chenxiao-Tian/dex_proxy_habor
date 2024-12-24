@@ -58,7 +58,6 @@ class UniswapV3Arb(DexCommon):
         client_request_id = request.client_request_id
         try:
             nonce = await self._api.get_next_nonce_to_use()
-            request.nonce = nonce
             self._logger.debug(f"Fetched Nonce :{nonce}, Client Request Id: {client_request_id}")
             if side == Side.BUY:
                 result = await self._api.swap_exact_output_single(
@@ -139,14 +138,9 @@ class UniswapV3Arb(DexCommon):
 
         except Exception as e:
             self._logger.exception(f'Failed to insert order: %r', e)
-            if len(e.args) and ('message' in e.args[0] and 'nonce too low' in e.args[0]['message']):
-                # Means a cancel/amend for this txn reached arbitrum sequencer first
-                # Not finalising order here as finalisation will happen in subsequent cancel/amend block
-                return 200, {'error': {'message': repr(e)}}
-            else:
-                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
-                self.__orders_pre_finalisation_clean_up(order)
-                return 400, {'error': {'message': repr(e)}}
+            self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+            self.__orders_pre_finalisation_clean_up(order)
+            return 400, {'error': {'message': repr(e)}}
 
     async def _cancel_all(self, path, params, received_at_ms):
         try:
@@ -228,7 +222,7 @@ class UniswapV3Arb(DexCommon):
         else:
             assert False
 
-    async def _amend_transaction(self, request, params, gas_price_wei):
+    async def _amend_transaction(self, request: Request, params, gas_price_wei):
         result: Optional[ApiResult] = None
         if request.request_type == RequestType.ORDER:
             if request.nonce is None:
@@ -236,7 +230,7 @@ class UniswapV3Arb(DexCommon):
                                    f"for Client Request Id".format(request.client_request_id))
 
                 return ApiResult(error_type=ErrorType.TRANSACTION_FAILED,
-                                 error_message=f"RETRY. Insert pending for request: {request}")
+                                 error_message=f"RETRY. Insert pending for {request.client_request_id}")
 
             instrument = self.__instruments.get_instrument(InstrumentId(self.__exchange_name, request.symbol))
             base_ccy_symbol = instrument.base_currency
@@ -275,7 +269,7 @@ class UniswapV3Arb(DexCommon):
                 self._api.update_next_nonce_to_use(request.nonce + 1)
         return result
 
-    async def _cancel_transaction(self, request, gas_price_wei):
+    async def _cancel_transaction(self, request: Request, gas_price_wei):
         if request.request_type in [RequestType.ORDER, RequestType.TRANSFER, RequestType.APPROVE]:
             try:
                 if request.nonce is None:
@@ -283,7 +277,7 @@ class UniswapV3Arb(DexCommon):
                     self._logger.debug(f"Cancellation requested before setting nonce "
                                        f"for Client Request Id".format(request.client_request_id))
                     return ApiResult(error_type=ErrorType.TRANSACTION_FAILED,
-                                     error_message=f"RETRY. Insert pending for {request}")
+                                     error_message=f"RETRY. Insert pending for {request.client_request_id}")
 
                 result = await self._api.cancel_transaction(request.nonce, gas_price_wei)
                 if result.error_type == ErrorType.NO_ERROR:
