@@ -1,7 +1,7 @@
 import logging
 
 from pantheon import Pantheon
-from pyutils.exchange_apis.dex_common import RequestType, RequestStatus
+from pyutils.exchange_apis.dex_common import Request, RequestType, RequestStatus
 
 from web3.exceptions import TransactionNotFound
 
@@ -41,12 +41,18 @@ class TransactionsStatusPoller:
         for tx_hash in list(tx_hash_to_client_r_id_and_request_type.keys()):
             self.__logger.debug(f'Polling tx_hash {tx_hash}')
             client_request_id, request_type = tx_hash_to_client_r_id_and_request_type[tx_hash]
-            request = self.__dex.get_request(client_request_id)
+            request: Request = self.__dex.get_request(client_request_id)
             if request is None or request.is_finalised():
-                tx_hash_to_client_r_id_and_request_type.pop(tx_hash)
+                self.__tx_hash_to_client_rid_and_request_type.pop(tx_hash, None)
             else:
                 try:
                     receipt = await self.__dex.get_transaction_receipt(request, tx_hash)
+
+                    # request might be finalised while we were waiting for its transaction_receipt
+                    if request is None or request.is_finalised():
+                        self.__tx_hash_to_client_rid_and_request_type.pop(tx_hash, None)
+                        continue
+
                     if receipt is not None:
                         self.__logger.debug(f'Polled receipt of tx_hash {tx_hash}: {receipt}')
 

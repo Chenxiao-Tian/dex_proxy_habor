@@ -174,9 +174,9 @@ class UniswapV3(DexCommon):
             return
 
         if (request_status == RequestStatus.SUCCEEDED and request.request_type == RequestType.ORDER):
-            await self.__compute_exec_price(request, tx_receipt)
+            self.__compute_exec_price(request, tx_receipt)
 
-        await super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
+        super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
 
         if request.request_type == RequestType.ORDER:
             event = {
@@ -219,7 +219,7 @@ class UniswapV3(DexCommon):
                 self._logger.exception(
                     f'Error occurred while handling WS message: %r', e)
 
-    async def  __compute_exec_price(self, request: OrderRequest, tx_receipt: dict):
+    def  __compute_exec_price(self, request: OrderRequest, tx_receipt: dict):
         try:
             for log in tx_receipt['logs']:
                 topic = Web3.to_hex(log['topics'][0])
