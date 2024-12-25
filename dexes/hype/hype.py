@@ -259,7 +259,7 @@ class Hype(DexCommon):
 
     def __assert_cancel_order_by_ex_oid_schema(self, received_keys: list) -> None:
         expected_keys = [
-            "coin",
+            "asset",
             "oid"
         ]
 
@@ -269,7 +269,7 @@ class Hype(DexCommon):
 
     def __assert_cancel_order_by_cl_oid_schema(self, received_keys: list) -> None:
         expected_keys = [
-            "coin",
+            "asset",
             "cloid"
         ]
 
@@ -290,7 +290,7 @@ class Hype(DexCommon):
 
     def __assert_order_schema(self, received_keys: list) -> None:
         expected_keys = [
-            "coin",
+            "asset",
             "is_buy",
             "sz",
             "limit_px",
@@ -307,7 +307,7 @@ class Hype(DexCommon):
             "type": "cancel",
             "cancels": [
                 {
-                    "a": self.coin_to_asset[order["coin"]],
+                    "a": order["asset"],
                     "o": order["oid"]
                 }
                 for order in orders
@@ -319,7 +319,7 @@ class Hype(DexCommon):
             "type": "cancelByCloid",
             "cancels": [
                 {
-                    "asset": self.coin_to_asset[order["coin"]],
+                    "asset": order["asset"],
                     "cloid": order["cloid"]
                 }
                 for order in orders
@@ -447,7 +447,7 @@ class Hype(DexCommon):
                 self.__assert_order_schema(order.keys())
 
             order_wires: List[OrderWire] = [
-                order_request_to_order_wire(order, self.coin_to_asset[order["coin"]]) for order in params['orders']
+                order_request_to_order_wire(order, order["asset"]) for order in params['orders']
             ]
 
             order_action = order_wires_to_order_action(order_wires)
