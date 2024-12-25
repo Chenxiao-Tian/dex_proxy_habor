@@ -119,7 +119,7 @@ class DexCommon(ABC):
         pass
 
     @abstractmethod
-    async def on_request_status_update(self, client_request_id, request_status: RequestStatus, tx_receipt: dict, mined_tx_hash: str = None):
+    def on_request_status_update(self, client_request_id, request_status: RequestStatus, tx_receipt: dict, mined_tx_hash: str = None):
         """
         Called when a request status is changed, usually by `TransactionsStatusPoller`
         """

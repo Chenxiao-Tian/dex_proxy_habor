@@ -194,7 +194,7 @@ class Hype(DexCommon):
         return 10_000_000_000
 
     async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict, mined_tx_hash: str = None):
-        await super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
+        super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
 
     async def _get_all_open_requests(self, path: str, params: dict, received_at_ms: int):
         return await super()._get_all_open_requests(path, params, received_at_ms)

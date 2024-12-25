@@ -438,7 +438,7 @@ class UniswapV3Bloxroute(DexCommon):
 
         if request_status == RequestStatus.SUCCEEDED and request.request_type == RequestType.ORDER:
             self.__populate_orders_dex_specifics(request, mined_tx_hash)
-            await self.__compute_exec_price(request, tx_receipt)
+            self.__compute_exec_price(request, tx_receipt)
 
         if request.request_type == RequestType.ORDER:
             self.__orders_pre_finalisation_clean_up(request)
@@ -451,7 +451,7 @@ class UniswapV3Bloxroute(DexCommon):
                 # if tx_receipt not None
                 # Txn got mined in Failed State, Cancellation Failed
 
-        await super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
+        super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
 
         if request.request_type == RequestType.ORDER:
             event = {
@@ -494,7 +494,7 @@ class UniswapV3Bloxroute(DexCommon):
                 self._logger.exception(
                     f'Error occurred while handling WS message: %r', e)
 
-    async def __compute_exec_price(self, request: OrderRequest, tx_receipt: dict):
+    def __compute_exec_price(self, request: OrderRequest, tx_receipt: dict):
         try:
             for log in tx_receipt['logs']:
                 topic = Web3.to_hex(log['topics'][0])
