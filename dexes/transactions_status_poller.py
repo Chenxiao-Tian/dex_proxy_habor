@@ -40,7 +40,12 @@ class TransactionsStatusPoller:
     async def __poll_tx(self, tx_hash_to_client_r_id_and_request_type: dict):
         for tx_hash in list(tx_hash_to_client_r_id_and_request_type.keys()):
             self.__logger.debug(f'Polling tx_hash {tx_hash}')
-            client_request_id, request_type = tx_hash_to_client_r_id_and_request_type[tx_hash]
+
+            val = tx_hash_to_client_r_id_and_request_type.get(tx_hash)
+            if val is None:
+                continue
+            client_request_id, request_type = val
+
             request: Request = self.__dex.get_request(client_request_id)
             if request is None or request.is_finalised():
                 self.__tx_hash_to_client_rid_and_request_type.pop(tx_hash, None)
