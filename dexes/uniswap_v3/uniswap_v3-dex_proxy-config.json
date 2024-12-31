@@ -84,6 +84,7 @@
     "exchange_name": "chainEth-uni3",
     "chain_name": "Ethereum Mainnet For Testing",
     "native_token": "ETH",
+    "request_status_poll_ms": 1000,
     "blx_authorisation_header": "OGUyNDY1YzUtNjYyNC00Yjc3LWEyY2UtODU0MDExN2RmYTA2OjRjMzUxOGI2ZjE4ODQwMWQ0YzYwOTEyZjAxOGQ0YzI4",
     "connectors": {
       "uniswap_v3": {

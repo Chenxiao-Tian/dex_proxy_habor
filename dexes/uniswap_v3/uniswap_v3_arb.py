@@ -359,7 +359,7 @@ class UniswapV3Arb(DexCommon):
                 self._logger.info("[WS] [MESSAGE] %s", message)
 
                 tx_hash = message['params']['result']['transaction']['hash']
-                await self._transactions_status_poller.poll_for_status(tx_hash)
+                await self._transactions_status_poller.poll_for_status([tx_hash])
             except Exception as e:
                 self._logger.exception(
                     f'Error occurred while handling WS message: %r', e)
