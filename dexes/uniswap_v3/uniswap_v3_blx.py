@@ -60,6 +60,7 @@ class UniswapV3Bloxroute(DexCommon):
         self.__exchange_name = config['exchange_name']
         self.__chain_name = config['chain_name']
         self.__native_token = config['native_token']
+        self.__request_status_poll_ms = config["request_status_poll_ms"]
         self.__targeted_block_info = BlockInfo()
         self.__tx_hash_to_order_info: Dict[str, OrderInfo] = {}
 
@@ -489,7 +490,7 @@ class UniswapV3Bloxroute(DexCommon):
                 self._logger.info("[WS] [MESSAGE] %s", message)
 
                 tx_hash = message['params']['result']['transaction']['hash']
-                await self._transactions_status_poller.poll_for_status(tx_hash)
+                await self._transactions_status_poller.poll_for_status([tx_hash])
             except Exception as e:
                 self._logger.exception(
                     f'Error occurred while handling WS message: %r', e)
@@ -558,7 +559,7 @@ class UniswapV3Bloxroute(DexCommon):
     async def __finalise_missed_requests(self):
         while True:
             try:
-                await self.pantheon.sleep(1)
+                await self.pantheon.sleep(self.__request_status_poll_ms / 1000)
 
                 self._logger.debug('Polling for finalising requests missing targeted block')
 
@@ -570,6 +571,7 @@ class UniswapV3Bloxroute(DexCommon):
 
                 # Caching: so that we don't call rpc method self._api.get_block for same block_num
                 block_num_vs_block_data = {}
+                tx_hashes_to_poll = []
 
                 for request in open_requests:
                     try:
@@ -609,13 +611,12 @@ class UniswapV3Bloxroute(DexCommon):
                             if HexBytes(tx_hash) in targeted_block_data.transactions:
                                 self._logger.debug(
                                     f'tx_hash={tx_hash} found in the targeted_block_num={targeted_block_num}')
+                                tx_hashes_to_poll.append(tx_hash)
                                 request_mined = True
                                 break
 
                         if not request_mined:
                             await self.on_request_status_update(request.client_request_id, RequestStatus.FAILED, None)
-                        # else:
-                        #     transaction_status_poller will handle finalising the request
 
                     # retry after 1 sec
                     except BlockNotFound:
@@ -624,6 +625,9 @@ class UniswapV3Bloxroute(DexCommon):
                         self._logger.exception(
                             f'Error in polling tx_hashes of request={request} for finalising requests \
                                 missing targeted block: %r', ex)
+
+                if len(tx_hashes_to_poll) > 0:
+                    await self._transactions_status_poller.poll_for_status(tx_hashes_to_poll)
             except Exception as e:
                 self._logger.exception(f'Error in polling for finalising request missing targeted block: %r', e)
 
