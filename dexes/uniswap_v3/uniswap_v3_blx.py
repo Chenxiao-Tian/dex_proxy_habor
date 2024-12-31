@@ -787,21 +787,24 @@ class UniswapV3Bloxroute(DexCommon):
         }
 
         rest_str = json.dumps(rest_body)
-        sign_begin_at_ms = int(time.time() * 1_000)
-
-        message = messages.encode_defunct(text=Web3.keccak(text=rest_str).hex())
-        public_key_address = self.__flashbot_signing_account.address
-        signature = Account.sign_message(message, self.__flashbot_signing_account.key).signature.hex()
-        flashbot_signature = f"{public_key_address}:{signature}"
-        signed_header = self.__builders_request_header.copy()
-        signed_header["X-Flashbots-Signature"] = flashbot_signature
-
-        signed_at_ms = int(time.time() * 1_000)
-        self._logger.info(f'stat=signBundleTelem, responseDelayMs={signed_at_ms - sign_begin_at_ms}')
+        signed_header = None
 
         bundle_jobs = []
         for builder_rpc_url in self.__builders_rpc:
             if "flashbots" in builder_rpc_url or "titanbuilder" in builder_rpc_url:
+                if signed_header is None:
+                    sign_begin_at_ms = int(time.time() * 1_000)
+
+                    message = messages.encode_defunct(text=Web3.keccak(text=rest_str).hex())
+                    public_key_address = self.__flashbot_signing_account.address
+                    signature = Account.sign_message(message, self.__flashbot_signing_account.key).signature.hex()
+                    flashbot_signature = f"{public_key_address}:{signature}"
+                    signed_header = self.__builders_request_header.copy()
+                    signed_header["X-Flashbots-Signature"] = flashbot_signature
+
+                    signed_at_ms = int(time.time() * 1_000)
+                    self._logger.info(f'stat=signBundleTelem, responseDelayMs={signed_at_ms - sign_begin_at_ms}')
+
                 bundle_jobs.append(self._shoot_bundle_rest(builder_rpc_url, signed_header, rest_str))
             else:
                 bundle_jobs.append(self._shoot_bundle_rest(builder_rpc_url, self.__builders_request_header, rest_str))
