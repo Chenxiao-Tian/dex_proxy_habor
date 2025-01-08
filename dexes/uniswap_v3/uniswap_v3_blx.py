@@ -555,81 +555,77 @@ class UniswapV3Bloxroute(DexCommon):
             self._logger.exception(
                 f'Error occurred while computing execution price of request={request}: %r', ex)
 
-    # finalises requests who missed to get minned in the targeted block
-    async def __finalise_missed_requests(self):
+    async def __poll_for_requests_status(self):
         while True:
-            try:
-                await self.pantheon.sleep(self.__request_status_poll_ms / 1000)
+            await self.pantheon.sleep(self.__request_status_poll_ms / 1000)
+            asyncio.create_task(self.__maybe_update_requests_status())
 
-                self._logger.debug('Polling for finalising requests missing targeted block')
+    async def __maybe_update_requests_status(self):
+        try:
+            open_requests = self._request_cache.get_all()
+            if len(open_requests) == 0:
+                return
 
-                open_requests = self._request_cache.get_all()
-                if len(open_requests) == 0:
-                    continue
+            curr_block_num, _ = self.__dex_helper.get_curr_block()
 
-                curr_block_num, _ = self.__dex_helper.get_curr_block()
+            # Caching: so that we don't call rpc method self._api.get_block for same block_num
+            block_num_vs_block_data = {}
+            tx_hashes_to_poll = []
 
-                # Caching: so that we don't call rpc method self._api.get_block for same block_num
-                block_num_vs_block_data = {}
-                tx_hashes_to_poll = []
+            for request in open_requests:
+                try:
+                    if (
+                            request.request_status == RequestStatus.SUCCEEDED
+                            or request.request_status == RequestStatus.CANCELED
+                            or request.request_status == RequestStatus.FAILED
+                    ):
+                        continue
 
-                for request in open_requests:
-                    try:
-                        if (
-                                request.request_status == RequestStatus.SUCCEEDED
-                                or request.request_status == RequestStatus.CANCELED
-                                or request.request_status == RequestStatus.FAILED
-                        ):
-                            continue
+                    targeted_block_num = request.dex_specific.get('targeted_block_num')
+                    if targeted_block_num is None or targeted_block_num > curr_block_num:
+                        continue
 
-                        targeted_block_num = request.dex_specific.get('targeted_block_num')
-                        if targeted_block_num is None or targeted_block_num > curr_block_num:
-                            continue
+                    if targeted_block_num not in block_num_vs_block_data or block_num_vs_block_data[
+                        targeted_block_num] is None:
+                        targeted_block_data = await self._api.get_block(targeted_block_num)
+                        block_num_vs_block_data[targeted_block_num] = targeted_block_data
 
-                        if targeted_block_num not in block_num_vs_block_data or block_num_vs_block_data[
-                            targeted_block_num] is None:
-                            targeted_block_data = await self._api.get_block(targeted_block_num)
-                            block_num_vs_block_data[targeted_block_num] = targeted_block_data
+                        self._logger.debug(f'block_num={targeted_block_num}, block_data={targeted_block_data}')
+                    else:
+                        targeted_block_data = block_num_vs_block_data[targeted_block_num]
 
-                            self._logger.debug(f'block_num={targeted_block_num}, block_data={targeted_block_data}')
-                        else:
-                            targeted_block_data = block_num_vs_block_data[targeted_block_num]
+                    if targeted_block_data is None or request.is_finalised():
+                        continue
 
-                        if targeted_block_data is None:
-                            continue
+                    if (
+                        request.request_type == RequestType.ORDER
+                        and request.request_status != RequestStatus.CANCEL_REQUESTED
+                        and request.deadline_since_epoch_s <= targeted_block_data.timestamp
+                    ):
+                        self._logger.error(
+                            f'Wrong order deadline might have been set. Please check. Request={request}')
 
-                        if (
-                            request.request_type == RequestType.ORDER
-                            and request.request_status != RequestStatus.CANCEL_REQUESTED
-                            and request.deadline_since_epoch_s <= targeted_block_data.timestamp
-                        ):
-                            self._logger.error(
-                                f'Wrong order deadline might have been set. Please check. Request={request}')
+                    request_mined = False
+                    for tx_hash, _ in request.tx_hashes:
+                        if HexBytes(tx_hash) in targeted_block_data.transactions:
+                            self._logger.debug(
+                                f'tx_hash={tx_hash} found in the targeted_block_num={targeted_block_num}')
+                            tx_hashes_to_poll.append(tx_hash)
+                            request_mined = True
+                            break
 
-                        request_mined = False
-                        for tx_hash, _ in request.tx_hashes:
-                            if HexBytes(tx_hash) in targeted_block_data.transactions:
-                                self._logger.debug(
-                                    f'tx_hash={tx_hash} found in the targeted_block_num={targeted_block_num}')
-                                tx_hashes_to_poll.append(tx_hash)
-                                request_mined = True
-                                break
+                    if not request_mined:
+                        await self.on_request_status_update(request.client_request_id, RequestStatus.FAILED, None)
 
-                        if not request_mined:
-                            await self.on_request_status_update(request.client_request_id, RequestStatus.FAILED, None)
+                except BlockNotFound:
+                    self._logger.debug(f"Got BlockNotFound while polling tx_hashes of request={request}")
+                except Exception as ex:
+                    self._logger.exception(f'Error in polling status of request={request}: %r', ex)
 
-                    # retry after 1 sec
-                    except BlockNotFound:
-                        self._logger.debug(f"Got BlockNotFound while polling tx_hashes of request={request}")
-                    except Exception as ex:
-                        self._logger.exception(
-                            f'Error in polling tx_hashes of request={request} for finalising requests \
-                                missing targeted block: %r', ex)
-
-                if len(tx_hashes_to_poll) > 0:
-                    await self._transactions_status_poller.poll_for_status(tx_hashes_to_poll)
-            except Exception as e:
-                self._logger.exception(f'Error in polling for finalising request missing targeted block: %r', e)
+            if len(tx_hashes_to_poll) > 0:
+                await self._transactions_status_poller.poll_for_status(tx_hashes_to_poll)
+        except Exception as e:
+            self._logger.exception(f'Error in polling requests status: %r', e)
 
     async def start(self, private_key):
         self.__instruments = await self.pantheon.get_instruments_live_source(
@@ -674,7 +670,7 @@ class UniswapV3Bloxroute(DexCommon):
         self.pantheon.spawn(self.__get_tx_status_ws())
 
         await self.__dex_helper.start()
-        self.pantheon.spawn(self.__finalise_missed_requests())
+        self.pantheon.spawn(self.__poll_for_requests_status())
 
         self.started = True
 
@@ -805,9 +801,9 @@ class UniswapV3Bloxroute(DexCommon):
                     signed_at_ms = int(time.time() * 1_000)
                     self._logger.info(f'stat=signBundleTelem, responseDelayMs={signed_at_ms - sign_begin_at_ms}')
 
-                bundle_jobs.append(self._shoot_bundle_rest(builder_rpc_url, signed_header, rest_str))
+                bundle_jobs.append(self._shoot_bundle_rest(builder_rpc_url, signed_header, rest_str, bundle_id))
             else:
-                bundle_jobs.append(self._shoot_bundle_rest(builder_rpc_url, self.__builders_request_header, rest_str))
+                bundle_jobs.append(self._shoot_bundle_rest(builder_rpc_url, self.__builders_request_header, rest_str, bundle_id))
 
         await asyncio.gather(*bundle_jobs)
 
@@ -821,9 +817,10 @@ class UniswapV3Bloxroute(DexCommon):
             self._logger.info('Client disconnected')
             self._titan_ws = None
 
-    async def _shoot_bundle_rest(self, builder_url: str, header: dict, json_str: str):
+    async def _shoot_bundle_rest(self, builder_url: str, header: dict, json_str: str, bundle_id: int):
         try:
             send_at_ms = int(time.time() * 1_000)
+            resp_rece_at_ms = None
             result = await self.__builders_session.post(builder_url, data=json_str, headers=header)
             response = await result.json()
             resp_rece_at_ms = int(time.time() * 1_000)
@@ -833,12 +830,16 @@ class UniswapV3Bloxroute(DexCommon):
                 or (response["result"] == "nil")
                 or (isinstance(response["result"], dict) and "bundleHash" in response["result"])
             ):
-                self._logger.info(f"Success: Post to {builder_url}, response {response}")
+                self._logger.info(f"Success: Post to {builder_url}, response {response}, bundle_id: {bundle_id}")
             else:
-                self._logger.error(f"Error: Post to {builder_url}, response {response}")
+                self._logger.error(f"Error: Post to {builder_url}, response: {response}, bundle_id: {bundle_id}")
             self._logger.info(f"stat=bundleTelem, builder={builder_url}, responseDelayMs={resp_rece_at_ms - send_at_ms}")
         except Exception as e:
-            self._logger.error(f"Error posting bundle to {builder_url}: {e}")
+            if resp_rece_at_ms is None:
+                resp_rece_at_ms = int(time.time() * 1_000)
+            self._logger.error(
+                f"Error posting bundle to {builder_url}: {e}, bundle_id: {bundle_id}, responseDelayMs={resp_rece_at_ms - send_at_ms}"
+            )
 
     async def _consume_titan_ws_msg(self):
         async for ws in websockets.connect(self._titan_ws_url, extra_headers={'Authorization': self._titan_api_key}):

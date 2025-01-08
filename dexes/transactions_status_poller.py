@@ -53,7 +53,17 @@ class TransactionsStatusPoller:
             client_request_id, request_type = val
             tasks.append(self.__poll_tx_hash(tx_hash, client_request_id, request_type))
 
-        await asyncio.gather(*tasks)
+            # To avoid issues like:
+            # socket.accept() out of system resource
+            # SSLError(OSError(24, 'Too many open files'))
+            #
+            # TODO: maybe increase system resources and not add this check
+            if len(tasks) >= 50:
+                await asyncio.gather(*tasks)
+                tasks = []
+
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
 
     async def __poll_tx_hash(self, tx_hash: str, client_request_id: str, request_type: RequestType):
         try:
