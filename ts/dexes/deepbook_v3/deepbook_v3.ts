@@ -2547,7 +2547,7 @@ export class DeepBookV3 implements DexInterface {
     }
 
     let limit: number | null = Number(params.get("limit"));
-    if (limit === null) limit = 50;
+    if (limit === null) limit = 1000;
 
     let query: SuiEventFilter = {
       // Does not get us maker trades
@@ -2671,7 +2671,7 @@ export class DeepBookV3 implements DexInterface {
       let queryParams: QueryEventsParams = {
         query: { Transaction: txDigest },
         cursor: null,
-        limit: 50,
+        limit: 1000,
         order: "descending",
       };
 
