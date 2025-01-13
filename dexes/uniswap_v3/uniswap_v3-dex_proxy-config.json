@@ -137,7 +137,8 @@
       "store_in_redis": false
     },
     "transactions_status_poller": {
-      "poll_interval_s": 15
+      "poll_interval_s": 15,
+      "periodically_poll_for_tx_receipt": false
     },
     "fireblocks": {
       "native_asset": "ETH",
