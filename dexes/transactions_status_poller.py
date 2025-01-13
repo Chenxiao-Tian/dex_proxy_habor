@@ -15,6 +15,7 @@ class TransactionsStatusPoller:
 
         self.__tx_hash_to_request_id_and_type = {}
         self.__poll_interval_s = config["poll_interval_s"]
+        self.__periodically_poll_for_tx_receipt = config.get("periodically_poll_for_tx_receipt", True)
 
     async def start(self):
         self.pantheon.spawn(self.__poll_tx_for_status())
@@ -37,10 +38,10 @@ class TransactionsStatusPoller:
 
         while True:
             self.__logger.debug("Polling status for transactions")
-            await self.__poll_tx(self.__tx_hash_to_request_id_and_type)
+            await self.__poll_tx(self.__tx_hash_to_request_id_and_type, self.__periodically_poll_for_tx_receipt)
             await self.pantheon.sleep(self.__poll_interval_s)
 
-    async def __poll_tx(self, tx_hash_to_request_id_and_type: dict):
+    async def __poll_tx(self, tx_hash_to_request_id_and_type: dict, get_receipt=True):
         tasks = []
 
         for tx_hash in list(tx_hash_to_request_id_and_type.keys()):
@@ -51,7 +52,7 @@ class TransactionsStatusPoller:
                 continue
 
             client_request_id, request_type = val
-            tasks.append(self.__poll_tx_hash(tx_hash, client_request_id, request_type))
+            tasks.append(self.__poll_tx_hash(tx_hash, client_request_id, request_type, get_receipt))
 
             # To avoid issues like:
             # socket.accept() out of system resource
@@ -65,12 +66,15 @@ class TransactionsStatusPoller:
         if len(tasks) > 0:
             await asyncio.gather(*tasks)
 
-    async def __poll_tx_hash(self, tx_hash: str, client_request_id: str, request_type: RequestType):
+    async def __poll_tx_hash(self, tx_hash: str, client_request_id: str, request_type: RequestType, get_receipt: bool):
         try:
             request: Request = self.__dex.get_request(client_request_id)
 
             if request is None or request.is_finalised():
                 self.__tx_hash_to_request_id_and_type.pop(tx_hash, None)
+                return
+
+            if not get_receipt:
                 return
 
             receipt = await self.__dex.get_transaction_receipt(request, tx_hash)
