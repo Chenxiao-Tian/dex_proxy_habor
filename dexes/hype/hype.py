@@ -26,7 +26,7 @@ from web_server import WebServer
 
 from .signing import (OrderWire, order_request_to_order_wire,
                       order_wires_to_order_action, sign_l1_action,
-                      sign_withdraw_from_bridge_action, sign_agent)
+                      sign_withdraw_from_bridge_action, sign_agent, sign_usd_class_transfer_action)
 
 
 class Hype(DexCommon):
@@ -68,6 +68,8 @@ class Hype(DexCommon):
         server.register("POST", "/private/withdraw-from-exchange", self.__withdraw_from_exchange)
         server.register("POST", "/private/deposit-into-exchange", self.__deposit_into_exchange)
         server.register("POST", "/private/update-leverage", self.__update_leverage)
+        server.register("POST", "/private/spot-to-perp-usdc-transfer", self.__transfer_usdc_from_spot_to_perp)
+        server.register("POST", "/private/perp-to-spot-usdc-transfer", self.__transfer_usdc_from_perp_to_spot)
 
     async def start(self, eth_private_key: Union[str, list]):
         self.__load_whitelist()
@@ -486,7 +488,7 @@ class Hype(DexCommon):
                 return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
 
             amount = str(params['amount'])
-
+            
             transfer = TransferRequest(
                 client_request_id=client_request_id,
                 symbol=symbol,
@@ -587,3 +589,80 @@ class Hype(DexCommon):
             self._logger.exception(f'Failed to transfer: %r', e)
             self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': str(e)}}
+        
+
+    async def __transfer_usdc_from_spot_to_perp(self,
+        path: str,
+        params: dict,
+        received_at_ms: int) -> Tuple[int, dict]:
+        return await self.__transfer_usdc_between_spot_and_perp_util(path, params, received_at_ms, True)
+    
+    async def __transfer_usdc_from_perp_to_spot(self,
+        path: str,
+        params: dict,
+        received_at_ms: int) -> Tuple[int, dict]:
+        return await self.__transfer_usdc_between_spot_and_perp_util(path, params, received_at_ms, False)
+
+    async def __transfer_usdc_between_spot_and_perp_util(
+        self,
+        path: str,
+        params: dict,
+        received_at_ms: int,
+        to_perp: bool) -> Tuple[int, dict]:
+        client_request_id = ''
+        try:
+            str_amount = str(params['amount'])
+            symbol = 'USDC'
+            if self.vault_address:
+                str_amount += f" subaccount:{self.vault_address}"
+            timestamp = int(time.time() * 1000)
+            action = {
+                "type": "usdClassTransfer",
+                "amount": str_amount,
+                "toPerp": to_perp,
+                "nonce": timestamp,
+            }
+            client_request_id = params['client_request_id']
+            
+            if self._request_cache.get(client_request_id) is not None:
+                return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
+            
+            signature = sign_usd_class_transfer_action(self._api._account, action, self.is_mainnet)
+
+            amount = Decimal(params['amount'])
+
+            transfer = TransferRequest(
+                client_request_id=client_request_id,
+                symbol=symbol,
+                amount=amount,
+                # Leaving this empty as the `address_to` is hardcoded in the
+                # pyutils api call and is our l2 account address
+                address_to="",
+                gas_limit=0,
+                request_path=path,
+                received_at_ms=received_at_ms)
+
+            self._logger.info(f'Transferring USDC from {"spot to perp" if to_perp else "perp to spot"} ={transfer}, request_path={path}')
+
+            self._request_cache.add(transfer)
+
+            result = await self._api.transfer_usdc_between_spot_and_perp(
+                amount=str_amount,
+                timestamp=timestamp,
+                chain="Mainnet" if self.is_mainnet else "Testnet",
+                signature_chain_id='0x66eee',
+                signature=signature,
+                to_perp=to_perp
+            )  
+
+            if result['status'] == 'ok':
+                self._request_cache.finalise_request(client_request_id, RequestStatus.SUCCEEDED)
+                return 200, {'status': 'ok'}
+            else:
+                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+                return 400, {'error': {'code': result['error'], 'message': result}}
+        except Exception as e:
+            self._logger.exception(f'Failed to transfer: %r', e)
+            self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+            return 400, {'error': {'message': str(e)}}
+    
