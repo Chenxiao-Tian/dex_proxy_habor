@@ -217,6 +217,22 @@ def sign_withdraw_from_bridge_action(wallet, action, is_mainnet):
         is_mainnet,
     )
 
+def sign_usd_class_transfer_action(wallet, action, is_mainnet):
+    action["signatureChainId"] = "0x66eee"
+    action["hyperliquidChain"] = "Mainnet" if is_mainnet else "Testnet"
+    return sign_user_signed_action(
+        wallet,
+        action,
+        [
+            {"name": "hyperliquidChain", "type": "string"},
+            {"name": "amount", "type": "string"},
+            {"name": "toPerp", "type": "bool"},
+            {"name": "nonce", "type": "uint64"},
+        ],
+        "HyperliquidTransaction:UsdClassTransfer",
+        is_mainnet,
+    )
+
 
 def sign_inner(wallet, data):
     structured_data = encode_structured_data(data)
