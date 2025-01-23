@@ -2,13 +2,21 @@
     "Ethereum Mainnet": {
         "bridge_details": {
             "matching_address": "0xeB8d770ec18DB98Db922E9D83260A585b9F0DeAD",
-            "__cash_addresses_details": "https://github.com/derivexyz/v2-matching/tree/master/deployments/957",
+            "__cash_addresses_details": "https://github.com/derivexyz/v2-core/blob/4bafa4c252b64bdc7fdcc75e2e1a90f1a13f943b/deployments/957",
             "cash_addresses": {
                 "USDC": "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
                 "WSTETH": "0x69c7AADFfD607F74eE610f047f552CaDecabca4E",
                 "WETH": "0xE201fCEfD4852f96810C069f66560dc25B2C7A55",
                 "WBTC": "0x7da2D398dddDfC946Efd2C758c4688D21887790d",
-                "USDT": "0x5E72430EC945CCc183c34e2860FFC2b5bac712c2"
+                "USDT": "0x5E72430EC945CCc183c34e2860FFC2b5bac712c2",
+                "DRV": "0x1Abdb2896e57047fD989af7B3Ee6B7e81830F8D2",
+                "WEETH": "0xF30EE744fCfd135A135E6a4e327e01d0f697e6Ec",
+                "DAI": "0x67bB0B7c87Df9C5C433ac7eCADfa7396A2927fcF",
+                "USDE": "0x028B9fFA86fc4c366e11AA8b3E71dc0502713ABF",
+                "CBBTC": "0xC1efE4c45B79250A29A5Dc66cCADc60DB0FcEEe8",
+                "SUSDE": "0x375804CdcF0D534FDD2657584A7c4Ff5AB14A2bb",
+                "OP": "0xDaffF9B244327d09dde1dDFcf9981ef0Df2D1568",
+                "RSETH": "0x35fdB6e79c05809ba6Dc3B2EF5FF7D0BB5D75020"
             },
             "deposit_module_address": "0x9B3FE5E5a3bcEa5df4E08c41Ce89C4e3Ff01Ace3",
             "withdraw_module_address": "0x9d0E8f5b25384C7310CB8C6aE32C8fbeb645d083",
@@ -70,6 +78,46 @@
                     "l1_socket_bridge_connector_address": "0x3553c0102684c20e2f8192d6F013c7242710b4b3",
                     "l2_socket_bridge_address": "0xF64010ACE8f7333dF61F6D0ae3d08C5d4704D69A",
                     "l2_socket_bridge_connector_address": "0x0e276315EB155d28C7Aebd78AC118F967277a265"
+                },
+                {
+                    "symbol": "DRV",
+                    "l1_token_address": "0xB1D1eae60EEA9525032a6DCb4c1CE336a1dE71BE",
+                    "l2_token_address": "0x2EE0fd70756EDC663AcC9676658A1497C247693A"
+                },
+                {
+                    "symbol": "WEETH",
+                    "l1_token_address": "0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee",
+                    "l2_token_address": "0x7B35b4c05a90Ea5f311AeC815BE4148b446a68a2"
+                },
+                {
+                    "symbol": "DAI",
+                    "l1_token_address": "0x6b175474e89094c44da98b954eedeac495271d0f",
+                    "l2_token_address": "0xB56D58Ce246C31c4D3a3bFB354996FF28D081dB7"
+                },
+                {
+                    "symbol": "USDE",
+                    "l1_token_address": "0x4c9edd5852cd905f086c759e8383e09bff1e68b3",
+                    "l2_token_address": "0x1569e57B9e1dA866f9b862Acd8b134ea16B234F5"
+                },
+                {
+                    "symbol": "CBBTC",
+                    "l1_token_address": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+                    "l2_token_address": "0x1EA87f372285409425771F19Eb7938b427DAb148"
+                },
+                {
+                    "symbol": "SUSDE",
+                    "l1_token_address": "0x9d39a5de30e57443bff2a8307a4256c8797a3497",
+                    "l2_token_address": "0xb82d12742c3728a14eaa43ebe1c0d32bb62216eb"
+                },
+                {
+                    "symbol": "OP",
+                    "l1_token_address": "0x4200000000000000000000000000000000000042",
+                    "l2_token_address": "0x30f85847F9F17f219A9a21B93396a3B2eAEa500F"
+                },
+                {
+                    "symbol": "RSETH",
+                    "l1_token_address": "0xA1290d69c65A6Fe4DF752f95823fae25cB99e5A7",
+                    "l2_token_address": "0xc47e2E800a9184cFbD274AC1eeCcCDF942715dB7"
                 }
             ]
         },
@@ -259,9 +307,11 @@
     "Ethereum Sepolia Testnet": {
         "bridge_details": {
           "cash_addresses": {
+              "WETH": "0x41675b7746AE0E464f2594d258CF399c392A179C",
               "WSTETH": "0x8dca1bc475fb6008165186061398e318dd3e5f06",
               "USDC": "0x6caf294DaC985ff653d5aE75b4FF8E0A66025928",
-              "SNX": "0x2c5fed9208034f49723f91179ceefb8f42dbba32"
+              "SNX": "0x2c5fed9208034f49723f91179ceefb8f42dbba32",
+              "DRV": "0x057fd0dEF0BEf37Bf36Aef9CB550faf88428C5D0"
           },
           "matching_address": "0x3cc154e220c2197c5337b7Bd13363DD127Bc0C6E",
           "deposit_module_address": "0x43223Db33AdA0575D2E100829543f8B04A37a1ec",
@@ -315,6 +365,11 @@
                 "l1_socket_bridge_connector_address": "0xE46401d94ebF0ccdCc5337Bb7DA940DBD032e177",
                 "l2_socket_bridge_address": "0x6654d10da9A657C920f7fA67d6b3e443B9917d7A",
                 "l2_socket_bridge_connector_address": "0x03027410f25c527d5aeb3e6e56a6389611dcb2a9"
+              },
+              {
+                "symbol": "DRV",
+                "l1_token_address": "0xeCAAd20Fe81818E4Ce1EB35E463f681084ab2DD5",
+                "l2_token_address": "0x3FBFD80EF7591658d1D7DdEC067F413eFd6f985c"
               }
           ]
         },
