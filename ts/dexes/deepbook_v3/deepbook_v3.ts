@@ -81,9 +81,17 @@ class MandatoryFields {
   static WithdrawalRequest = ["coin_type_id", "recipient", "quantity"];
   static ObjectInfoRequest = ["id"];
   static PoolInfoRequest = ["pool"];
-  static BalanceManagerFundsRequest = ["coin"];
-  static DepositIntoBalanceManagerRequest = ["coin", "quantity"];
-  static WithdrawFromBalanceManagerRequest = ["coin", "quantity"];
+  static BalanceManagerFundsRequest = ["coin", "balance_manager_id"];
+  static DepositIntoBalanceManagerRequest = [
+    "coin",
+    "quantity",
+    "balance_manager_id",
+  ];
+  static WithdrawFromBalanceManagerRequest = [
+    "coin",
+    "quantity",
+    "balance_manager_id",
+  ];
   static TradesByTimeRequest = ["start_ts", "max_pages"];
   static TradesByDigestRequest = ["tx_digests_list"];
   static StakeRequest = ["pool", "amount"];
@@ -105,7 +113,8 @@ export class DeepBookV3 implements DexInterface {
 
   private walletAddress: string;
 
-  private balanceManagerId: string;
+  private tradingBalanceManagerId: string;
+  private supportedBalanceManagersId: Array<string>;
 
   private clientPool: ClientPool;
   private gasManager: GasManager | undefined;
@@ -227,17 +236,36 @@ export class DeepBookV3 implements DexInterface {
       this.deepbookPackageId = DeepBookV3.TESTNET_DEEPBOOKV3_PACKAGE_ID;
     }
 
-    this.balanceManagerId = config.dex.balance_manager_id;
-    if (this.balanceManagerId === undefined) {
+    this.tradingBalanceManagerId = config.dex.trading_balance_manager;
+    if (this.tradingBalanceManagerId === undefined) {
       this.logger.warn(
-        "Cannot perform any account related operations without an entry for `dex.balance_manager_id` in the config"
+        "Cannot perform any trading related operations without an entry for `dex.trading_balance_manager` in the config"
+      );
+    }
+
+    this.supportedBalanceManagersId = config.dex.supported_balance_managers;
+    if (
+      this.supportedBalanceManagersId === undefined ||
+      this.supportedBalanceManagersId.length == 0
+    ) {
+      this.logger.warn("dex.supported_balance_managers is not defined");
+    }
+
+    if (
+      this.tradingBalanceManagerId &&
+      (this.supportedBalanceManagersId === undefined ||
+        this.supportedBalanceManagersId.indexOf(this.tradingBalanceManagerId) ==
+          -1)
+    ) {
+      throw new Error(
+        "dex.trading_balance_manager not in dex.supported_balance_managers"
       );
     }
 
     this.clientPool = new ClientPool(
       lf,
       config.dex,
-      this.balanceManagerId,
+      this.supportedBalanceManagersId,
       this.walletAddress,
       this.environment,
       this.coinsMap,
@@ -359,7 +387,7 @@ export class DeepBookV3 implements DexInterface {
     GET("/object-info", this.getObjectInfo);
 
     GET("/wallet-address", this.getWalletAddress);
-    GET("/balance-manager-id", this.getBalanceManagerId);
+    GET("/trading-balance-manager-id", this.getTradingBalanceManagerId);
 
     GET("/wallet-balance-info", this.getWalletBalanceInfo);
     GET("/balance-manager-balance-info", this.getBalanceManagerBalanceInfo);
@@ -434,33 +462,37 @@ export class DeepBookV3 implements DexInterface {
       setInterval(this.claimMakerRebates, claimRebatesIntervalMs);
     }
 
-    if (this.config.dex.subscribe_to_events) {
-      await this.subscribeToEvents({
-        Sender: this.walletAddress,
-      });
+    // WS subscription support directly using RPC node is removed for SUI
+    // https://docs.sui.io/guides/developer/sui-101/using-events#monitoring-events
+    //
+    // if (this.config.dex.subscribe_to_events) {
+    //   // Subscribe to transactions from our wallet
+    //   await this.subscribeToEvents({
+    //     Sender: this.walletAddress,
+    //   });
 
-      if (this.balanceManagerId) {
-        // Subscribe to maker trades
-        await this.subscribeToEvents({
-          MoveEventField: {
-            path: "/maker_balance_manager_id",
-            value: this.balanceManagerId,
-          },
-        });
+    //   if (this.tradingBalanceManagerId) {
+    //     // Subscribe to maker trades
+    //     await this.subscribeToEvents({
+    //       MoveEventField: {
+    //         path: "/maker_balance_manager_id",
+    //         value: this.tradingBalanceManagerId,
+    //       },
+    //     });
 
-        // Subscribe to taker trades
-        await this.subscribeToEvents({
-          MoveEventField: {
-            path: "/taker_balance_manager_id",
-            value: this.balanceManagerId,
-          },
-        });
-      } else {
-        this.logger.warn(
-          "Cannot subscribe to maker and taker trades, without an entry for `dex.balance_manager_id` in the config"
-        );
-      }
-    }
+    //     // Subscribe to taker trades
+    //     await this.subscribeToEvents({
+    //       MoveEventField: {
+    //         path: "/taker_balance_manager_id",
+    //         value: this.tradingBalanceManagerId,
+    //       },
+    //     });
+    //   } else {
+    //     this.logger.warn(
+    //       "Cannot subscribe to maker and taker trades, without an entry for `dex.balance_manager_id` in the config"
+    //     );
+    //   }
+    // }
 
     await this.server.start();
   };
@@ -695,7 +727,7 @@ export class DeepBookV3 implements DexInterface {
             tx.add(
               client.deepBookClient.deepBook.withdrawSettledAmounts(
                 poolName,
-                "MANAGER"
+                this.tradingBalanceManagerId
               )
             );
 
@@ -775,7 +807,10 @@ export class DeepBookV3 implements DexInterface {
 
             const tx = new Transaction();
             tx.add(
-              client.deepBookClient.deepBook.claimRebates(poolName, "MANAGER")
+              client.deepBookClient.deepBook.claimRebates(
+                poolName,
+                this.tradingBalanceManagerId
+              )
             );
 
             return tx;
@@ -889,7 +924,7 @@ export class DeepBookV3 implements DexInterface {
     const cursor: string | null = params.get("cursor");
 
     let limit: number | null = Number(params.get("limit"));
-    if (limit === null) limit = 20;
+    if (limit === null) limit = 1000;
 
     let queryParams: QueryTransactionBlocksParams = {
       filter: filter,
@@ -1056,18 +1091,18 @@ export class DeepBookV3 implements DexInterface {
     };
   };
 
-  getBalanceManagerId = async (
+  getTradingBalanceManagerId = async (
     requestId: bigint,
     path: string,
     params: any,
     receivedAtMs: number
   ): Promise<RestResult> => {
-    this.logger.debug(`[${requestId}] Fetching balance manager id`);
+    this.logger.debug(`[${requestId}] Fetching trading balance manager id`);
 
     return {
       statusCode: 200,
       payload: {
-        balance_manager_id: this.balanceManagerId,
+        trading_balance_manager_id: this.tradingBalanceManagerId,
       },
     };
   };
@@ -1178,7 +1213,11 @@ export class DeepBookV3 implements DexInterface {
 
         const tx = new Transaction();
         tx.add(
-          client.deepBookClient.governance.stake(poolName, "MANAGER", amount)
+          client.deepBookClient.governance.stake(
+            poolName,
+            this.tradingBalanceManagerId,
+            amount
+          )
         );
 
         return tx;
@@ -1251,7 +1290,12 @@ export class DeepBookV3 implements DexInterface {
         );
 
         const tx = new Transaction();
-        tx.add(client.deepBookClient.governance.unstake(poolName, "MANAGER"));
+        tx.add(
+          client.deepBookClient.governance.unstake(
+            poolName,
+            this.tradingBalanceManagerId
+          )
+        );
 
         return tx;
       };
@@ -1472,7 +1516,10 @@ export class DeepBookV3 implements DexInterface {
     const tx = new Transaction();
     tx.moveCall({
       target: `${this.deepbookPackageId}::pool::get_account_order_details`,
-      arguments: [tx.object(pool.address), tx.object(this.balanceManagerId)],
+      arguments: [
+        tx.object(pool.address),
+        tx.object(this.tradingBalanceManagerId),
+      ],
       typeArguments: [
         this.getCoin(pool.baseCoin).type,
         this.getCoin(pool.quoteCoin).type,
@@ -1624,7 +1671,7 @@ export class DeepBookV3 implements DexInterface {
 
     const tradeId = `${event.id.txDigest}_${event.id.eventSeq}`;
     const liquidityIndicator =
-      json.maker_balance_manager_id === this.balanceManagerId
+      json.maker_balance_manager_id === this.tradingBalanceManagerId
         ? "Maker"
         : "Taker";
     const clientOrderId =
@@ -1748,14 +1795,14 @@ export class DeepBookV3 implements DexInterface {
 
         let tradeProof = tx.moveCall({
           target: `${this.deepbookPackageId}::balance_manager::generate_proof_as_owner`,
-          arguments: [tx.object(this.balanceManagerId)],
+          arguments: [tx.object(this.tradingBalanceManagerId)],
         });
 
         tx.moveCall({
           target: `${this.deepbookPackageId}::pool::place_limit_order`,
           arguments: [
             tx.object(order.poolId),
-            tx.object(this.balanceManagerId),
+            tx.object(this.tradingBalanceManagerId),
             tradeProof,
             tx.pure.u64(order.clientOrderId),
             tx.pure.u8(orderType),
@@ -1956,14 +2003,14 @@ export class DeepBookV3 implements DexInterface {
           let orderType = DeepBookV3.parseOrderType(order.type);
           let tradeProof = tx.moveCall({
             target: `${this.deepbookPackageId}::balance_manager::generate_proof_as_owner`,
-            arguments: [tx.object(this.balanceManagerId)],
+            arguments: [tx.object(this.tradingBalanceManagerId)],
           });
 
           tx.moveCall({
             target: `${this.deepbookPackageId}::pool::place_limit_order`,
             arguments: [
               tx.object(order.poolId),
-              tx.object(this.balanceManagerId),
+              tx.object(this.tradingBalanceManagerId),
               tradeProof,
               tx.pure.u64(order.clientOrderId),
               tx.pure.u8(orderType),
@@ -2134,7 +2181,7 @@ export class DeepBookV3 implements DexInterface {
         tx.add(
           client.deepBookClient.deepBook.cancelOrder(
             pool,
-            "MANAGER",
+            this.tradingBalanceManagerId,
             order!.exchangeOrderId!
           )
         );
@@ -2249,7 +2296,12 @@ export class DeepBookV3 implements DexInterface {
         this.logger.debug(`[${requestId}] Cancelling all orders. pool=${pool}`);
 
         const tx = new Transaction();
-        tx.add(client.deepBookClient.deepBook.cancelAllOrders(pool, "MANAGER"));
+        tx.add(
+          client.deepBookClient.deepBook.cancelAllOrders(
+            pool,
+            this.tradingBalanceManagerId
+          )
+        );
         return tx;
       };
 
@@ -2358,7 +2410,7 @@ export class DeepBookV3 implements DexInterface {
           tx.add(
             client.deepBookClient.deepBook.cancelOrder(
               pool,
-              "MANAGER",
+              this.tradingBalanceManagerId,
               exchangeOrderId
             )
           );
@@ -2482,8 +2534,9 @@ export class DeepBookV3 implements DexInterface {
       let parsedJson = event.parsedJson as any;
       if (event.type.endsWith("OrderFilled")) {
         if (
-          parsedJson.maker_balance_manager_id === this.balanceManagerId ||
-          parsedJson.taker_balance_manager_id === this.balanceManagerId
+          parsedJson.maker_balance_manager_id ===
+            this.tradingBalanceManagerId ||
+          parsedJson.taker_balance_manager_id === this.tradingBalanceManagerId
         ) {
           orderFilledEvents.push(this.processOrderFilledEvent(event));
         }
@@ -2633,8 +2686,9 @@ export class DeepBookV3 implements DexInterface {
       let parsedJson = event.parsedJson as any;
       if (event.type.endsWith("OrderFilled")) {
         if (
-          parsedJson.maker_balance_manager_id === this.balanceManagerId ||
-          parsedJson.taker_balance_manager_id === this.balanceManagerId
+          parsedJson.maker_balance_manager_id ===
+            this.tradingBalanceManagerId ||
+          parsedJson.taker_balance_manager_id === this.tradingBalanceManagerId
         ) {
           orderFilledEvents.push(this.processOrderFilledEvent(event));
         }
@@ -3048,10 +3102,15 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<RestResult> => {
     assertFields(params, MandatoryFields.BalanceManagerFundsRequest);
 
+    const balanceManagerId: string = params.get("balance_manager_id");
+    if (!this.isSupported(balanceManagerId)) {
+      throw new Error(`Balance manager ${balanceManagerId} not supported`);
+    }
+
     const coin: string = params.get("coin");
 
     this.logger.debug(
-      `[${requestId}] Querying balance manager fund for coin=${coin} balanceManagerId=${this.balanceManagerId}`
+      `[${requestId}] Querying balance manager fund for coin=${coin} balanceManagerId=${balanceManagerId}`
     );
 
     let posInfo = null;
@@ -3060,7 +3119,7 @@ export class DeepBookV3 implements DexInterface {
       this.logger.debug(`[${requestId}] using ${client.name} client`);
 
       let response = await client.deepBookClient.checkManagerBalance(
-        "MANAGER",
+        balanceManagerId,
         coin
       );
 
@@ -3071,22 +3130,26 @@ export class DeepBookV3 implements DexInterface {
       };
 
       let tasks = [];
-      for (let poolName in this.poolsMap) {
-        let pool: Pool = this.poolsMap[poolName];
-        if (
-          coin === "DEEP" ||
-          coin === pool.baseCoin ||
-          coin === pool.quoteCoin
-        ) {
-          tasks.push(
-            this.getCoinLockedAmount(
-              requestId,
-              client.suiClient,
-              coin,
-              poolName,
-              pool
-            )
-          );
+
+      // there won't be any locked balance for non-trading balance managers
+      if (balanceManagerId === this.tradingBalanceManagerId) {
+        for (let poolName in this.poolsMap) {
+          let pool: Pool = this.poolsMap[poolName];
+          if (
+            coin === "DEEP" ||
+            coin === pool.baseCoin ||
+            coin === pool.quoteCoin
+          ) {
+            tasks.push(
+              this.getCoinLockedAmount(
+                requestId,
+                client.suiClient,
+                coin,
+                poolName,
+                pool
+              )
+            );
+          }
         }
       }
 
@@ -3170,7 +3233,10 @@ export class DeepBookV3 implements DexInterface {
     const tx = new Transaction();
     tx.moveCall({
       target: `${this.deepbookPackageId}::pool::locked_balance`,
-      arguments: [tx.object(pool.address), tx.object(this.balanceManagerId)],
+      arguments: [
+        tx.object(pool.address),
+        tx.object(this.tradingBalanceManagerId),
+      ],
       typeArguments: [baseCoin.type, quoteCoin.type],
     });
 
@@ -3232,11 +3298,20 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<RestResult> => {
     assertFields(params, MandatoryFields.DepositIntoBalanceManagerRequest);
 
+    const balanceManagerId: string = params.balance_manager_id;
+    if (!this.isSupported(balanceManagerId)) {
+      throw new Error(`Balance manager ${balanceManagerId} not supported`);
+    }
+
     const coin: string = params.coin;
     const quantity: number = Number(params.quantity);
 
     if (coin === "SUI") {
-      return await this.depositSuiIntoBalanceManager(requestId, quantity);
+      return await this.depositSuiIntoBalanceManager(
+        requestId,
+        quantity,
+        balanceManagerId
+      );
     }
 
     let response = null;
@@ -3247,13 +3322,13 @@ export class DeepBookV3 implements DexInterface {
 
       let txBlockGenerator = () => {
         this.logger.debug(
-          `[${requestId}] Depositing into balance_manager_id=${this.balanceManagerId}: coin=${coin}, quantity=${quantity} `
+          `[${requestId}] Depositing into balance_manager_id=${balanceManagerId}: coin=${coin}, quantity=${quantity} `
         );
 
         const tx = new Transaction();
         tx.add(
           client.deepBookClient.balanceManager.depositIntoManager(
-            "MANAGER",
+            balanceManagerId,
             coin,
             quantity
           )
@@ -3286,11 +3361,11 @@ export class DeepBookV3 implements DexInterface {
 
     if (status === "success") {
       this.logger.info(
-        `[${requestId}] Successfully deposited ${quantity} ${coin} into balance manager ${this.balanceManagerId}. Digest=${digest}`
+        `[${requestId}] Successfully deposited ${quantity} ${coin} into balance manager ${balanceManagerId}. Digest=${digest}`
       );
     } else {
       this.logger.error(
-        `[${requestId}] Failed to deposit ${quantity} ${coin} into balance manager ${this.balanceManagerId}. Digest=${digest}`
+        `[${requestId}] Failed to deposit ${quantity} ${coin} into balance manager ${balanceManagerId}. Digest=${digest}`
       );
     }
 
@@ -3302,10 +3377,11 @@ export class DeepBookV3 implements DexInterface {
 
   depositSuiIntoBalanceManager = async (
     requestId: bigint,
-    quantity: number
+    quantity: number,
+    balanceManagerId: string
   ): Promise<RestResult> => {
     this.logger.debug(
-      `[${requestId}] Depositing SUI into balance_manager_id=${this.balanceManagerId}: quantity=${quantity} `
+      `[${requestId}] Depositing SUI into balance_manager_id=${balanceManagerId}: quantity=${quantity} `
     );
     let client = this.clientPool.getClient();
     this.logger.debug(`[${requestId}] using ${client.name} client`);
@@ -3335,7 +3411,7 @@ export class DeepBookV3 implements DexInterface {
       const tx = new Transaction();
       tx.add(
         client.deepBookClient.balanceManager.depositIntoManager(
-          "MANAGER",
+          balanceManagerId,
           "SUI",
           quantity
         )
@@ -3359,11 +3435,11 @@ export class DeepBookV3 implements DexInterface {
 
       if (status === "success") {
         this.logger.info(
-          `[${requestId}] Successfully deposited ${quantity} SUI into balance manager ${this.balanceManagerId}. Digest=${digest}`
+          `[${requestId}] Successfully deposited ${quantity} SUI into balance manager ${balanceManagerId}. Digest=${digest}`
         );
       } else {
         this.logger.error(
-          `[${requestId}] Failed to deposit ${quantity} SUI into balance manager ${this.balanceManagerId}. Digest=${digest}`
+          `[${requestId}] Failed to deposit ${quantity} SUI into balance manager ${balanceManagerId}. Digest=${digest}`
         );
       }
     } catch (error) {
@@ -3410,6 +3486,11 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<RestResult> => {
     assertFields(params, MandatoryFields.WithdrawFromBalanceManagerRequest);
 
+    const balanceManagerId: string = params.balance_manager_id;
+    if (!this.isSupported(balanceManagerId)) {
+      throw new Error(`Balance manager ${balanceManagerId} not supported`);
+    }
+
     const coin: string = params.coin;
     const quantity: number = Number(params.quantity);
 
@@ -3421,13 +3502,13 @@ export class DeepBookV3 implements DexInterface {
 
       let txBlockGenerator = () => {
         this.logger.debug(
-          `[${requestId}] Withdrawing from balance_manager_id=${this.balanceManagerId}: coin=${coin}, quantity=${quantity}`
+          `[${requestId}] Withdrawing from balance_manager_id=${balanceManagerId}: coin=${coin}, quantity=${quantity}`
         );
 
         const tx = new Transaction();
         tx.add(
           client.deepBookClient.balanceManager.withdrawFromManager(
-            "MANAGER",
+            balanceManagerId,
             coin,
             quantity,
             this.walletAddress
@@ -3461,11 +3542,11 @@ export class DeepBookV3 implements DexInterface {
 
     if (status === "success") {
       this.logger.info(
-        `Successfully withdrawn ${quantity} ${coin} from balance manager ${this.balanceManagerId}. Digest=${digest}`
+        `Successfully withdrawn ${quantity} ${coin} from balance manager ${balanceManagerId}. Digest=${digest}`
       );
     } else {
       this.logger.error(
-        `Failed to withdraw ${quantity} ${coin} from balance manager ${this.balanceManagerId}. Digest=${digest}`
+        `Failed to withdraw ${quantity} ${coin} from balance manager ${balanceManagerId}. Digest=${digest}`
       );
     }
 
@@ -3487,7 +3568,10 @@ export class DeepBookV3 implements DexInterface {
     const tx = new Transaction();
     tx.moveCall({
       target: `${this.deepbookPackageId}::pool::account`,
-      arguments: [tx.object(pool.address), tx.object(this.balanceManagerId)],
+      arguments: [
+        tx.object(pool.address),
+        tx.object(this.tradingBalanceManagerId),
+      ],
       typeArguments: [baseCoin.type, quoteCoin.type],
     });
 
@@ -3592,7 +3676,7 @@ export class DeepBookV3 implements DexInterface {
   ): Promise<RestResult> => {
     assertFields(params, MandatoryFields.TransactionDigestsInfoRequest);
 
-    const digests: string[] = params.get("digests")?.split(',') || [];
+    const digests: string[] = params.get("digests")?.split(",") || [];
 
     this.logger.debug(`[${requestId}] Querying txDigest ${digests}`);
 
@@ -3610,7 +3694,7 @@ export class DeepBookV3 implements DexInterface {
           showEffects: true,
           showInput: true,
           showRawInput: true,
-          showRawEffects: true
+          showRawEffects: true,
         },
       });
     } catch (error) {
@@ -3676,5 +3760,9 @@ export class DeepBookV3 implements DexInterface {
     let is_bid = exchOrderIdAsInt >> BigInt(127) == BigInt(0);
 
     return is_bid == true ? "BUY" : "SELL";
+  }
+
+  isSupported(balanceManagerId: string): boolean {
+    return this.supportedBalanceManagersId.includes(balanceManagerId);
   }
 }

@@ -40,8 +40,8 @@ tx.add(
     poolKey: "SUI_DBUSDC",
     balanceManagerKey: "MANAGER_1",
     clientOrderId: "1",
-    price: 0.1,
-    quantity: 0.2,
+    price: 1,
+    quantity: 2,
     isBid: false,
     orderType: 0, // GTC: 0, IOC: 1, FOK: 2, GPO: 3
     selfMatchingOption: 0, // SELF_MATCHING_ALLOWED = 0, CANCEL_TAKER = 1, CANCEL_MAKER = 2

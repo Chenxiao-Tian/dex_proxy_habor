@@ -1,6 +1,11 @@
 import { LoggerFactory } from "../../logger.js";
 import type { NetworkType } from "./types.js";
-import { Coin, DeepBookClient, Pool } from "@mysten/deepbook-v3";
+import {
+  Coin,
+  DeepBookClient,
+  Pool,
+  BalanceManager,
+} from "@mysten/deepbook-v3";
 import { SuiClient, SuiHTTPTransport } from "@mysten/sui/client";
 import { Logger } from "winston";
 import { WebSocket } from "ws";
@@ -26,7 +31,7 @@ export class ClientPool {
   constructor(
     lf: LoggerFactory,
     config: any,
-    balanceManagerId: string,
+    supportedBalanceManagers: Array<string>,
     walletAddress: string,
     environment: NetworkType,
     coinsMap: Record<string, Coin>,
@@ -34,14 +39,17 @@ export class ClientPool {
   ) {
     this.logger = lf.createLogger("clients_pool");
 
-    let balanceManager = undefined;
-    if (balanceManagerId) {
-      balanceManager = {
-        MANAGER: {
-          address: balanceManagerId,
+    let balanceManagersConfig: {
+      [key: string]: BalanceManager;
+    } = {};
+
+    if (supportedBalanceManagers) {
+      for (let balanceManager of supportedBalanceManagers) {
+        balanceManagersConfig[balanceManager] = {
+          address: balanceManager,
           tradeCap: "",
-        },
-      };
+        };
+      }
     }
 
     this.clients = new Array();
@@ -72,7 +80,7 @@ export class ClientPool {
         client: suiClient,
         address: walletAddress,
         env: environment,
-        balanceManagers: balanceManager,
+        balanceManagers: balanceManagersConfig,
         coins: coinsMap,
         pools: poolsMap,
       });
@@ -106,9 +114,7 @@ export class ClientPool {
         let sequenceNumber = BigInt(
           await client.suiClient.getLatestCheckpointSequenceNumber()
         );
-        this.logger.debug(
-          `${client.name}: sequence_number: ${sequenceNumber}`
-        );
+        this.logger.debug(`${client.name}: sequence_number: ${sequenceNumber}`);
 
         if (sequenceNumber > this.latestSequenceNumberFound) {
           if (this.clientIdxToUse !== idx) {
@@ -120,7 +126,9 @@ export class ClientPool {
 
         //separate if block to avoid mixing of conditions
         if (client.name.startsWith("internal_sui")) {
-          this.logger.debug(`Internal Sui client is ${client.name} at idx ${idx}`);
+          this.logger.debug(
+            `Internal Sui client is ${client.name} at idx ${idx}`
+          );
 
           // Update if this client has the highest sequence number
           if (sequenceNumber > this.latestInternalNodeSequenceNumberFound) {
@@ -139,17 +147,26 @@ export class ClientPool {
     }
   };
 
-  getClient = (): { name: string; suiClient: SuiClient, deepBookClient: DeepBookClient } => {
+  getClient = (): {
+    name: string;
+    suiClient: SuiClient;
+    deepBookClient: DeepBookClient;
+  } => {
     return this.clients.at(this.clientIdxToUse)!;
   };
 
-  getInternalClient = (): { name: string; suiClient: SuiClient, deepBookClient: DeepBookClient } => {
-    if (this.internalClientIdxToUse !== -1){
+  getInternalClient = (): {
+    name: string;
+    suiClient: SuiClient;
+    deepBookClient: DeepBookClient;
+  } => {
+    if (this.internalClientIdxToUse !== -1) {
       return this.clients.at(this.internalClientIdxToUse)!;
     } else {
-
       //fall back to default client if the functionality fails
-      this.logger.warn(`Internal leading client not set, current value ${this.internalClientIdxToUse}, falling back to default client`);
+      this.logger.warn(
+        `Internal leading client not set, current value ${this.internalClientIdxToUse}, falling back to default client`
+      );
       return this.clients.at(this.clientIdxToUse)!;
     }
   };
