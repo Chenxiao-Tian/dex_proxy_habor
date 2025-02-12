@@ -13,7 +13,11 @@
     "env": "mainnet",
     "subscribe_to_events": false,
     "wallet_address": "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c",
-    "balance_manager_id": "0x1fe5a96fb4510de480663b1f9a14307d4e584e309d560c1dd36dcdf9556ab84c",
+    "trading_balance_manager": "0x1fe5a96fb4510de480663b1f9a14307d4e584e309d560c1dd36dcdf9556ab84c",
+    "supported_balance_managers": [
+      "0x1fe5a96fb4510de480663b1f9a14307d4e584e309d560c1dd36dcdf9556ab84c",
+      "0x960e649b943f43294ab6573f661a92b995cb86d646e47aa9f87ec5def1a68704"
+    ],
     "withdraw_settled_amounts_interval_s": 300,
     "track_leading_client_poll_interval_s": 10,
     "exchange_connectors": {

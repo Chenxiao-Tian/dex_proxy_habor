@@ -78,21 +78,21 @@
         }
 ```
 
-4. Get balance manager id:
+4. Get trading balance manager id:
    Request:
 
 ```
         curl \
         -X GET \
         -H "Content-Type: application/json" \
-        "http://localhost:3000/balance-manager-id"
+        "http://localhost:3000/trading-balance-manager-id"
 ```
 
     Response:
 
 ```
         {
-            "balance_manager_id": "0x1fe5a96fb4510de480663b1f9a14307d4e584e309d560c1dd36dcdf9556ab84c"
+            "trading_balance_manager_id": "0x1fe5a96fb4510de480663b1f9a14307d4e584e309d560c1dd36dcdf9556ab84c"
         }
 ```
 
@@ -201,7 +201,7 @@
         curl \
         -X GET \
         -H "Content-Type: application/json" \
-        http://localhost:3000/balance-manager-balance-info?coin=SUI
+        "http://localhost:3000/balance-manager-balance-info?coin=SUI&balance_manager_id=0x79c283daf0fddb99f20d0a12cf26549d576a83f6b78c3353c9fbd1d4f6eda6b8"
 ```
 
     Response:
@@ -420,7 +420,7 @@
         -X POST \
         -H "Content-Type: application/json" \
         http://localhost:3000/deposit-into-balance-manager \
-        -d '{"jsonrpc":"2.0","coin":"SUI","quantity":"1"}'
+        -d '{"jsonrpc":"2.0","coin":"SUI","quantity":"1","balance_manager_id":"0x79c283daf0fddb99f20d0a12cf26549d576a83f6b78c3353c9fbd1d4f6eda6b8"}'
 
 ```
 
@@ -584,7 +584,7 @@
     -X POST \
     -H "Content-Type: application/json" \
     http://localhost:3000/withdraw-from-balance-manager \
-    -d '{"jsonrpc":"2.0","coin":"SUI","quantity":"0.001"}'
+    -d '{"jsonrpc":"2.0","coin":"SUI","quantity":"0.001","balance_manager_id":"0x79c283daf0fddb99f20d0a12cf26549d576a83f6b78c3353c9fbd1d4f6eda6b8"}'
 ```
 
     Response:
