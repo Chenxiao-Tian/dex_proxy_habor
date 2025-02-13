@@ -36,6 +36,7 @@
             "tokens": [
                 {
                     "symbol": "USDC",
+                    "bridge_type": "socket_v1",
                     "l1_token_address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
                     "l2_token_address": "0x6879287835A86F50f784313dBEd5E5cCC5bb8481",
                     "l1_socket_bridge_address": "0x6D303CEE7959f814042D31E0624fB88Ec6fbcC1d",
@@ -45,6 +46,7 @@
                 },
                 {
                     "symbol": "WSTETH",
+                    "bridge_type": "socket_v1",
                     "l1_token_address": "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0",
                     "l2_token_address": "0xdf77b286eDa539CCb6326e9eDB86aa69D83108a5",
                     "l1_socket_bridge_address": "0xeBB5D642aA8ccDeE98373D6aC3ee0602b63824b3",
@@ -54,6 +56,7 @@
                 },
                 {
                     "symbol": "WETH",
+                    "bridge_type": "socket_v1",
                     "l1_token_address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
                     "l2_token_address": "0x15CEcd5190A43C7798dD2058308781D0662e678E",
                     "l1_socket_bridge_address": "0xD4efe33C66B8CdE33B8896a2126E41e5dB571b7e",
@@ -63,6 +66,7 @@
                 },
                 {
                     "symbol": "WBTC",
+                    "bridge_type": "socket_v1",
                     "l1_token_address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
                     "l2_token_address": "0x9b80ab732a6F1030326Af0014f106E12C4Db18EC",
                     "l1_socket_bridge_address": "0x3Eec7c855aF33280F1eD38b93059F5aa5862E3ab",
@@ -72,6 +76,7 @@
                 },
                 {
                     "symbol": "USDT",
+                    "bridge_type": "socket_v1",
                     "l1_token_address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
                     "l2_token_address": "0x954bE1803546150bfd887c9ff70fd221F2F505d3",
                     "l1_socket_bridge_address": "0x5e98A25d8d6FF69A8992d6Aa57948dFB77D4ECBa",
@@ -81,8 +86,13 @@
                 },
                 {
                     "symbol": "DRV",
+                    "bridge_type": "layerzero",
                     "l1_token_address": "0xB1D1eae60EEA9525032a6DCb4c1CE336a1dE71BE",
-                    "l2_token_address": "0x2EE0fd70756EDC663AcC9676658A1497C247693A"
+                    "l2_token_address": "0x2EE0fd70756EDC663AcC9676658A1497C247693A",
+                    "l1_layerzero_bridge_address": "0xB1D1eae60EEA9525032a6DCb4c1CE336a1dE71BE",
+                    "l2_layerzero_bridge_address": "0x2EE0fd70756EDC663AcC9676658A1497C247693A",
+                    "l1_layerzero_chain_eid": 30101,
+                    "l2_layerzero_chain_eid": 30311
                 },
                 {
                     "symbol": "WEETH",
@@ -329,8 +339,10 @@
           },
           "l1_standard_bridge_address": "0x80F6C67BF87576A0F88C0A84667015F32ED46bB6",
           "l2_standard_bridge_address": "0x4200000000000000000000000000000000000010",
-          "tokens": [{
+          "tokens": [
+              {
                 "symbol": "USDC",
+                "bridge_type": "socket_v1",
                 "_l1_token_address": "0x7E07E15D2a87A24492740D16f5bdF58c16db0c4E",
                 "l1_token_address": "0x565810cbfa3Cf1390963E5aFa2fB953795686339",
                 "l2_token_address": "0xe80F2a02398BBf1ab2C9cc52caD1978159c215BD",
@@ -341,6 +353,7 @@
               },
               {
                 "symbol": "WETH",
+                "bridge_type": "socket_v1",
                 "l1_token_address": "0xE67ABDA0D43f7AC8f37876bBF00D1DFadbB93aaa",
                 "l2_token_address": "0x3a34565D81156cF0B1b9bC5f14FD00333bcf6B93",
                 "l1_socket_bridge_address": "0xd9cB39b5ad36C6D2ec4E8d5337B62a1C1B71BAcc",
@@ -350,6 +363,7 @@
               },
               {
                 "symbol": "WSTETH",
+                "bridge_type": "socket_v1",
                 "l1_token_address": "0x2A69EFA58248647D57D0A3a09e7ED38D2a8343d2",
                 "l2_token_address": "0x37Db2a7cFb832442861F0053db422bDEA20DE847",
                 "l1_socket_bridge_address": "0x383848aA8e899E9B913aA54fC81E67a53640FC71",
@@ -359,6 +373,7 @@
               },
               {
                 "symbol": "SNX",
+                "bridge_type": "socket_v1",
                 "l1_token_address": "0x9D7b6f4ffE5d654d67A013599Efbe669d56B6134",
                 "l2_token_address": "0x751FD1d1B327D6d842cD57CAAEABf581836cFF5F",
                 "l1_socket_bridge_address": "0x0A7104f2cBeC2E9c7FDC91097D7b7099078E85eB",
@@ -368,8 +383,13 @@
               },
               {
                 "symbol": "DRV",
+                "bridge_type": "layerzero",
                 "l1_token_address": "0xeCAAd20Fe81818E4Ce1EB35E463f681084ab2DD5",
-                "l2_token_address": "0x3FBFD80EF7591658d1D7DdEC067F413eFd6f985c"
+                "l2_token_address": "0x3FBFD80EF7591658d1D7DdEC067F413eFd6f985c",
+                "l1_layerzero_bridge_address": "0xeCAAd20Fe81818E4Ce1EB35E463f681084ab2DD5",
+                "l2_layerzero_bridge_address": "0x3FBFD80EF7591658d1D7DdEC067F413eFd6f985c",
+                "l1_layerzero_chain_eid": 40161,
+                "l2_layerzero_chain_eid": 40308
               }
           ]
         },
