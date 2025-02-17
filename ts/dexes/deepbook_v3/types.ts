@@ -2,6 +2,8 @@ import type {
   Transaction,
   TransactionObjectArgument,
 } from "@mysten/sui/transactions";
+import { DeepBookClient } from "@mysten/deepbook-v3";
+import { SuiClient } from "@mysten/sui/client";
 
 export type NetworkType = "mainnet" | "testnet";
 
@@ -19,4 +21,10 @@ export type PoolInfo = {
   lot_size: string;
   base_asset_trading_fees: string;
   quote_asset_trading_fees: string;
+};
+
+export type Client = {
+  name: string;
+  suiClient: SuiClient;
+  deepBookClient: DeepBookClient;
 };

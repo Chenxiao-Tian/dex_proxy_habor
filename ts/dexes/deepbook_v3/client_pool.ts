@@ -1,5 +1,5 @@
 import { LoggerFactory } from "../../logger.js";
-import type { NetworkType } from "./types.js";
+import type { Client, NetworkType } from "./types.js";
 import {
   Coin,
   DeepBookClient,
@@ -12,11 +12,7 @@ import { WebSocket } from "ws";
 
 export class ClientPool {
   private logger: Logger;
-  private clients: Array<{
-    name: string;
-    suiClient: SuiClient;
-    deepBookClient: DeepBookClient;
-  }>;
+  private clients: Array<Client>;
   private clientIdxToUse: number = 0;
 
   // not setting as default 0 to avoid conflicts
@@ -107,59 +103,57 @@ export class ClientPool {
 
   trackLeadingClient = async () => {
     this.logger.debug("Tracking leading clients");
-    let idx = -1;
-    for (let client of this.clients) {
-      try {
-        idx++;
-        let sequenceNumber = BigInt(
-          await client.suiClient.getLatestCheckpointSequenceNumber()
-        );
-        this.logger.debug(`${client.name}: sequence_number: ${sequenceNumber}`);
 
-        if (sequenceNumber > this.latestSequenceNumberFound) {
-          if (this.clientIdxToUse !== idx) {
-            this.clientIdxToUse = idx;
-            this.logger.debug(`${client.name} is leading now`);
-          }
-          this.latestSequenceNumberFound = sequenceNumber;
+    let tasks = [];
+    for (let idx = 0; idx < this.clients.length; idx++) {
+      tasks.push(this.checkIfLeading(this.clients.at(idx)!, idx));
+    }
+
+    await Promise.allSettled(tasks);
+  };
+
+  checkIfLeading = async (client: Client, idx: number) => {
+    try {
+      let sequenceNumber = BigInt(
+        await client.suiClient.getLatestCheckpointSequenceNumber()
+      );
+      this.logger.debug(`${client.name}: sequence_number: ${sequenceNumber}`);
+
+      if (
+        sequenceNumber > this.latestSequenceNumberFound ||
+        // prefer internal_sui if same sequence number
+        (sequenceNumber == this.latestSequenceNumberFound &&
+          this.isInternalNode(client) &&
+          !this.isInternalNode(this.clients.at(this.clientIdxToUse)!))
+      ) {
+        if (this.clientIdxToUse !== idx) {
+          this.clientIdxToUse = idx;
+          this.logger.debug(`${client.name} is leading now`);
         }
-
-        //separate if block to avoid mixing of conditions
-        if (client.name.startsWith("internal_sui")) {
-          this.logger.debug(
-            `Internal Sui client is ${client.name} at idx ${idx}`
-          );
-
-          // Update if this client has the highest sequence number
-          if (sequenceNumber > this.latestInternalNodeSequenceNumberFound) {
-            if (this.internalClientIdxToUse !== idx) {
-              this.internalClientIdxToUse = idx;
-              this.logger.debug(`${client.name} is leading internal node now`);
-            }
-            this.latestInternalNodeSequenceNumberFound = sequenceNumber;
-          }
-        }
-      } catch (error) {
-        this.logger.error(
-          `${client.name} error while querying sequence number: ${error}`
-        );
+        this.latestSequenceNumberFound = sequenceNumber;
       }
+
+      if (client.name.startsWith("internal_sui")) {
+        if (sequenceNumber > this.latestInternalNodeSequenceNumberFound) {
+          if (this.internalClientIdxToUse !== idx) {
+            this.internalClientIdxToUse = idx;
+            this.logger.debug(`${client.name} is leading internal node now`);
+          }
+          this.latestInternalNodeSequenceNumberFound = sequenceNumber;
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        `${client.name} error while querying sequence number: ${error}`
+      );
     }
   };
 
-  getClient = (): {
-    name: string;
-    suiClient: SuiClient;
-    deepBookClient: DeepBookClient;
-  } => {
+  getClient = (): Client => {
     return this.clients.at(this.clientIdxToUse)!;
   };
 
-  getInternalClient = (): {
-    name: string;
-    suiClient: SuiClient;
-    deepBookClient: DeepBookClient;
-  } => {
+  getInternalClient = (): Client => {
     if (this.internalClientIdxToUse !== -1) {
       return this.clients.at(this.internalClientIdxToUse)!;
     } else {
@@ -229,5 +223,9 @@ export class ClientPool {
     }
 
     return parsedConfig;
+  };
+
+  isInternalNode = (client: Client) => {
+    return client.name.startsWith("internal_sui");
   };
 }
