@@ -1,4 +1,4 @@
-command = "/etc/horust/scripts/service-wrapper /usr/bin/socat -T 3600 TCP4-LISTEN:10933,reuseaddr,fork VSOCK-CONNECT:3:${CONTEXT_ID}933"
+command = "/etc/horust/scripts/service-wrapper /usr/bin/socat -T 3600 TCP4-LISTEN:10933,reuseaddr,fork,nodelay VSOCK-CONNECT:3:${CONTEXT_ID}933"
 start-after = ["enclave-init.toml"]
 start-delay = "0s"
 user = "root"
