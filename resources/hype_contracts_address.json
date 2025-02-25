@@ -70,9 +70,18 @@
         "tokens": [
             {
                 "symbol": "PURR",
-                "address": "0xc4bf3f870c0e9465323c0b6ed28096c2",
+                "address": "0xc1fb593aeffbeb02f85e0308e9956a90",
                 "valid_withdrawal_addresses": [
-                    "0x661d6d943bEEA194A9D8217F5C01167E2BE48914"
+                    "0xebe163781f141102c6ba2220bb13481b9f4b538c",
+                    "0x8bee7340304a051b16cecee05fb8c999db3b65ed"
+                ]
+            },
+            {
+                "symbol": "HYPE",
+                "address": "0x0d01dc56dcaaca66ad901c959b4011ec",
+                "valid_withdrawal_addresses": [
+                    "0xebe163781f141102c6ba2220bb13481b9f4b538c",
+                    "0x8bee7340304a051b16cecee05fb8c999db3b65ed"
                 ]
             }
         ]
