@@ -233,6 +233,23 @@ def sign_usd_class_transfer_action(wallet, action, is_mainnet):
         is_mainnet,
     )
 
+def sign_spot_send(wallet, action, is_mainnet):
+    action["signatureChainId"] = "0x66eee"
+    action["hyperliquidChain"] = "Mainnet" if is_mainnet else "Testnet"
+    return sign_user_signed_action(
+        wallet,
+        action,
+        [
+            {"name": "hyperliquidChain", "type": "string"},
+            {"name": "destination", "type": "string"},
+            {"name": "token", "type": "string"},
+            {"name": "amount", "type": "string"},
+            {"name": "time", "type": "uint64"},
+        ],
+        "HyperliquidTransaction:SpotSend",
+        is_mainnet,
+    )
+
 
 def sign_inner(wallet, data):
     structured_data = encode_structured_data(data)

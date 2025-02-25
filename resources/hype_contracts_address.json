@@ -65,5 +65,16 @@
             }
         ],
         "bridge_address": "0x279c9462fdba349550b49a23de27dd19d5891baa"
+    },
+    "Hyperliquid": {
+        "tokens": [
+            {
+                "symbol": "PURR",
+                "address": "0xc4bf3f870c0e9465323c0b6ed28096c2",
+                "valid_withdrawal_addresses": [
+                    "0x661d6d943bEEA194A9D8217F5C01167E2BE48914"
+                ]
+            }
+        ]
     }
 }
