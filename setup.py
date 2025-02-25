@@ -21,7 +21,7 @@ setuptools.setup(
     install_requires=[
         'msgpack==1.0.8',
         'orjson==3.6.1',
-        "pyutils @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.13.23",
+        "pyutils @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.13.28",
         # workaround; discussion in link below
         # https://auros-group.slack.com/archives/C039ZE7QS56/p1740366619748929
         "kafka-python==2.0.2",

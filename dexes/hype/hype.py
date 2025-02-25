@@ -1,3 +1,4 @@
+from collections import defaultdict
 import concurrent.futures
 import json
 import os
@@ -26,8 +27,10 @@ from web_server import WebServer
 
 from .signing import (OrderWire, order_request_to_order_wire,
                       order_wires_to_order_action, sign_l1_action,
-                      sign_withdraw_from_bridge_action, sign_agent, sign_usd_class_transfer_action)
+                      sign_withdraw_from_bridge_action, sign_agent, sign_usd_class_transfer_action,
+                      sign_spot_send)
 
+HYPERLIQUID = 'Hyperliquid'
 
 class Hype(DexCommon):
     def __init__(
@@ -70,8 +73,13 @@ class Hype(DexCommon):
         server.register("POST", "/private/update-leverage", self.__update_leverage)
         server.register("POST", "/private/spot-to-perp-usdc-transfer", self.__transfer_usdc_from_spot_to_perp)
         server.register("POST", "/private/perp-to-spot-usdc-transfer", self.__transfer_usdc_from_perp_to_spot)
+        server.register("POST", "/private/send-spot-token", self.__transfer_spot_to_external_wallet)
 
     async def start(self, eth_private_key: Union[str, list]):
+        self.__symbol_address = {}
+        self.__hype_withdrawal_address_whitelists_from_res_file = defaultdict(set)
+        self.__tokens_from_res_file = {}
+
         self.__load_whitelist()
 
         def key_generator(keys_list):
@@ -124,21 +132,34 @@ class Hype(DexCommon):
         addresses_whitelists_file_path = f'{file_prefix}/../../resources/hype_contracts_address.json'
         self._logger.debug(f'Loading addresses whitelists from {addresses_whitelists_file_path}')
         with open(addresses_whitelists_file_path, 'r') as contracts_address_file:
-            contracts_address_json = json.load(contracts_address_file)[self.__chain_name]
+            contracts_address_json = json.load(contracts_address_file)
 
-            tokens_list_json = contracts_address_json["tokens"]
-            self.__tokens_from_res_file = {}
-            for token_json in tokens_list_json:
-                symbol = token_json["symbol"]
-                if symbol in self._withdrawal_address_whitelists_from_res_file:
-                    raise RuntimeError(f'Duplicate token : {symbol} in contracts_address file')
-                for withdrawal_address in token_json["valid_withdrawal_addresses"]:
-                    self._withdrawal_address_whitelists_from_res_file[symbol].add(Web3.to_checksum_address(withdrawal_address))
+            chain_data = contracts_address_json[self.__chain_name]
 
-                if symbol != self.__native_token:
-                    self.__tokens_from_res_file[symbol] = ERC20Token(token_json["symbol"], Web3.to_checksum_address(token_json["address"]))
+            self._withdrawal_address_whitelists_from_res_file = self.__process_tokens(chain_data["tokens"], self.__chain_name)
 
-            self.bridge_address = Web3.to_checksum_address(contracts_address_json["bridge_address"])
+            self.bridge_address = Web3.to_checksum_address(chain_data["bridge_address"])
+
+            hyperliquid_chain_data = contracts_address_json[HYPERLIQUID]
+
+            self.__hype_withdrawal_address_whitelists_from_res_file = self.__process_tokens(hyperliquid_chain_data["tokens"], HYPERLIQUID)
+
+    def __process_tokens(self, tokens_list_json, chain):
+        withdraw_whitelist = defaultdict(set)
+        for token_json in tokens_list_json:
+            symbol = token_json["symbol"]
+            if symbol in withdraw_whitelist:
+                raise RuntimeError(f'Duplicate token : {symbol} in contracts_address file')
+
+            if chain == HYPERLIQUID:
+                self.__symbol_address[symbol] = token_json['address']
+
+            for withdrawal_address in token_json["valid_withdrawal_addresses"]:
+                    withdraw_whitelist[symbol].add(Web3.to_checksum_address(withdrawal_address))
+
+            if symbol != self.__native_token and chain == self.__chain_name :
+                self.__tokens_from_res_file[symbol] = ERC20Token(token_json["symbol"], Web3.to_checksum_address(token_json["address"]))
+        return withdraw_whitelist
 
     # We don't need to do anything special on a new client connection
     async def on_new_connection(self, _):
@@ -665,4 +686,82 @@ class Hype(DexCommon):
             self._logger.exception(f'Failed to transfer: %r', e)
             self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': str(e)}}
-    
+
+    async def __transfer_spot_to_external_wallet(self,  path: str,
+        params: dict,
+        received_at_ms: int):
+        try:
+            str_amount = str(params['amount'])
+            client_request_id = params['client_request_id']
+            destination = params['destination']
+            token = params['token']
+
+            ok, reason = self.__allow_spot_withdraw(client_request_id, token, destination)
+            if not ok:
+                return 400, {'error': {'message': reason}}
+
+            if self.vault_address:
+                str_amount += f" subaccount:{self.vault_address}"
+            timestamp = int(time.time() * 1000)
+            action = {
+                "type": "spotSend",
+                "token": f"{token}:{self.__symbol_address[token]}",
+                "amount": str_amount,
+                "time": timestamp,
+                "destination": destination
+            }
+
+            if self._request_cache.get(client_request_id) is not None:
+                return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
+
+            signature = sign_spot_send(self._api._account, action, self.is_mainnet)
+
+            amount = Decimal(params['amount'])
+
+            transfer = TransferRequest(
+                client_request_id=client_request_id,
+                symbol=token,
+                amount=amount,
+                # Leaving this empty as the `address_to` is hardcoded in the
+                # pyutils api call and is our l2 account address
+                address_to="",
+                gas_limit=0,
+                request_path=path,
+                received_at_ms=received_at_ms)
+
+            self._request_cache.add(transfer)
+
+            result = await self._api.send_spot_token(
+                amount=str_amount,
+                timestamp=timestamp,
+                chain="Mainnet" if self.is_mainnet else "Testnet",
+                signature_chain_id='0x66eee',
+                signature=signature,
+                destination=destination,
+                token=f"{token}:{self.__symbol_address[token]}"
+            )
+            if result['status'] == 'ok':
+                self._request_cache.finalise_request(client_request_id, RequestStatus.SUCCEEDED)
+                return 200, {'status': 'ok'}
+            else:
+                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+                return 400, {'error': {'code': result['status'], 'message': result}}
+        except Exception as e:
+            self._logger.exception(f'Failed to Spot Send: %r', e)
+            self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+            return 400, {'error': {'message': str(e)}}
+
+    def __allow_spot_withdraw(self, client_request_id, symbol, address_to):
+        if symbol not in self.__hype_withdrawal_address_whitelists_from_res_file:
+            self._logger.error(
+                f'HIGH ALERT: client_request_id={client_request_id} tried to withdraw unknown token={symbol}')
+            return False, f'Unknown token={symbol}'
+
+        assert address_to is not None
+        if Web3.to_checksum_address(address_to) not in self.__hype_withdrawal_address_whitelists_from_res_file[symbol]:
+            self._logger.error(
+                f'HIGH ALERT: client_request_id={client_request_id} tried to withdraw token={symbol} '
+                f'to unknown address={address_to}')
+            return False, f'Unknown withdrawal_address={address_to} for token={symbol}'
+
+        return True, ''
