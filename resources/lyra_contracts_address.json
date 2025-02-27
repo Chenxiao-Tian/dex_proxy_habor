@@ -128,6 +128,25 @@
                     "symbol": "RSETH",
                     "l1_token_address": "0xA1290d69c65A6Fe4DF752f95823fae25cB99e5A7",
                     "l2_token_address": "0xc47e2E800a9184cFbD274AC1eeCcCDF942715dB7"
+                },
+                {
+                    "symbol": "SOLVBTC",
+                    "l1_token_address": "0x7a56e1c57c7475ccf742a1832b028f0456652f97",
+                    "l2_token_address": "0xCFB66706ae87F60120aF42F07eC8940bE44a34d6"
+                },
+                {
+                    "symbol": "SOLVBTCBBN",
+                    "l1_token_address": "0xd9D920AA40f578ab794426F5C90F6C731D159DEf",
+                    "l2_token_address": "0x7755C4529017CA8069f57B19E450FFaf128048A6"
+                },
+                {
+                    "symbol": "LBTC",
+                    "l1_token_address": "0x8236a87084f8B84306f72007F36F2618A5634494",
+                    "l2_token_address": "0x36b5C126A3D7B25F6032653A0d18823Ee48a890e"
+                },
+                {
+                    "symbol": "STDRV",
+                    "l2_token_address": "0x7499d654422023a407d92e1D83D387d81BC68De1"
                 }
             ]
         },
@@ -390,6 +409,10 @@
                 "l2_layerzero_bridge_address": "0x3FBFD80EF7591658d1D7DdEC067F413eFd6f985c",
                 "l1_layerzero_chain_eid": 40161,
                 "l2_layerzero_chain_eid": 40308
+              },
+              {
+                "symbol": "STDRV",
+                "l2_token_address": "0xbe9dbda519e15a1c0d238cea0b3dad47a484a6ff"
               }
           ]
         },
