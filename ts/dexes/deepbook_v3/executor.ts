@@ -91,7 +91,12 @@ export class Executor {
 
       if (
         errorStr.includes("Transaction timed out before reaching finality") ||
-        errorStr.includes("equivocated until the next epoch")
+        errorStr.includes("equivocated until the next epoch") ||
+        // Not necessary that the gas coin is locked (maybe balance manager or something else is locked)
+        // but it is the case almost always. So skip the gas coin for this epoch.
+        errorStr.includes(
+          "one or more of its objects is reserved for another transaction"
+        )
       ) {
         skipGasCoinUntilNextEpoch = true;
       }
