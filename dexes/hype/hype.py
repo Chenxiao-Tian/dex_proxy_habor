@@ -280,25 +280,16 @@ class Hype(DexCommon):
             self._logger.exception(f'Failed to cancel all: %r', e)
             return 400, {'error': {'message': str(e)}}
 
-    def __assert_cancel_order_by_ex_oid_schema(self, received_keys: list) -> None:
-        expected_keys = [
-            "asset",
-            "oid"
-        ]
+    def __assert_cancel_order_by(self, by_what: str, id_name: str, received_keys: list) -> None:
+        assert len(received_keys) == 2, f"Sign Cancel by {by_what} request must contain exactly 2 fields ('{id_name}' and 'asset' or 'coin'), received: {received_keys}."
+        assert id_name in received_keys, f"Missing field '{id_name}' in the Sign Cancel by {by_what} request, received: {received_keys}."
+        assert 'asset' in received_keys or 'coin' in received_keys, f"Missing field 'asset' or 'coin' in the Sign Cancel by {by_what} request, received: {received_keys}."
 
-        assert len(received_keys) == len(expected_keys), f"Sign cancel Request does not contain the correct set of fields. Expected [{', '.join(expected_keys)}]"
-        for key in expected_keys:
-            assert key in received_keys, f"Missing field({key}) in the Sign Cancel by ExchangeOrderId request"
+    def __assert_cancel_order_by_ex_oid_schema(self, received_keys: list) -> None:
+        self.__assert_cancel_order_by("ExchangeOrderId", "oid", received_keys)
 
     def __assert_cancel_order_by_cl_oid_schema(self, received_keys: list) -> None:
-        expected_keys = [
-            "asset",
-            "cloid"
-        ]
-
-        assert len(received_keys) == len(expected_keys), f"Sign cancel Request does not contain the correct set of fields. Expected [{', '.join(expected_keys)}]"
-        for key in expected_keys:
-            assert key in received_keys, f"Missing field({key}) in the Sign Cancel by ClientOrderId request"
+        self.__assert_cancel_order_by("ClientOrderId", "cloid", received_keys)
 
     def __assert_update_leverage(self, received_keys: list) -> None:
         expected_keys = [
@@ -330,7 +321,7 @@ class Hype(DexCommon):
             "type": "cancel",
             "cancels": [
                 {
-                    "a": order["asset"],
+                    "a": order["asset"] if "asset" in order else self.coin_to_asset[order["coin"]],
                     "o": order["oid"]
                 }
                 for order in orders
@@ -342,7 +333,7 @@ class Hype(DexCommon):
             "type": "cancelByCloid",
             "cancels": [
                 {
-                    "asset": order["asset"],
+                    "asset": order["asset"] if "asset" in order else self.coin_to_asset[order["coin"]],
                     "cloid": order["cloid"]
                 }
                 for order in orders
