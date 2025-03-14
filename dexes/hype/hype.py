@@ -40,7 +40,7 @@ class Hype(DexCommon):
         self.order_req_id = 0
         self.bridge_address = None
         self.vault_address = None
-        self.coin_to_asset = None
+        self.coin_to_asset = dict()
         self.is_mainnet = False
 
         self.__register_endpoints(server)
@@ -100,7 +100,6 @@ class Hype(DexCommon):
 
         self._logger.info(f"wallet_address={self._api._wallet_address}")
 
-        await self.coin_definitions()
         self.pantheon.spawn(self.reload_coin_definitions_loop())
 
         await super().start(default_key)
@@ -111,21 +110,33 @@ class Hype(DexCommon):
         self.started = True
 
     async def coin_definitions(self):
-        meta_info = await self._api.get_swaps_meta_info()
-        previous_coin_definitions_count = len(self.coin_to_asset) if self.coin_to_asset is not None else 0
-        self.coin_to_asset = {asset_info["name"]: asset for (asset, asset_info) in enumerate(meta_info['universe'])}
-        self._logger.debug(f'Loaded {len(self.coin_to_asset)} definitions')
-        if previous_coin_definitions_count != 0 and previous_coin_definitions_count != len(self.coin_to_asset):
-            self._logger.debug(f'Coin definitions count changed: old value {previous_coin_definitions_count}')
+        # https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/exchange-endpoint#asset
+
+        previous_coin_definitions_count = len(self.coin_to_asset)
+
+        swap_meta_info = await self._api.get_swaps_meta_info()
+        spot_meta_info = await self._api.get_spot_meta_info()
+
+        self.coin_to_asset = {asset_info["name"]: asset for (asset, asset_info) in enumerate(swap_meta_info['universe'])}
+        self.coin_to_asset.update({asset_info["name"]: 1000 + asset for (asset, asset_info) in enumerate(spot_meta_info['universe'])})
+
+        self._logger.debug(f'Coin definitions count: {previous_coin_definitions_count} -> {len(self.coin_to_asset)}')
+        self._logger.debug(f"all coins: {self.coin_to_asset}")
 
     async def reload_coin_definitions_loop(self):
         while True:
-            await self.pantheon.sleep(self.__reload_coin_definitions_interval_s)
             try:
                 await self.coin_definitions()
-                self._logger.debug('Coin definitions reloaded')
             except Exception as ex:
                 self._logger.exception(f'Failed to reload coin definitions: %r', ex)
+
+            await self.pantheon.sleep(self.__reload_coin_definitions_interval_s)
+
+    def get_asset(self, coin: str):
+        if coin not in self.coin_to_asset:
+            self._logger.debug(f"received unknown coin: {coin}")
+            return -1
+        return self.coin_to_asset[coin]
 
     def __load_whitelist(self):
         file_prefix = os.path.dirname(os.path.realpath(__file__))
@@ -317,27 +328,37 @@ class Hype(DexCommon):
         for key in expected_keys: assert key in received_keys, f"Missing field({key}) in the request"
 
     def __create_cancel_by_ex_oid_action(self, orders: list[dict]) -> dict:
+        cancels = []
+        for order in orders:
+            asset = order["asset"] if "asset" in order else self.get_asset(order["coin"])
+            if asset < 0:
+                self._logger.debug(f"Skipping to cancel by ex oid order {json.dumps(order)}, unknown coin")
+                continue
+            cancels.append({
+                "a": asset,
+                "o": order["oid"]
+            })
+
         return {
             "type": "cancel",
-            "cancels": [
-                {
-                    "a": order["asset"] if "asset" in order else self.coin_to_asset[order["coin"]],
-                    "o": order["oid"]
-                }
-                for order in orders
-            ]
+            "cancels": cancels
         }
 
     def __create_cancel_by_cl_oid_action(self, orders: list[dict]) -> dict:
+        cancels = []
+        for order in orders:
+            asset = order["asset"] if "asset" in order else self.get_asset(order["coin"])
+            if asset < 0:
+                self._logger.debug(f"Skipping to cancel by cl oid order {json.dumps(order)}, unknown coin")
+                continue
+            cancels.append({
+                "asset": asset,
+                "cloid": order["cloid"]
+            })
+
         return {
             "type": "cancelByCloid",
-            "cancels": [
-                {
-                    "asset": order["asset"] if "asset" in order else self.coin_to_asset[order["coin"]],
-                    "cloid": order["cloid"]
-                }
-                for order in orders
-            ]
+            "cancels": cancels
         }
 
     async def __sign_cancel_order_request(
@@ -420,7 +441,13 @@ class Hype(DexCommon):
         self.__assert_update_leverage(list(params.keys()))
 
         coin = params['coin']
-        asset_index = self.coin_to_asset[coin]
+
+        asset_index = self.get_asset(coin)
+        if asset_index < 0:
+            err_msg = f"received unknown coin for updating leverage: {json.dumps(params)}"
+            self._logger.debug(err_msg)
+            return 400, {'error': err_msg}
+
         is_cross = params['is_cross']
         leverage = int(params['leverage'])
         timestamp = int(time.time() * 1000)
@@ -500,7 +527,7 @@ class Hype(DexCommon):
                 return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
 
             amount = str(params['amount'])
-            
+
             transfer = TransferRequest(
                 client_request_id=client_request_id,
                 symbol=symbol,
@@ -601,14 +628,14 @@ class Hype(DexCommon):
             self._logger.exception(f'Failed to transfer: %r', e)
             self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': str(e)}}
-        
+
 
     async def __transfer_usdc_from_spot_to_perp(self,
         path: str,
         params: dict,
         received_at_ms: int) -> Tuple[int, dict]:
         return await self.__transfer_usdc_between_spot_and_perp_util(path, params, received_at_ms, True)
-    
+
     async def __transfer_usdc_from_perp_to_spot(self,
         path: str,
         params: dict,
@@ -635,10 +662,10 @@ class Hype(DexCommon):
                 "nonce": timestamp,
             }
             client_request_id = params['client_request_id']
-            
+
             if self._request_cache.get(client_request_id) is not None:
                 return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
-            
+
             signature = sign_usd_class_transfer_action(self._api._account, action, self.is_mainnet)
 
             amount = Decimal(params['amount'])
@@ -665,7 +692,7 @@ class Hype(DexCommon):
                 signature_chain_id='0x66eee',
                 signature=signature,
                 to_perp=to_perp
-            )  
+            )
 
             if result['status'] == 'ok':
                 self._request_cache.finalise_request(client_request_id, RequestStatus.SUCCEEDED)
