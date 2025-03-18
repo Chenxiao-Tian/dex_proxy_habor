@@ -103,6 +103,8 @@ stages:
     ENVIRONMENT:  prod
   - PROCESS_NAME: dex_proxy-vert-1
     ENVIRONMENT:  prod
+  - PROCESS_NAME: dex_proxy-vert-test-1
+    ENVIRONMENT:  dev
 
 
 # Some applications are only containerised, and not enclaved. Supported keys:
