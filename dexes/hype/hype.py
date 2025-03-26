@@ -110,17 +110,10 @@ class Hype(DexCommon):
         self.started = True
 
     async def coin_definitions(self):
-        # https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/exchange-endpoint#asset
-
         previous_coin_definitions_count = len(self.coin_to_asset)
+        self.coin_to_asset = await self._api.get_coin_to_asset()
 
-        swap_meta_info = await self._api.get_swaps_meta_info()
-        spot_meta_info = await self._api.get_spot_meta_info()
-
-        self.coin_to_asset = {asset_info["name"]: asset for (asset, asset_info) in enumerate(swap_meta_info['universe'])}
-        self.coin_to_asset.update({asset_info["name"]: 1000 + asset for (asset, asset_info) in enumerate(spot_meta_info['universe'])})
-
-        self._logger.debug(f'Coin definitions count: {previous_coin_definitions_count} -> {len(self.coin_to_asset)}')
+        self._logger.debug(f'Coin definitions count change: {previous_coin_definitions_count} -> {len(self.coin_to_asset)}')
         self._logger.debug(f"all coins: {self.coin_to_asset}")
 
     async def reload_coin_definitions_loop(self):
