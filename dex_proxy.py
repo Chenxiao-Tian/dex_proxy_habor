@@ -7,7 +7,7 @@ from collections import defaultdict
 from pantheon import Pantheon, StandardArgParser
 
 from web_server import WebServer
-from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex, UniswapV3Arb, Lyra, Per, Hype, Native
+from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex, UniswapV3Arb, Lyra, Per, Hype, Native, Vert
 
 from eth_account import Account
 
@@ -62,6 +62,8 @@ class DexProxy:
             self.__exchange = Hype(pantheon, dex_config, self.__server, self)
         elif name == 'native':
             self.__exchange = Native(pantheon, dex_config, self.__server, self)
+        elif name == 'vert':
+            self.__exchange = Vert(pantheon, dex_config, self.__server, self)
         else:
             raise Exception(f'Exchange {name} not supported')
 
