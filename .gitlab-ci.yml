@@ -101,7 +101,9 @@ stages:
     ENVIRONMENT:  prod
   - PROCESS_NAME: dex_proxy-uni3-arb-1
     ENVIRONMENT:  prod
-  - PROCESS_NAME: dex_proxy-vert-1
+  - PROCESS_NAME: dex_proxy-vert-1-sonic
+    ENVIRONMENT:  prod
+  - PROCESS_NAME: dex_proxy-vert-1-arbitrum
     ENVIRONMENT:  prod
   - PROCESS_NAME: dex_proxy-vert-test-1
     ENVIRONMENT:  dev
