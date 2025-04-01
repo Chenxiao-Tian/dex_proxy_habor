@@ -32,7 +32,7 @@
     },
     "Sonic Mainnet": {
         "subaccounts": {
-            "vertex_1s1": "0x1c574bf92ae7c274efcf5395c9eee275c0c2b1d1000000000000000000000001"
+            "vertex_1s1_sonic": "0x1c574bf92ae7c274efcf5395c9eee275c0c2b1d1000000000000000000000001"
         },
         "tokens": [
             {
