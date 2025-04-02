@@ -6,7 +6,7 @@ import traceback
 
 from pyutils.exchange_apis.dex_common import RequestType, RequestStatus, ErrorType, TransferRequest, ApproveRequest
 from pyutils.exchange_apis.vertex_api import Collateral
-from pyutils.exchange_apis.utils.vertex_signature_generator import get_sender_binary32
+from pyutils.exchange_apis.utils.vertex_signature_generator import EIP712Types
 
 from web3 import Web3
 
@@ -70,6 +70,15 @@ class Vert(DexCommon):
             # Load subaccount whitelist
             whitelisted_subaccounts_json = addresses_whitelists_json["subaccounts"]
             for sub_alias, sub_id in whitelisted_subaccounts_json.items():
+                # validate that sub_id is a valid 66 symbols long hex string
+                if not sub_id.startswith("0x"):
+                    sub_id = '0x' + sub_id
+                if len(sub_id) != 66:
+                    raise RuntimeError(f"Exchange subaccount invalid : {sub_id}")
+                # try to convert from hex to make sure that there is no exception generated
+                Web3.to_bytes(hexstr=sub_id)
+
+                self._logger.debug(f"Adding mapping: {sub_alias}: {sub_id}")
                 self.__whitelisted_subaccounts[sub_alias] = sub_id
 
             # Load token details
@@ -411,19 +420,23 @@ class Vert(DexCommon):
             return 400, {"error": {"message": str(e)}}
 
     async def __get_chain_name(self, path: str, params: dict, received_at_ms: int):
-        return 200, {'chain': self.__chain_name}
+        return 200, {'chain': self.__chain_name, "accounts": self.__whitelisted_subaccounts}
 
     async def __get_ws_auth_signature(self, path: str, params: dict, received_at_ms: int):
         try:
+            assert 'sender' in params, 'Missing sender field'
+            assert 'expiration' in params, 'Missing expiration field'
+
             expiration_timestamp = params['expiration']
-            account_name = params['account'] if 'account' in params else 'default'
+            sender = params['sender']
 
-            if 'chain_name' in params:
-                chain_name = params['chain_name']
-                if chain_name != self.__chain_name:
-                    raise Exception(f'DEX is for chain {self.__chain_name}. {chain_name} is not supported')
+            message_to_sign = {
+                'sender': Web3.to_bytes(hexstr=sender),
+                'expiration': expiration_timestamp
+            }
 
-            signature = self._api.generate_auth_signature(account_name, expiration_timestamp)
+            signature = self._api.signature_generator.generate_signature(EIP712Types.AUTHENTICATE_STREAM, message_to_sign)
+
             return 200, {"signature": signature}
 
         except Exception as e:
@@ -436,13 +449,13 @@ class Vert(DexCommon):
             assert 'expiration' in params, 'Missing expiration field'
             assert 'nonce' in params, 'Missing nonce field'
             assert 'product_id' in params, 'Missing product_id field'
+            assert 'sender' in params, 'Missing sender field'
 
-            account_name = params['account'] if 'account' in params else 'default'
+            sender = params['sender']
             product_id = int(params['product_id'])
 
             order_message = {
-                'sender': get_sender_binary32(address=self._api._wallet_address,
-                                              account_name=account_name),
+                'sender': Web3.to_bytes(hexstr=sender),
                 'priceX18': int(params['price']),
                 'amount': int(params['amount']),
                 'expiration': int(params['expiration']),
