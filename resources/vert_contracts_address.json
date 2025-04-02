@@ -1,6 +1,6 @@
 {
     "Arbitrum Mainnet": {
-        "subaccounts": [],
+        "subaccounts": {},
         "tokens": [
             {
                 "name": "USDC",
