@@ -330,6 +330,135 @@
                 ]
             }
         ],
+        "lyra_chain_tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                ]
+            },
+            {
+                "symbol": "WETH",
+                "valid_withdrawal_addresses": [
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "valid_withdrawal_addresses": [
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                ]
+            },
+            {
+                "symbol": "WSTETH",
+                "valid_withdrawal_addresses": [
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                ]
+            }
+        ],
+        "whitelisted_bidding_wallets": [ "0xb4c4BbD9974D7F4D6e0814A7f9aA1f018F032818" ],
+        "whitelisted_bidding_subaccount_ids": [ 252, 253, 5303, 5304, 23711 ]
+    },
+    "Arbitrum Mainnet": {
+        "bridge_details": {
+            "matching_address": "0xeB8d770ec18DB98Db922E9D83260A585b9F0DeAD",
+            "__cash_addresses_details": "https://github.com/derivexyz/v2-core/blob/4bafa4c252b64bdc7fdcc75e2e1a90f1a13f943b/deployments/957",
+            "cash_addresses": {
+                "USDC": "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
+                "WSTETH": "0x69c7AADFfD607F74eE610f047f552CaDecabca4E",
+                "WETH": "0xE201fCEfD4852f96810C069f66560dc25B2C7A55",
+                "WBTC": "0x7da2D398dddDfC946Efd2C758c4688D21887790d",
+                "USDT": "0x5E72430EC945CCc183c34e2860FFC2b5bac712c2",
+                "DRV": "0x1Abdb2896e57047fD989af7B3Ee6B7e81830F8D2",
+                "WEETH": "0xF30EE744fCfd135A135E6a4e327e01d0f697e6Ec",
+                "DAI": "0x67bB0B7c87Df9C5C433ac7eCADfa7396A2927fcF",
+                "USDE": "0x028B9fFA86fc4c366e11AA8b3E71dc0502713ABF",
+                "CBBTC": "0xC1efE4c45B79250A29A5Dc66cCADc60DB0FcEEe8",
+                "SUSDE": "0x375804CdcF0D534FDD2657584A7c4Ff5AB14A2bb",
+                "OP": "0xDaffF9B244327d09dde1dDFcf9981ef0Df2D1568",
+                "RSETH": "0x35fdB6e79c05809ba6Dc3B2EF5FF7D0BB5D75020"
+            },
+            "deposit_module_address": "0x9B3FE5E5a3bcEa5df4E08c41Ce89C4e3Ff01Ace3",
+            "withdraw_module_address": "0x9d0E8f5b25384C7310CB8C6aE32C8fbeb645d083",
+            "transfer_module_address": "0x01259207A40925b794C8ac320456F7F6c8FE2636",
+            "trade_module_address": "0xB8D20c2B7a1Ad2EE33Bc50eF10876eD3035b5e7b",
+            "rfq_module_address": "0x9371352CCef6f5b36EfDFE90942fFE622Ab77F1D",
+            "subaccount_module_address": "0xE7603DF191D699d8BD9891b821347dbAb889E5a5",
+            "action_typehash": "0x4d7a9f27c403ff9c0f19bce61d76d82f9aa29f8d6d4b0c5474607d9770d1af17",
+            "domain_separator": "0xd96e5f90797da7ec8dc4e276260c7f3f87fedf68775fbe1ef116e996fc60441b",
+            "risk_manager_addresses": {
+                "SM": "0x28c9ddF9A3B29c2E6a561c1BC520954e5A33de5D",
+                "PM_BTC": "0x45DA02B9cCF384d7DbDD7b2b13e705BADB43Db0D",
+                "PM_ETH": "0xe7cD9370CdE6C9b5eAbCe8f86d01822d3de205A0"
+            },
+            "tokens": [
+                {
+                    "symbol": "WETH",
+                    "bridge_type": "socket_v1",
+                    "l1_token_address": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+                    "l2_token_address": "0x15CEcd5190A43C7798dD2058308781D0662e678E",
+                    "l1_socket_bridge_address": "0x8e9f58E6c206CB9C98aBb9F235E0f02D65dFc922",
+                    "l1_socket_bridge_connector_address": "0x3809150509df79D96334c4EB6Ba1c386827C3c67",
+                    "l2_socket_bridge_address": "0x92728d330d024b19332419D5c5aa59887A2862d6",
+                    "l2_socket_bridge_connector_address": "0xE49B4fE6F37e1814520E529eC1A7A9AC118ec77d"
+                },
+                {
+                    "__comment": "Connector points to the USDC.e connector so we will receive USDC.e on Arbitrum if we bridge USDC out",
+                    "symbol": "USDC",
+                    "bridge_type": "socket_v1",
+                    "l1_token_address": "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8",
+                    "l2_token_address": "0x6879287835A86F50f784313dBEd5E5cCC5bb8481",
+                    "l2_socket_bridge_address": "0x4C9faD010D8be90Aba505c85eacc483dFf9b8Fa9",
+                    "l2_socket_bridge_connector_address": "0xFc1e42b0C3Ff8d69FBe639a6a674fF5f0FcE778D"
+                },
+                {
+                    "symbol": "WSTETH",
+                    "bridge_type": "socket_v1",
+                    "l1_token_address": "0x5979D7b546E38E414F7E9822514be443A4800529",
+                    "l2_token_address": "0xdf77b286eDa539CCb6326e9eDB86aa69D83108a5",
+                    "l2_socket_bridge_address": "0x760c8D80905dCE001E9f0982F3Eb7722C342DecF",
+                    "l2_socket_bridge_connector_address": "0x122B8c35acC306f89191ceB76FD533620B9C8945"
+                }
+            ]
+        },
+        "tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                ]
+            },
+            {
+                "symbol": "WETH",
+                "valid_withdrawal_addresses": [
+                ]
+            }
+        ],
+        "lyra_chain_tokens":[
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                ]
+            },
+            {
+                "symbol": "WETH",
+                "valid_withdrawal_addresses": [
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "valid_withdrawal_addresses": [
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                ]
+            },
+            {
+                "symbol": "WSTETH",
+                "valid_withdrawal_addresses": [
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                ]
+            }
+        ],
         "whitelisted_bidding_wallets": [ "0xb4c4BbD9974D7F4D6e0814A7f9aA1f018F032818" ],
         "whitelisted_bidding_subaccount_ids": [ 252, 253, 5303, 5304, 23711 ]
     },
@@ -417,6 +546,22 @@
           ]
         },
         "tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            }
+        ],
+        "lyra_chain_tokens":[
             {
                 "symbol": "ETH",
                 "valid_withdrawal_addresses": [

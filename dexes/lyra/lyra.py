@@ -9,6 +9,7 @@ from pantheon import Pantheon
 from pantheon.pantheon_types import Side
 
 # For type annotations
+from collections import defaultdict
 from decimal import Decimal
 from typing import Tuple
 from web3 import Web3
@@ -257,6 +258,7 @@ class Lyra(DexCommon):
 
         self.__bidding_wallet_whitelist = []
         self.__bidding_subaccount_whitelist = []
+        self.__lyra_chain_withdrawal_addresses_whitelist = defaultdict(set)
 
     def __register_endpoints(self, server: WebServer) -> None:
         server.register("POST", "/private/create-account", self.__create_account)
@@ -282,6 +284,7 @@ class Lyra(DexCommon):
 
         server.register("POST", "/private/deposit-into-l2", self.__deposit_into_l2)
         server.register("POST", "/private/withdraw-from-l2", self.__withdraw_from_l2)
+        server.register("POST", "/private/withdraw-to-peer-l2-wallet", self.transfer)
 
         server.register("GET", "/private/get-l2-balance", self.__get_l2_balance)
 
@@ -300,7 +303,12 @@ class Lyra(DexCommon):
         await self.__gas_price_tracker.wait_gas_price_ready()
 
         max_nonce_cached = self._request_cache.get_max_nonce()
+
+        self._logger.info('Initializing nonce for l1 api')
         self._api.initialize_starting_nonce(max_nonce_cached + 1)
+
+        self._logger.info('Initializing nonce for l2 api')
+        self._api.l2_api.initialize_starting_nonce(0)
 
         def __assert(field, field_name) -> None:
             assert field is not None, f"{field_name} is None"
@@ -345,6 +353,15 @@ class Lyra(DexCommon):
                     raise RuntimeError(f"Duplicate token : {symbol} in contracts_address file")
                 for withdrawal_address in token_json["valid_withdrawal_addresses"]:
                     self._withdrawal_address_whitelists_from_res_file[symbol].add(Web3.to_checksum_address(withdrawal_address))
+
+            lyra_tokens_list_json = contracts_address_json.get("lyra_chain_tokens", None)
+            if lyra_tokens_list_json is not None:
+                for token_json in lyra_tokens_list_json:
+                    symbol = token_json["symbol"]
+                    if symbol in self.__lyra_chain_withdrawal_addresses_whitelist:
+                        raise RuntimeError(f"Duplicate lyra chain token : {symbol} in contracts_address file")
+                    for withdrawal_address in token_json["valid_withdrawal_addresses"]:
+                        self.__lyra_chain_withdrawal_addresses_whitelist[symbol].add(Web3.to_checksum_address(withdrawal_address))
 
             whitelisted_bidding_wallets_json = contracts_address_json["whitelisted_bidding_wallets"]
             for address in whitelisted_bidding_wallets_json:
@@ -809,6 +826,21 @@ class Lyra(DexCommon):
     async def _approve(self, request, gas_price_wei: int, nonce: int = None):
         raise Exception(f"The endpoint is not supported in Lyra")
 
+    def __allow_lyra_withdraw(self, client_request_id, symbol, address_to):
+        if symbol not in self.__lyra_chain_withdrawal_addresses_whitelist:
+            self._logger.error(
+                f'HIGH ALERT: client_request_id={client_request_id} tried to withdraw unknown token={symbol} on lyra')
+            return False, f'Unknown token={symbol} on lyra'
+
+        assert address_to is not None
+        if Web3.to_checksum_address(address_to) not in self.__lyra_chain_withdrawal_addresses_whitelist[symbol]:
+            self._logger.error(
+                f'HIGH ALERT: client_request_id={client_request_id} tried to withdraw token={symbol} '
+                f'to unknown address={address_to} on lyra chain')
+            return False, f'Unknown withdrawal_address={address_to} for token={symbol} on lyra chain'
+
+        return True, ''
+
     async def _transfer(
         self, request, gas_price_wei: int, nonce: int = None,
     ):
@@ -816,13 +848,25 @@ class Lyra(DexCommon):
             assert request.address_to is not None
             return await self._api.withdraw(request.symbol, request.address_to, request.amount,
                                             request.gas_limit, gas_price_wei)
+        if request.request_path == "/private/withdraw-to-peer-l2-wallet":
+            assert request.address_to is not None
+
+            self.__mark_as_l2_request(request)
+
+            ok, reason = self.__allow_lyra_withdraw(request.client_request_id, request.symbol,
+                                              request.address_to)
+            if not ok:
+                raise RuntimeError(reason)
+
+            return await self._api.l2_api.withdraw(request.symbol,
+                                                   request.address_to,
+                                                   request.amount,
+                                                   request.gas_limit,
+                                                   gas_price_wei)
         else:
             assert False
 
     async def _amend_transaction(self, request: Request, params, gas_price_wei):
-        if self.__is_l2_request(request):
-            raise Exception("Amending L2 transactions is not supported")
-
         if request.request_type == RequestType.TRANSFER:
             if request.request_path == "/private/withdraw":
                 return await self._api.withdraw(
@@ -831,6 +875,10 @@ class Lyra(DexCommon):
             elif request.request_path == "/private/deposit-into-l2":
                 return await self._api.deposit_into_l2(
                     request.symbol, request.amount, request.gas_limit, gas_price=gas_price_wei, nonce=request.nonce
+                )
+            elif request.request_path == "/private/withdraw-to-peer-l2-wallet":
+                return await self._api.l2_api.withdraw(
+                    request.symbol, request.address_to, request.amount, request.gas_limit, gas_price_wei, nonce=request.nonce
                 )
             else:
                 raise Exception(f"Unsupported request_path={request.request_path} for amending transfer request")

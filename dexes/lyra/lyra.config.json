@@ -92,7 +92,7 @@
                 },
                 "web3": {
                     "l1_http": "https://sepolia.infura.io/v3/d3bf8a4fe2744587bf47459446b7f170",
-                    "l2_http": "https://l2-prod-testnet-0eakp60405.t.conduit.xyz"
+                    "l2_http": "https://rpc-prod-testnet-0eakp60405.t.conduit.xyz"
                 }
             },
             "fireblocks": {
