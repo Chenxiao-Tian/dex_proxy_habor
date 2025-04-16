@@ -35,7 +35,7 @@ class DexCommon(ABC):
 
         self.started = False
 
-        self._config = config
+        self._config: dict = config
         self._server = server
         self._event_sink = event_sink
 

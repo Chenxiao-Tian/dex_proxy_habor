@@ -3,7 +3,6 @@ import json
 import time
 import os
 from decimal import Decimal
-
 from pantheon import Pantheon
 from pantheon.market_data_types import Side
 from pantheon.instruments_source import InstrumentLifecycle, InstrumentsLiveSource, InstrumentUsageExchanges
@@ -12,53 +11,104 @@ from pantheon.market_data_types import InstrumentId
 from pyutils.exchange_apis.uniswapV3_api import *
 from pyutils.exchange_apis.erc20web3_api import ErrorType
 from pyutils.exchange_connectors import ConnectorType
-from pyutils.gas_pricing.eth import GasPriceTracker, PriorityFee
+from pyutils.gas_pricing.eth import PriorityFee
 
 from ..dex_common import DexCommon
+
+
+class OrderInfo:
+    def __init__(self, gas_price_wei: int, base_ccy_qty: Decimal, quote_ccy_qty: Decimal):
+        self.gas_price_wei = gas_price_wei
+        self.base_ccy_qty = base_ccy_qty
+        self.quote_ccy_qty = quote_ccy_qty
 
 
 class UniswapV3(DexCommon):
     CHANNELS = ['ORDER']
 
-    def __init__(self, pantheon: Pantheon, config, server, event_sink):
-        super().__init__(pantheon, ConnectorType.UniswapV3, config, server, event_sink)
-
+    def __init__(self, pantheon: Pantheon, config, server, event_sink, connector_type: ConnectorType):
+        super().__init__(pantheon, connector_type, config, server, event_sink)
         self.msg_queue = asyncio.Queue()
 
         self._server.register('POST', '/private/insert-order', self.__insert_order)
+        self._server.register("POST", "/private/wrap-unwrap-native", self.__wrap_unwrap_native_token)
 
         self.__instruments: InstrumentsLiveSource = None
-        self.__exchange_name = config['exchange_name']
-        self.__chain_name = config['chain_name']
-        self.__native_token = config['native_token']
+        self.__exchange_name = config["name"]
+        self.__chain_name = config["chain_name"]
+        self.__native_token = config["native_token"]
+        self.__contract_addresses_file_path = config["resources_file_path"]
+        self.__txn_gas_limit = 10000000
+        # 0.01 GWEI usually.
+        self.__base_block_gas_price = 10_000_000_000
+        self.__tx_hash_to_order_info: Dict[str, OrderInfo] = {}
 
-        self.__gas_price_tracker = GasPriceTracker(pantheon, config['gas_price_tracker'])
+    def __split_symbol_to_base_quote_ccy(self, symbol):
+        instrument = self.__instruments.get_instrument(
+            InstrumentId(self.__exchange_name, symbol))
+        return instrument.base_currency, instrument.quote_currency, instrument
+
+    async def __send_order_on_chain(self, request: OrderRequest, gas_price_wei: int) -> ApiResult:
+        """
+            Sends transaction to chain for given client_request_id
+        """
+        base_ccy_symbol, quote_ccy_symbol, _ = self.__split_symbol_to_base_quote_ccy(request.symbol)
+        side = request.side
+        client_request_id = request.client_request_id
+        try:
+            nonce = await self._api.get_next_nonce_to_use()
+            self._logger.debug(f"Fetched Nonce :{nonce}, Client Request Id: {client_request_id}")
+            if side == Side.BUY:
+                result = await self._api.swap_exact_output_single(
+                    token_in_symbol=quote_ccy_symbol, token_out_symbol=base_ccy_symbol,
+                    token_in_max_amount=request.quote_ccy_qty,
+                    token_out_amount=request.base_ccy_qty, fee=request.fee_rate,
+                    deadline=request.deadline_since_epoch_s,
+                    gas_limit=request.gas_limit, gas_price=gas_price_wei, nonce=nonce)
+            else:
+                result = await self._api.swap_exact_input_single(
+                    token_in_symbol=base_ccy_symbol, token_out_symbol=quote_ccy_symbol,
+                    token_in_amount=request.base_ccy_qty,
+                    token_out_min_amount=request.quote_ccy_qty, fee=request.fee_rate,
+                    deadline=request.deadline_since_epoch_s,
+                    gas_limit=request.gas_limit, gas_price=gas_price_wei, nonce=nonce)
+            if result.error_type == ErrorType.NO_ERROR:
+                self._api.update_next_nonce_to_use(nonce + 1)
+        finally:
+            self._api.nonce_lock_release()
+
+        return result
+
+    def __parse_params_to_order(self, params: dict, received_at_ms: int) -> OrderRequest:
+        """
+            Parse params to construct OrderRequest obj
+        """
+        client_request_id = params['client_request_id']
+        symbol = params['symbol']
+        base_ccy_qty = Decimal(params['base_ccy_qty'])
+        quote_ccy_qty = Decimal(params['quote_ccy_qty'])
+        assert params['side'] == 'BUY' or params['side'] == 'SELL', 'Unknown order side'
+        side = Side.BUY if params['side'] == 'BUY' else Side.SELL
+        fee_rate = int(params['fee_rate'])
+        gas_limit = self.__txn_gas_limit
+
+        timeout_s = None
+        if 'timeout_s' in params:
+            timeout_s = int(time.time() + params['timeout_s'])
+
+        order = OrderRequest(client_request_id, symbol, base_ccy_qty,
+                             quote_ccy_qty, side, fee_rate, gas_limit, timeout_s, received_at_ms)
+        return order
 
     async def __insert_order(self, path, params: dict, received_at_ms):
         client_request_id = ''
         try:
             client_request_id = params['client_request_id']
-
+            gas_price_wei = int(params['gas_price_wei'])
             if self._request_cache.get(client_request_id) is not None:
                 return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
-
-            symbol = params['symbol']
-            base_ccy_qty = Decimal(params['base_ccy_qty'])
-            quote_ccy_qty = Decimal(params['quote_ccy_qty'])
-            assert params['side'] == 'BUY' or params['side'] == 'SELL', 'Unknown order side'
-            side = Side.BUY if params['side'] == 'BUY' else Side.SELL
-            fee_rate = int(params['fee_rate'])
-            gas_price_wei = int(params['gas_price_wei'])
-            gas_limit = 500000  # TODO: Check for the most suitable value
-            timeout_s = int(time.time() + params['timeout_s'])
-
-            instrument = self.__instruments.get_instrument(InstrumentId(self.__exchange_name, symbol))
-            base_ccy_symbol = instrument.base_currency
-            quote_ccy_symbol = instrument.quote_currency
-
-            order = OrderRequest(client_request_id, symbol, base_ccy_qty,
-                                 quote_ccy_qty, side, fee_rate, gas_limit, timeout_s, received_at_ms)
-
+            order = self.__parse_params_to_order(params, received_at_ms)
+            base_ccy_symbol, quote_ccy_symbol, instrument = self.__split_symbol_to_base_quote_ccy(order.symbol)
             self._logger.debug(f'Inserting={order}, gas_price_wei={gas_price_wei}')
             self._request_cache.add(order)
 
@@ -67,19 +117,12 @@ class UniswapV3(DexCommon):
                 self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'message': reason}}
 
-            if (not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol)):
-                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+            if not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol):
+                self._request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'message': 'unexpected instrument native code'}}
 
-            if side == Side.BUY:
-                result = await self._api.swap_exact_output_single(
-                    quote_ccy_symbol, base_ccy_symbol, quote_ccy_qty, base_ccy_qty, fee_rate, timeout_s,
-                    gas_limit, gas_price_wei)
-            else:
-                result = await self._api.swap_exact_input_single(
-                    base_ccy_symbol, quote_ccy_symbol, base_ccy_qty, quote_ccy_qty, fee_rate, timeout_s,
-                    gas_limit, gas_price_wei)
-
+            result = await self.__send_order_on_chain(order, gas_price_wei)
             if result.error_type == ErrorType.NO_ERROR:
                 order.order_id = result.tx_hash
                 order.nonce = result.nonce
@@ -87,6 +130,8 @@ class UniswapV3(DexCommon):
                 order.used_gas_prices_wei.append(gas_price_wei)
 
                 self._transactions_status_poller.add_for_polling(result.tx_hash, client_request_id, RequestType.ORDER)
+                self.__tx_hash_to_order_info[result.tx_hash] = OrderInfo(gas_price_wei, order.base_ccy_qty,
+                                                                         order.quote_ccy_qty)
                 self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
 
                 return 200, {'result': {'tx_hash': result.tx_hash, 'nonce': result.nonce}}
@@ -97,10 +142,64 @@ class UniswapV3(DexCommon):
         except Exception as e:
             self._logger.exception(f'Failed to insert order: %r', e)
             self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+            self.__orders_pre_finalisation_clean_up(order)
             return 400, {'error': {'message': repr(e)}}
 
     async def _cancel_all(self, path, params, received_at_ms):
-        return await super()._cancel_all(path, params, received_at_ms)
+        try:
+            assert params['request_type'] in ['ORDER', 'TRANSFER', 'APPROVE'], 'Unknown transaction type'
+            request_type = RequestType[params['request_type']]
+
+            self._logger.debug(f'Canceling all requests, request_type={request_type.name}')
+
+            cancel_requested = []
+            failed_cancels = []
+            # TODO- Latency Improvement - use asyncio.gather()
+            for request in self._request_cache.get_all(request_type):
+                try:
+                    if request.request_status != RequestStatus.PENDING or request.nonce is None:
+                        continue
+                    gas_price_wei = self._get_gas_price(request, priority_fee=PriorityFee.Fast)
+                    if request.request_status == RequestStatus.CANCEL_REQUESTED and \
+                            request.used_gas_prices_wei[-1] >= gas_price_wei:
+                        self._logger.info(
+                            f'Not sending cancel request for client_request_id={request.client_request_id} '
+                            f'as cancel with greater than or equal to the gas_price_wei={gas_price_wei} already in progress')
+                        cancel_requested.append(request.client_request_id)
+                        continue
+
+                    if len(request.used_gas_prices_wei) > 0:
+                        gas_price_wei = max(gas_price_wei, int(1.1 * request.used_gas_prices_wei[-1]))
+
+                    ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
+                    if not ok:
+                        self._logger.error(
+                            f'Not sending cancel request for client_request_id={request.client_request_id}: {reason}')
+                        failed_cancels.append(request.client_request_id)
+                        continue
+
+                    self._logger.debug(f'Canceling={request}, gas_price_wei={gas_price_wei}')
+                    result = await self._cancel_transaction(request, gas_price_wei)
+                    if result.error_type == ErrorType.NO_ERROR:
+                        request.tx_hashes.append((result.tx_hash, RequestType.CANCEL.name))
+                        request.used_gas_prices_wei.append(gas_price_wei)
+                        request.request_status = RequestStatus.CANCEL_REQUESTED
+                        self._transactions_status_poller.add_for_polling(result.tx_hash, request.client_request_id,
+                                                                         RequestType.CANCEL)
+                        self._request_cache.maybe_add_or_update_request_in_redis(request.client_request_id)
+                        cancel_requested.append(request.client_request_id)
+                    else:
+                        failed_cancels.append(request.client_request_id)
+
+                except Exception as ex:
+                    self._logger.exception(f'Failed to cancel request={request.client_request_id}: %r', ex)
+                    failed_cancels.append(request.client_request_id)
+
+            return 400 if failed_cancels else 200, {'cancel_requested': cancel_requested,
+                                                    'failed_cancels': failed_cancels}
+        except Exception as e:
+            self._logger.exception(f'Failed to cancel all: %r', e)
+            return 400, {'error': {'message': str(e)}}
 
     async def _get_all_open_requests(self, path, params, received_at_ms):
         return await super()._get_all_open_requests(path, params, received_at_ms)
@@ -114,51 +213,88 @@ class UniswapV3(DexCommon):
     async def _approve(self, request, gas_price_wei, nonce=None):
         return await self._api.approve(request.symbol, request.amount, request.gas_limit, gas_price_wei, nonce)
 
-    async def _transfer(self, request,gas_price_wei, nonce=None):
+    async def _transfer(self, request, gas_price_wei, nonce=None):
         path = request.request_path
         symbol = request.symbol
         address_to = request.address_to
         amount = request.amount
-        gas_limit = request.gas_limit,
+        gas_limit = request.gas_limit
         if path == '/private/withdraw':
             assert address_to is not None
             return await self._api.withdraw(symbol, address_to, amount, gas_limit, gas_price_wei)
         else:
             assert False
 
-    async def _amend_transaction(self, request, params, gas_price_wei):
+    async def _amend_transaction(self, request: Request, params, gas_price_wei):
+        result: Optional[ApiResult] = None
         if request.request_type == RequestType.ORDER:
+            if request.nonce is None:
+                self._logger.debug(f"Amend requested before setting nonce "
+                                   f"for Client Request Id".format(request.client_request_id))
+
+                return ApiResult(error_type=ErrorType.TRANSACTION_FAILED,
+                                 error_message=f"RETRY. Insert pending for {request.client_request_id}")
+
             instrument = self.__instruments.get_instrument(InstrumentId(self.__exchange_name, request.symbol))
             base_ccy_symbol = instrument.base_currency
             quote_ccy_symbol = instrument.quote_currency
 
-            timeout_s = int(time.time() + params['timeout_s'])
+            timeout_s = None
+            if 'timeout_s' in params:
+                timeout_s = int(time.time() + params['timeout_s'])
             request.deadline_since_epoch_s = timeout_s
 
-            if (not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol)):
+            request.base_ccy_qty = Decimal(params["base_ccy_qty"])
+            request.quote_ccy_qty = Decimal(params["quote_ccy_qty"])
+
+            if not self.__validate_tokens_address(instrument.native_code, base_ccy_symbol, quote_ccy_symbol):
                 ApiResult(error_type=ErrorType.TRANSACTION_FAILED, error_message='unexpected instrument native code')
 
             if request.side == Side.BUY:
-                return await self._api.swap_exact_output_single(
+                result = await self._api.swap_exact_output_single(
                     quote_ccy_symbol, base_ccy_symbol, request.quote_ccy_qty, request.base_ccy_qty, request.fee_rate,
                     timeout_s, request.gas_limit, gas_price_wei, nonce=request.nonce)
             else:
-                return await self._api.swap_exact_input_single(
+                result = await self._api.swap_exact_input_single(
                     base_ccy_symbol, quote_ccy_symbol, request.base_ccy_qty, request.quote_ccy_qty, request.fee_rate,
                     timeout_s, request.gas_limit, gas_price_wei, nonce=request.nonce)
+
+            self.__tx_hash_to_order_info[result.tx_hash] = OrderInfo(gas_price_wei, request.base_ccy_qty,
+                                                                     request.quote_ccy_qty)
         elif request.request_type == RequestType.TRANSFER:
-            return await self._api.withdraw(
-                request.symbol, request.address_to, request.amount, request.gas_limit, gas_price_wei,
-                nonce=request.nonce)
+            result = await self._api.withdraw(request.symbol, request.address_to, request.amount,
+                                              request.gas_limit, gas_price_wei, nonce=request.nonce)
         elif request.request_type == RequestType.APPROVE:
-            return await self._api.approve(request.symbol, request.amount, request.gas_limit, gas_price_wei,
-                                           nonce=request.nonce)
+            result = await self._api.approve(request.symbol, request.amount, request.gas_limit,
+                                             gas_price_wei, nonce=request.nonce)
         else:
             raise Exception('Unsupported request type for amending')
 
-    async def _cancel_transaction(self, request, gas_price_wei):
-        if request.request_type == RequestType.ORDER or request.request_type == RequestType.TRANSFER or request.request_type == RequestType.APPROVE:
-            return await self._api.cancel_transaction(request.nonce, gas_price_wei)
+        if result is not None:
+            if result.error_type == ErrorType.NO_ERROR:
+                self._api.update_next_nonce_to_use(request.nonce + 1)
+        return result
+
+    async def _cancel_transaction(self, request: Request, gas_price_wei):
+        if request.request_type in [RequestType.ORDER, RequestType.TRANSFER, RequestType.APPROVE]:
+            try:
+                if request.nonce is None:
+                    # TODO - Improvement to do early cancellations can be done here
+                    self._logger.debug(f"Cancellation requested before setting nonce "
+                                       f"for Client Request Id".format(request.client_request_id))
+                    return ApiResult(error_type=ErrorType.TRANSACTION_FAILED,
+                                     error_message=f"RETRY. Insert pending for {request.client_request_id}")
+
+                result = await self._api.cancel_transaction(request.nonce, gas_price_wei)
+                if result.error_type == ErrorType.NO_ERROR:
+                    self._api.update_next_nonce_to_use(request.nonce + 1)
+                return result
+            except Exception as e:
+                if len(e.args) and ("message" in e.args[0] and "nonce too low" in e.args[0]["message"]):
+                    return ApiResult(error_type=ErrorType.TRANSACTION_FAILED,
+                                     error_message=f"{request} already mined!")
+                raise e
+
         else:
             raise Exception(f"Cancelling not supported for the {request.request_type}")
 
@@ -166,16 +302,31 @@ class UniswapV3(DexCommon):
         return await self._api.get_transaction_receipt(tx_hash)
 
     def _get_gas_price(self, request, priority_fee: PriorityFee):
-        return self.__gas_price_tracker.get_gas_price(priority_fee=priority_fee)
+        return self.__base_block_gas_price
 
-    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict, mined_tx_hash: str = None):
+    def __populate_orders_dex_specifics(self, order_request: OrderRequest, mined_tx_hash: str):
+        order_info = None
+        if mined_tx_hash:
+            order_info = self.__tx_hash_to_order_info.get(mined_tx_hash)
+        if order_info:
+            order_request.dex_specific["mined_tx_gas_price_wei"] = order_info.gas_price_wei
+            order_request.dex_specific["mined_tx_base_ccy_qty"] = str(order_info.base_ccy_qty)
+            order_request.dex_specific["mined_tx_quote_ccy_qty"] = str(order_info.quote_ccy_qty)
+        else:
+            self._logger.error(f"Did not find order_info for {mined_tx_hash}")
+
+    async def on_request_status_update(self, client_request_id, request_status, tx_receipt: dict,
+                                       mined_tx_hash: str = None):
         request = self.get_request(client_request_id)
-        if (request == None):
+        if request is None:
             return
 
-        if (request_status == RequestStatus.SUCCEEDED and request.request_type == RequestType.ORDER):
+        if request_status == RequestStatus.SUCCEEDED and request.request_type == RequestType.ORDER:
+            self.__populate_orders_dex_specifics(request, mined_tx_hash)
             self.__compute_exec_price(request, tx_receipt)
 
+        if request.request_type == RequestType.ORDER:
+            self.__orders_pre_finalisation_clean_up(request)
         super().on_request_status_update(client_request_id, request_status, tx_receipt, mined_tx_hash)
 
         if request.request_type == RequestType.ORDER:
@@ -219,7 +370,7 @@ class UniswapV3(DexCommon):
                 self._logger.exception(
                     f'Error occurred while handling WS message: %r', e)
 
-    def  __compute_exec_price(self, request: OrderRequest, tx_receipt: dict):
+    def __compute_exec_price(self, request: OrderRequest, tx_receipt: dict):
         try:
             for log in tx_receipt['logs']:
                 topic = Web3.to_hex(log['topics'][0])
@@ -228,29 +379,13 @@ class UniswapV3(DexCommon):
                 if topic == '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67':
                     swap_log = self._api.get_swap_log(log['address'], tx_receipt)
                     self._logger.debug(f'Swap_log={swap_log}')
-                    # https://docs.uniswap.org/contracts/v3/reference/core/interfaces/pool/IUniswapV3PoolEvents#swap
-
-                    # Sample swap_log:
-                    # (AttributeDict({'args': AttributeDict({'sender': '0xE592427A0AEce92De3Edee1F18E0157C05861564',
-                    # 'recipient': '0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB', 'amount0': 100000000000, 'amount1': -332504806775,
-                    # 'sqrtPriceX96': 144687485274156549416468062839, 'liquidity': 580197578039432673188, 'tick': 12045}),
-                    # 'event': 'Swap', 'logIndex': 222, 'transactionIndex': 120, 'transactionHash':
-                    # HexBytes('0x858c864355ca60d342c2b250ed4d641d66f4a922039ce4d2307101d75d5450eb'),
-                    # 'address': '0x03AfDFB6CaBd6BA2a9e54015226F67E9295a9Bea', 'blockHash':
-                    # HexBytes('0xdd5186fa2d0298777165467ddfcc944b073f68a9d1060b332c3fdfa7b5e90fbc'), 'blockNumber': 9065089}),)
-
-                    # positive amount means that the corresponding token is added to the pool while negative amount means corresponding token is taken out of the pool
-
-                    instrument = self.__instruments.get_instrument(
-                        InstrumentId(self.__exchange_name, request.symbol))
-                    base_ccy_symbol = instrument.base_currency
-                    quote_ccy_symbol = instrument.quote_currency
-
+                    base_ccy_symbol, quote_ccy_symbol, instrument = self.__split_symbol_to_base_quote_ccy(
+                        request.symbol)
                     token0_amount = int(swap_log[0]['args']['amount0'])
                     token1_amount = int(swap_log[0]['args']['amount1'])
 
-                    if (request.side == Side.BUY):
-                        if (token0_amount > 0):
+                    if request.side == Side.BUY:
+                        if token0_amount > 0:
                             base_ccy_amount = Decimal(
                                 self._api.from_native_amount(base_ccy_symbol, abs(token1_amount)))
                             quote_ccy_amount = Decimal(
@@ -261,7 +396,7 @@ class UniswapV3(DexCommon):
                             quote_ccy_amount = Decimal(
                                 self._api.from_native_amount(quote_ccy_symbol, token1_amount))
                     else:
-                        if (token0_amount > 0):
+                        if token0_amount > 0:
                             base_ccy_amount = Decimal(
                                 self._api.from_native_amount(base_ccy_symbol, token0_amount))
                             quote_ccy_amount = Decimal(
@@ -273,13 +408,11 @@ class UniswapV3(DexCommon):
                                 self._api.from_native_amount(quote_ccy_symbol, abs(token0_amount)))
 
                     request.exec_price = round(
-                        quote_ccy_amount/base_ccy_amount, 8).normalize()
+                        quote_ccy_amount / base_ccy_amount, 8).normalize()
         except Exception as ex:
             self._logger.exception(f'Error occurred while computing execution price of request={request}: %r', ex)
 
     async def start(self, private_key):
-        await self.__gas_price_tracker.start()
-        await self.__gas_price_tracker.wait_gas_price_ready()
 
         self.__instruments = await self.pantheon.get_instruments_live_source(
             exchanges=[self.__exchange_name],
@@ -290,7 +423,7 @@ class UniswapV3(DexCommon):
             rmq_conn_name='url')
 
         file_prefix = os.path.dirname(os.path.realpath(__file__))
-        addresses_whitelists_file_path = f'{file_prefix}/../../resources/uni3_contracts_address.json'
+        addresses_whitelists_file_path = file_prefix + self.__contract_addresses_file_path
         self._logger.debug(f'Loading addresses whitelists from {addresses_whitelists_file_path}')
         with open(addresses_whitelists_file_path, 'r') as contracts_address_file:
             contracts_address_json = json.load(contracts_address_file)[self.__chain_name]
@@ -302,10 +435,12 @@ class UniswapV3(DexCommon):
                 if symbol in self._withdrawal_address_whitelists_from_res_file:
                     raise RuntimeError(f'Duplicate token : {symbol} in contracts_address file')
                 for withdrawal_address in token_json["valid_withdrawal_addresses"]:
-                    self._withdrawal_address_whitelists_from_res_file[symbol].add(Web3.to_checksum_address(withdrawal_address))
+                    self._withdrawal_address_whitelists_from_res_file[symbol].add(
+                        Web3.to_checksum_address(withdrawal_address))
 
                 if symbol != self.__native_token:
-                    self.__tokens_from_res_file[symbol] = ERC20Token(token_json["symbol"], Web3.to_checksum_address(token_json["address"]))
+                    self.__tokens_from_res_file[symbol] = ERC20Token(token_json["symbol"],
+                                                                     Web3.to_checksum_address(token_json["address"]))
 
             uniswap_router_address = Web3.to_checksum_address(contracts_address_json["uniswap_router_address"])
 
@@ -316,12 +451,54 @@ class UniswapV3(DexCommon):
         max_nonce_loaded = self._request_cache.get_max_nonce()
         self._api.initialize_starting_nonce(max_nonce_loaded + 1)
 
-        self.pantheon.spawn(self.__get_tx_status_ws())
+        if self._config.get('ws_subscription_for_mined_txs', True):
+            self.pantheon.spawn(self.__get_tx_status_ws())
 
         self.started = True
 
+    async def __wrap_unwrap_native_token(self, path, params: dict, received_at_ms):
+        client_request_id = ''
+        try:
+            client_request_id = params['client_request_id']
+            request = params['request']
+            assert request == 'wrap' or request == 'unwrap', 'Unknown request, should be either wrap or unwrap'
+            amount = Decimal(params['amount'])
+            gas_price_wei = int(params['gas_price_wei'])
+            gas_limit = int(params['gas_limit'])
+            wrap_unwrap = WrapUnwrapRequest(client_request_id, request, amount, gas_limit, received_at_ms)
+            self._logger.debug(
+                f'{"Wrapping" if wrap_unwrap.request == "wrap" else "Unwrapping"}={wrap_unwrap}, gas_price_wei={gas_price_wei}')
+            self._request_cache.add(wrap_unwrap)
+
+            ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
+            if not ok:
+                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+                return 400, {"error": {"message": reason}}
+
+            if request == "wrap":
+                result = await self._api.wrap('W' + self.__native_token, amount, gas_limit, gas_price_wei)
+            else:
+                result = await self._api.unwrap("W" + self.__native_token, amount, gas_limit, gas_price_wei)
+
+            if result.error_type == ErrorType.NO_ERROR:
+                wrap_unwrap.tx_hashes.append((result.tx_hash, RequestType.WRAP_UNWRAP.name))
+                wrap_unwrap.used_gas_prices_wei.append(gas_price_wei)
+                self._transactions_status_poller.add_for_polling(
+                    result.tx_hash, client_request_id, RequestType.WRAP_UNWRAP)
+                self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
+                return 200, {'tx_hash': result.tx_hash}
+            else:
+                return 400, {'error': {'message': result.error_message}}
+        except Exception as ex:
+            self._logger.exception(f'Failed to handle wrap_unwrap request %r: %r', client_request_id, ex)
+            self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+            return 400, {'error': {'message': repr(ex)}}
+
     def _on_fireblocks_tokens_whitelist_refresh(self, tokens_from_fireblocks: dict):
         for symbol, (_, address) in tokens_from_fireblocks.items():
+            if symbol == 'ETHAETH':
+                symbol = self.__native_token
+
             if len(address) == 0:
                 assert symbol == self.__native_token
                 continue
@@ -329,15 +506,21 @@ class UniswapV3(DexCommon):
             address = Web3.to_checksum_address(address)
             if symbol in self.__tokens_from_res_file:
                 if address != self.__tokens_from_res_file[symbol].address:
-                    self._logger.error(f'Symbol={symbol} address did not match: Fireblocks: {address} Resources File: {self.__tokens_from_res_file[symbol].address}')
+                    self._logger.error(
+                        f'Symbol={symbol} address did not match: Fireblocks: {address} Resources File: {self.__tokens_from_res_file[symbol].address}')
                 continue
 
             try:
                 self._api._add_or_update_erc20_contract(symbol, address)
             except Exception as ex:
-                self._logger.exception(f'Error in adding or updating ERC20 token (symbol={symbol}, address={address}): %r', ex)
+                self._logger.exception(
+                    f'Error in adding or updating ERC20 token (symbol={symbol}, address={address}): %r', ex)
 
     def __validate_tokens_address(self, instr_native_code: str, base_ccy: str, quote_ccy: str) -> bool:
         base_ccy_address = self._api.get_erc20_contract(base_ccy).address
         quote_ccy_address = self._api.get_erc20_contract(quote_ccy).address
         return instr_native_code.upper().endswith("-" + base_ccy_address.upper() + "-" + quote_ccy_address.upper())
+
+    def __orders_pre_finalisation_clean_up(self, order_request: OrderRequest):
+        for tx_hash, _ in order_request.tx_hashes:
+            self.__tx_hash_to_order_info.pop(tx_hash, None)
