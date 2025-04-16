@@ -66,6 +66,8 @@
     "dex": {
         "name": "chainArb-uni3",
         "chain_name": "Arbitrum Mainnet For Testing",
+        "native_token": "ETH",
+        "resources_file_path": "/../../resources/uni3_arb_contracts_address.json",
         "connectors": {
             "uniswap_v3_arb": {
                 "web3": {

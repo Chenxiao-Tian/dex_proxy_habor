@@ -5,9 +5,10 @@ import weakref
 from collections import defaultdict
 
 from pantheon import Pantheon, StandardArgParser
+from pyutils.exchange_connectors import ConnectorType
 
 from web_server import WebServer
-from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex, UniswapV3Arb, Lyra, Per, Hype, Native, Vert
+from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex, Lyra, Per, Hype, Native, Vert
 
 from eth_account import Account
 
@@ -45,11 +46,13 @@ class DexProxy:
             self.__exchange = UniswapV3Bloxroute(
                 pantheon, dex_config, self.__server, self)
         elif name == 'chainArb-uni3':
-            self.__exchange = UniswapV3Arb(
-                pantheon, dex_config, self.__server, self)
+            self.__exchange = UniswapV3(
+                pantheon, dex_config, self.__server, self, ConnectorType.UniswapV3Arb)
         elif name in ['chainEth-uni3', 'chainGoerli-uni3']:
             self.__exchange = UniswapV3(
-                pantheon, dex_config, self.__server, self)
+                pantheon, dex_config, self.__server, self, ConnectorType.UniswapV3)
+        elif name == 'chainFlame-uni3':
+            self.__exchange = UniswapV3(pantheon, dex_config, self.__server, self, ConnectorType.UniswapV3Astria)
         elif name == 'pdex':
             self.__exchange = Paradex(
                 pantheon, dex_config, self.__server, self)
