@@ -17,12 +17,22 @@
                         }
                     ]
                 },
-                "valid_withdrawal_addresses": []
+                "valid_withdrawal_addresses": [
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD"
+                ]
             },
             {
                 "name": "ETH",
                 "is_native_token": true,
-                "valid_withdrawal_addresses": []
+                "valid_withdrawal_addresses": [
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD"
+                ]
             }
         ],
         "bridge_eid_by_network_name": {
