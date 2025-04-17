@@ -1,0 +1,46 @@
+{
+  "Berachain Mainnet": {
+    "tokens": [],
+    "_comment_0": "https://documentation.kodiak.finance/overview/kodiak-contracts",
+    "uniswap_router_address": "0xe301E48F77963D3F7DbD2a4796962Bd7f3867Fb4"
+  },
+  "Berachain Mainnet For Testing": {
+    "_comment_1": "Berachain Mainnet For Testing: it has valid arb mainnet tokens address but the withdrawal_addresses are of our internal test wallets, it is created for testing purposes",
+    "tokens": [
+      {
+        "symbol": "BERA",
+        "valid_withdrawal_addresses": [
+          "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+        ]
+      },
+      {
+        "symbol": "WBTC",
+        "address": "0x0555e30da8f98308edb960aa94c0db47230d2b9c",
+        "valid_withdrawal_addresses": [
+          "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+        ]
+      },
+      {
+        "symbol": "WETH",
+        "address": "0x2f6f07cdcf3588944bf4c42ac74ff24bf56e7590",
+        "valid_withdrawal_addresses": [
+          "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+        ]
+      }
+    ],
+    "_comment_0": "https://documentation.kodiak.finance/overview/kodiak-contracts",
+    "uniswap_router_address": "0xe301E48F77963D3F7DbD2a4796962Bd7f3867Fb4"
+  },
+  "Berachain Testnet": {
+    "tokens": [
+      {
+        "symbol": "BERA",
+        "valid_withdrawal_addresses": [
+          "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+        ]
+      }
+    ],
+    "_comment_0": "https://documentation.kodiak.finance/overview/kodiak-contracts",
+    "uniswap_router_address": "0xCd2678b19626B8d1e6dAa724FcBbdbA9508B8A04"
+  }
+}
