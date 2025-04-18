@@ -50,9 +50,8 @@ class Vert(DexCommon):
 
         server.register("POST", "/private/get-ws-auth-signature", self.__get_ws_auth_signature)
         server.register("POST", "/private/sign_order", self.__get_order_signature)
-        # server.register("POST", "/private/sign_cancel_order", self.__get_cancel_order_signature)
-        # server.register("POST", "/private/sign_cancel_products_order", self.__get_cancel_products_order_signature)
-        # server.register("POST", "/private/sign_cancel_all", self.__get_cancel_products_order_signature)
+        server.register("POST", "/private/sign_cancel_order", self.__get_cancel_order_signature)
+        server.register("POST", "/private/sign_cancel_all", self.__get_cancel_all_signature)
 
         server.register("GET", "/public/chain_name", self.__get_chain_name)
 
@@ -424,8 +423,7 @@ class Vert(DexCommon):
 
     async def __get_ws_auth_signature(self, path: str, params: dict, received_at_ms: int):
         try:
-            assert 'sender' in params, 'Missing sender field'
-            assert 'expiration' in params, 'Missing expiration field'
+            self.assertRequiredFields(params, ['sender', 'expiration'])
 
             expiration_timestamp = params['expiration']
             sender = params['sender']
@@ -444,12 +442,7 @@ class Vert(DexCommon):
 
     async def __get_order_signature(self, path: str, params: dict, received_at_ms: int):
         try:
-            assert 'price' in params, 'Missing price field'
-            assert 'amount' in params, 'Missing amount field'
-            assert 'expiration' in params, 'Missing expiration field'
-            assert 'nonce' in params, 'Missing nonce field'
-            assert 'product_id' in params, 'Missing product_id field'
-            assert 'sender' in params, 'Missing sender field'
+            self.assertRequiredFields(params, ['price', 'amount', 'expiration', 'nonce', 'product_id', 'sender'])
 
             sender = params['sender']
             product_id = int(params['product_id'])
@@ -469,6 +462,56 @@ class Vert(DexCommon):
                 )
 
             return 200, {"signature": signature, "digest": digest}
+
+        except Exception as e:
+            traceback.print_exc()
+            return 400, {"error": {"message": str(e)}}
+
+    async def __get_cancel_order_signature(self, path: str, params: dict, received_at_ms: int):
+        try:
+            self.assertRequiredFields(params, ['sender', 'product_id', 'digest', 'nonce'])
+
+            sender = params['sender']
+            product_id = int(params['product_id'])
+
+            cancel_order_message = {
+                'sender': Web3.to_bytes(hexstr=sender),
+                'productIds': [product_id],
+                'digests': [Web3.to_bytes(hexstr=params['digest'])],
+                'nonce': int(params['nonce'])
+            }
+
+            signature = await self.pantheon.loop.run_in_executor(
+                self.__process_pool,
+                self._api.signature_generator.generate_signature,
+                EIP712Types.CANCEL_ORDERS, cancel_order_message
+                )
+
+            return 200, {"signature": signature}
+
+        except Exception as e:
+            traceback.print_exc()
+            return 400, {"error": {"message": str(e)}}
+
+    async def __get_cancel_all_signature(self, path: str, params: dict, received_at_ms: int):
+        try:
+            self.assertRequiredFields(params, ['sender', 'nonce'])
+
+            sender = params['sender']
+
+            cancel_all_message = {
+                'sender': Web3.to_bytes(hexstr=sender),
+                'productIds': [],
+                'nonce': int(params['nonce'])
+            }
+
+            signature = await self.pantheon.loop.run_in_executor(
+                self.__process_pool,
+                self._api.signature_generator.generate_signature,
+                EIP712Types.CANCEL_PRODUCT_ORDERS, cancel_all_message
+                )
+
+            return 200, {"signature": signature}
 
         except Exception as e:
             traceback.print_exc()

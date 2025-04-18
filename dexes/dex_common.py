@@ -465,3 +465,7 @@ class DexCommon(ABC):
         self._withdrawal_address_whitelists = self._withdrawal_address_whitelists_from_res_file.copy()
         for symbol in fireblocks_withdrawal_address_whitelist:
             self._withdrawal_address_whitelists[symbol].update(fireblocks_withdrawal_address_whitelist[symbol])
+
+    def assertRequiredFields(self, params: dict, required_fields: list):
+        for field in required_fields:
+            assert field in params, f'Missing required field: {field}'
