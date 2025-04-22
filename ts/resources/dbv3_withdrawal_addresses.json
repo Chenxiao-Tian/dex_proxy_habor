@@ -165,6 +165,14 @@
           "0x90942bc13ca257597352c10d64c9427353fb12060787c6ab9580157270a1c0c3",
           "0x607fd67c24fbd09154ab60b0f049cca51635bcc2d4d1306bc793b08d8e4091f1"
         ]
+      },
+      {
+        "coin_type": "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
+        "valid_withdrawal_addresses": [
+          "0x07f7817923726f43430002ea7bfea1cbfc1b389f84d7877769efc67e83007275",
+          "0x8feb43c930f6041df75e2d1f50aa172c83903b7fe7ca0ca665f75c1a9bebf4ed",
+          "0x607fd67c24fbd09154ab60b0f049cca51635bcc2d4d1306bc793b08d8e4091f1"
+        ]
       }
     ]
   },
