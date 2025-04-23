@@ -403,13 +403,21 @@
                     "l2_socket_bridge_connector_address": "0xE49B4fE6F37e1814520E529eC1A7A9AC118ec77d"
                 },
                 {
-                    "__comment": "Connector points to the USDC.e connector so we will receive USDC.e on Arbitrum if we bridge USDC out",
-                    "symbol": "USDC",
+                    "__comment": "USDC and USDC.e on Arbitrum maps to the same token on lyra chain. But the bridge connector will be different",
+                    "symbol": "USDC.e",
                     "bridge_type": "socket_v1",
                     "l1_token_address": "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8",
                     "l2_token_address": "0x6879287835A86F50f784313dBEd5E5cCC5bb8481",
                     "l2_socket_bridge_address": "0x4C9faD010D8be90Aba505c85eacc483dFf9b8Fa9",
                     "l2_socket_bridge_connector_address": "0xFc1e42b0C3Ff8d69FBe639a6a674fF5f0FcE778D"
+                },
+                {
+                    "symbol": "USDC",
+                    "bridge_type": "socket_v1",
+                    "l1_token_address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+                    "l2_token_address": "0x6879287835A86F50f784313dBEd5E5cCC5bb8481",
+                    "l2_socket_bridge_address": "0x4C9faD010D8be90Aba505c85eacc483dFf9b8Fa9",
+                    "l2_socket_bridge_connector_address": "0xBdE9e687F3A23Ebbc972c58D510dfc1f58Fb35EF"
                 },
                 {
                     "symbol": "WSTETH",
@@ -430,6 +438,12 @@
             {
                 "symbol": "WETH",
                 "valid_withdrawal_addresses": [
+                ]
+            },
+            {
+                "symbol": "USDC.e",
+                "valid_withdrawal_addresses": [
+                    "0x52c5233d3d12e9d5522759ace8b551d926b797d1"
                 ]
             }
         ],
