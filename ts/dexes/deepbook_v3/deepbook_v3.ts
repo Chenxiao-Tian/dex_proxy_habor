@@ -130,6 +130,11 @@ export class DeepBookV3 implements DexInterface {
   // pools for which we might need to call: withdraw settled amounts
   private maybeWithdrawSettledAmounts: Set<string>;
 
+  // To avoid withdrawal while another withdrawal for that token is in progress.
+  // This is to avoid the token getting equivocated (locked) for the current epoch.
+  private blockWithdrawalsFor: Set<string>;
+  private allowNextWithdrawalAfterMs: number | undefined;
+
   private environment: NetworkType;
   private deepbookPackageId: string;
 
@@ -214,6 +219,8 @@ export class DeepBookV3 implements DexInterface {
     this.logger.info(`wallet=${this.walletAddress}`);
 
     this.maybeWithdrawSettledAmounts = new Set<string>();
+
+    this.blockWithdrawalsFor = new Set<string>();
 
     if (config.dex.env === undefined) {
       throw new Error("The key, `dex.env` must be present in the config");
@@ -439,6 +446,15 @@ export class DeepBookV3 implements DexInterface {
       // 5 minutes
       const trackEpochIntervalMs = 5 * 60 * 1000;
       setInterval(this.trackEpoch, trackEpochIntervalMs);
+
+      if (this.config.dex.allow_next_withdrawal_after_s === undefined) {
+        throw new Error(
+          "allow_next_withdrawal_after_s not set for the read-write dex-proxy"
+        );
+      } else {
+        this.allowNextWithdrawalAfterMs =
+          this.config.dex.allow_next_withdrawal_after_s * 1000;
+      }
 
       if (this.config.dex.withdraw_settled_amounts_interval_s === undefined) {
         throw new Error(
@@ -2777,6 +2793,20 @@ export class DeepBookV3 implements DexInterface {
     return configuredAddresses.has(withdrawalAddress);
   };
 
+  getLockForWithdrawal = (coinTypeId: string) => {
+    if (this.blockWithdrawalsFor.has(coinTypeId)) {
+      const msg = `${coinTypeId} withdrawal is in progress retry after ${this.allowNextWithdrawalAfterMs} msec`;
+      this.logger.warn(msg);
+      throw new Error(msg);
+    }
+
+    this.blockWithdrawalsFor.add(coinTypeId);
+
+    setTimeout(() => {
+      this.blockWithdrawalsFor.delete(coinTypeId);
+    }, this.allowNextWithdrawalAfterMs);
+  };
+
   withdrawSui = async (
     requestId: bigint,
     path: string,
@@ -2801,6 +2831,8 @@ export class DeepBookV3 implements DexInterface {
       this.logger.error(`Alert: ${msg}`);
       throw new Error(msg);
     }
+
+    this.getLockForWithdrawal(coinTypeId);
 
     let client = this.clientPool.getClient();
     this.logger.debug(`[${requestId}] using ${client.name} client`);
@@ -2919,6 +2951,8 @@ export class DeepBookV3 implements DexInterface {
       this.logger.error(`Alert: ${msg}`);
       throw new Error(msg);
     }
+
+    this.getLockForWithdrawal(coinTypeId);
 
     let client = this.clientPool.getClient();
     this.logger.debug(`[${requestId}] using ${client.name} client`);
@@ -3306,6 +3340,8 @@ export class DeepBookV3 implements DexInterface {
     const coin: string = params.coin;
     const quantity: number = Number(params.quantity);
 
+    this.getLockForWithdrawal(this.getCoin(coin).type);
+
     if (coin === "SUI") {
       return await this.depositSuiIntoBalanceManager(
         requestId,
@@ -3493,6 +3529,8 @@ export class DeepBookV3 implements DexInterface {
 
     const coin: string = params.coin;
     const quantity: number = Number(params.quantity);
+
+    this.getLockForWithdrawal(this.getCoin(coin).type);
 
     let response = null;
     let status: string | undefined = undefined;

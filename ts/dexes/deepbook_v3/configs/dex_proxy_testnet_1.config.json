@@ -20,6 +20,7 @@
     ],
     "withdraw_settled_amounts_interval_s": 60,
     "track_leading_client_poll_interval_s": 10,
+    "allow_next_withdrawal_after_s": 30,
     "exchange_connectors": {
       "rest": [
         {
