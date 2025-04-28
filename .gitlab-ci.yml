@@ -111,6 +111,10 @@ stages:
     ENVIRONMENT:  dev
   - PROCESS_NAME: dex_proxy-drft-1
     ENVIRONMENT:  prod
+  - PROCESS_NAME: dex_proxy-chainFlame-uni3-1
+    ENVIRONMENT:  prod
+  - PROCESS_NAME: dex_proxy-chainFlame-uni3-test
+    ENVIRONMENT:  dev
 
 
 # Some applications are only containerised, and not enclaved. Supported keys:
