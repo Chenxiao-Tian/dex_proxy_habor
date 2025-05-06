@@ -1,6 +1,7 @@
 import json
 import os
 import uuid
+from decimal import Decimal
 
 import aiohttp
 import websockets
@@ -57,6 +58,8 @@ class UniswapV3Bloxroute(DexCommon):
             'POST', '/private/wrap-unwrap-eth', self.__wrap_unwrap_eth)
         self._server.register(
             'POST', '/private/wrap-unwrap-token', self.__wrap_unwrap_token)
+        self._server.register(
+            'POST', '/private/approve-token-wrap', self.__approve_token_wrap)
 
         self.__instruments: InstrumentsLiveSource = None
         self.__exchange_name = config['exchange_name']
@@ -65,6 +68,7 @@ class UniswapV3Bloxroute(DexCommon):
         self.__request_status_poll_ms = config["request_status_poll_ms"]
         self.__targeted_block_info = BlockInfo()
         self.__tx_hash_to_order_info: Dict[str, OrderInfo] = {}
+
 
         # WS connection
         self._titan_ws = None
@@ -86,6 +90,8 @@ class UniswapV3Bloxroute(DexCommon):
 
         self.__block_time_s: int = config.get("block_time_s", 12)
         self.__order_deadline_buffer_s = config.get("order_deadline_buffer_s", 5)
+        self.__approval_allowed_tokens = config.get('approval_allowed_tokens', ['STETH'])
+        self.__token_approve_contract_address_map = dict()
 
     def __split_symbol_to_base_quote_ccy(self, symbol):
         instrument = self.__instruments.get_instrument(
@@ -129,7 +135,8 @@ class UniswapV3Bloxroute(DexCommon):
         elif transaction_type == RequestType.APPROVE:
             built_tx = self._api.build_approve_tx(token_symbol=request.symbol, token_amount=request.amount,
                                                   gas_limit=request.gas_limit,
-                                                  gas_price=gas_price_wei, nonce=request.nonce)
+                                                  gas_price=gas_price_wei, nonce=request.nonce,
+                                                  approve_contract_address=request.approve_contract_address)
         elif transaction_type == RequestType.TRANSFER:
             built_tx = self._api.build_withdraw_tx(
                 token_symbol=request.symbol, address_to=request.address_to, amount=request.amount,
@@ -216,6 +223,53 @@ class UniswapV3Bloxroute(DexCommon):
         params['token'] = 'WETH'
         params['token_address'] = self._api.get_erc20_contract(params['token']).address
         return await self.__wrap_unwrap_token(path, params, received_at_ms)
+
+    async def __approve_token_wrap(self, path, params: dict, received_at_ms):
+        client_request_id = ''
+
+        try:
+            client_request_id = params['client_request_id']
+
+            if self._request_cache.get(client_request_id) is not None:
+                return 400, {'error': {'message': f'client_request_id={client_request_id} is already known'}}
+
+            token = params['token']
+            amount = Decimal(params['amount'])
+            gas_price_wei = int(params['gas_price_wei'])
+            gas_limit = int(params['gas_limit'])
+
+            assert token in self.__approval_allowed_tokens, 'Token not allowed for wrap_unwrap'
+            assert token in self.__token_approve_contract_address_map, 'Contract address for token approval not present'
+
+            ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
+            if not ok:
+                return 400, {'error': {'message': reason}}
+
+            request = ApproveRequest(client_request_id, token, amount, gas_limit, path, received_at_ms,
+                                     approve_contract_address=self.__token_approve_contract_address_map.get(token))
+            self._logger.debug(f'Approving={request}, gas_price_wei={gas_price_wei}')
+
+            self._request_cache.add(request)
+
+            result = await self._approve(request=request, gas_price_wei=gas_price_wei)
+            if result.error_type == ErrorType.NO_ERROR:
+                request.nonce = result.nonce
+                request.tx_hashes.append((result.tx_hash, RequestType.APPROVE.name))
+                request.used_gas_prices_wei.append(gas_price_wei)
+
+                self._transactions_status_poller.add_for_polling(
+                    result.tx_hash, client_request_id, RequestType.APPROVE)
+                self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
+                if result.pending_task:
+                    await result.pending_task
+                return 200, {'tx_hash': result.tx_hash}
+            else:
+                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+                return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
+        except Exception as e:
+            self._logger.exception(f'Failed to approve: %r', e)
+            self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
+            return 400, {'error': {'message': str(e)}}
 
     async def __wrap_unwrap_token(self, path, params: dict, received_at_ms):
         client_request_id = ''
@@ -672,6 +726,8 @@ class UniswapV3Bloxroute(DexCommon):
                 for withdrawal_address in token_json["valid_withdrawal_addresses"]:
                     self._withdrawal_address_whitelists_from_res_file[symbol].add(
                         Web3.to_checksum_address(withdrawal_address))
+                if token_json.get('approve_contract_address'):
+                    self.__token_approve_contract_address_map[symbol] = token_json.get('approve_contract_address')
 
                 if symbol != self.__native_token:
                     self.__tokens_from_res_file[symbol] = ERC20Token(token_json["symbol"],
