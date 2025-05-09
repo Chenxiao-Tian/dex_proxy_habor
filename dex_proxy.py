@@ -8,7 +8,7 @@ from pantheon import Pantheon, StandardArgParser
 from pyutils.exchange_connectors import ConnectorType
 
 from web_server import WebServer
-from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex, Lyra, Per, Hype, Native, Vert
+from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex, Lyra, Per, Hype, Native, Vert, UniswapV4
 
 from eth_account import Account
 
@@ -69,6 +69,8 @@ class DexProxy:
             self.__exchange = Native(pantheon, dex_config, self.__server, self)
         elif name == 'vert':
             self.__exchange = Vert(pantheon, dex_config, self.__server, self)
+        elif name == "chainUni-uni4":
+            self.__exchange = UniswapV4(pantheon, dex_config, self.__server, self)
         else:
             raise Exception(f'Exchange {name} not supported')
 
