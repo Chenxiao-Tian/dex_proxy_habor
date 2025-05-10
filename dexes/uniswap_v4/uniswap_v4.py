@@ -358,10 +358,10 @@ class UniswapV4(DexCommon):
             self.__tx_hash_to_order_info.pop(tx_hash, None)
 
     async def _amend_transaction(self, request, params, gas_price_wei):
-        pass
+        return 200, ApiResult()
 
     async def _cancel_all(self, path, params, received_at_ms):
-        pass
+        return 200, ApiResult()
 
     async def _cancel_transaction(self, request, gas_price_wei):
-        pass
+        return 200, ApiResult()
