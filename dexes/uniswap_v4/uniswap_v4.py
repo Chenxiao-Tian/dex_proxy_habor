@@ -361,7 +361,7 @@ class UniswapV4(DexCommon):
         return 200, ApiResult()
 
     async def _cancel_all(self, path, params, received_at_ms):
-        return 200, ApiResult()
+        return 200, {'cancel_requested': [], 'failed_cancels': []}
 
     async def _cancel_transaction(self, request, gas_price_wei):
         return 200, ApiResult()
