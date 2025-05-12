@@ -361,7 +361,80 @@ class UniswapV4(DexCommon):
         return 200, ApiResult()
 
     async def _cancel_all(self, path, params, received_at_ms):
-        return 200, {'cancel_requested': [], 'failed_cancels': []}
+        try:
+            assert params['request_type'] in ['ORDER', 'TRANSFER', 'APPROVE'], 'Unknown transaction type'
+            request_type = RequestType[params['request_type']]
+
+            self._logger.debug(f'Canceling all requests, request_type={request_type.name}')
+
+            cancel_requested = []
+            failed_cancels = []
+            # TODO- Latency Improvement - use asyncio.gather()
+            for request in self._request_cache.get_all(request_type):
+                try:
+                    if request.request_status != RequestStatus.PENDING or request.nonce is None:
+                        continue
+                    gas_price_wei = self._get_gas_price(request, priority_fee=PriorityFee.Fast)
+                    if request.request_status == RequestStatus.CANCEL_REQUESTED and \
+                            request.used_gas_prices_wei[-1] >= gas_price_wei:
+                        self._logger.info(
+                            f'Not sending cancel request for client_request_id={request.client_request_id} '
+                            f'as cancel with greater than or equal to the gas_price_wei={gas_price_wei} already in progress')
+                        cancel_requested.append(request.client_request_id)
+                        continue
+
+                    if len(request.used_gas_prices_wei) > 0:
+                        gas_price_wei = max(gas_price_wei, int(1.1 * request.used_gas_prices_wei[-1]))
+
+                    ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
+                    if not ok:
+                        self._logger.error(
+                            f'Not sending cancel request for client_request_id={request.client_request_id}: {reason}')
+                        failed_cancels.append(request.client_request_id)
+                        continue
+
+                    self._logger.debug(f'Canceling={request}, gas_price_wei={gas_price_wei}')
+                    result = await self._cancel_transaction(request, gas_price_wei)
+                    if result.error_type == ErrorType.NO_ERROR:
+                        request.tx_hashes.append((result.tx_hash, RequestType.CANCEL.name))
+                        request.used_gas_prices_wei.append(gas_price_wei)
+                        request.request_status = RequestStatus.CANCEL_REQUESTED
+                        self._transactions_status_poller.add_for_polling(result.tx_hash, request.client_request_id,
+                                                                         RequestType.CANCEL)
+                        self._request_cache.maybe_add_or_update_request_in_redis(request.client_request_id)
+                        cancel_requested.append(request.client_request_id)
+                    else:
+                        failed_cancels.append(request.client_request_id)
+
+                except Exception as ex:
+                    self._logger.exception(f'Failed to cancel request={request.client_request_id}: %r', ex)
+                    failed_cancels.append(request.client_request_id)
+
+            return 400 if failed_cancels else 200, {'cancel_requested': cancel_requested,
+                                                    'failed_cancels': failed_cancels}
+        except Exception as e:
+            self._logger.exception(f'Failed to cancel all: %r', e)
+            return 400, {'error': {'message': str(e)}}
 
     async def _cancel_transaction(self, request, gas_price_wei):
-        return 200, ApiResult()
+        if request.request_type in [RequestType.ORDER, RequestType.TRANSFER, RequestType.APPROVE]:
+            try:
+                if request.nonce is None:
+                    # TODO - Improvement to do early cancellations can be done here
+                    self._logger.debug(f"Cancellation requested before setting nonce "
+                                       f"for Client Request Id".format(request.client_request_id))
+                    return ApiResult(error_type=ErrorType.TRANSACTION_FAILED,
+                                     error_message=f"RETRY. Insert pending for {request.client_request_id}")
+
+                result = await self._api.cancel_transaction(request.nonce, gas_price_wei)
+                if result.error_type == ErrorType.NO_ERROR:
+                    self._api.update_next_nonce_to_use(request.nonce + 1)
+                return result
+            except Exception as e:
+                if len(e.args) and ("message" in e.args[0] and "nonce too low" in e.args[0]["message"]):
+                    return ApiResult(error_type=ErrorType.TRANSACTION_FAILED,
+                                     error_message=f"{request} already mined!")
+                raise e
+
+        else:
+            raise Exception(f"Cancelling not supported for the {request.request_type}")
