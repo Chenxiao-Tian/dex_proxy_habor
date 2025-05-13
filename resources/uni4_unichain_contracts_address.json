@@ -5,14 +5,16 @@
         "symbol": "ETH",
         "valid_withdrawal_addresses": [
           "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5",
-          "0x52c5233d3d12e9d5522759ace8b551d926b797d1"
+          "0x52c5233d3d12e9d5522759ace8b551d926b797d1",
+          "0x9E6C41845C54afa7f80Ef974A92E8E18773c7D83"
         ]
       },
       {
         "symbol": "USDC",
         "address": "0x078d782b760474a361dda0af3839290b0ef57ad6",
         "valid_withdrawal_addresses": [
-          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5",
+          "0x983bAe285269A9057Ebeb468d8fD8751cBd4D751"
         ]
       },
       {
