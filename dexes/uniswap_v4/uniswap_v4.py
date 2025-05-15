@@ -301,6 +301,7 @@ class UniswapV4(DexCommon):
 
                 swap_log = self._api.get_swap_log(tx_receipt)
                 self._logger.debug(f'Swap_log={swap_log}')
+                
                 inst_def = self.__instruments.get_instrument(InstrumentId(self.__exchange_name, request.symbol))
                 _, base_ccy_addr, quote_ccy_addr = inst_def.native_code.split('-')
                 base_ccy_addr = Web3.to_checksum_address(base_ccy_addr)
