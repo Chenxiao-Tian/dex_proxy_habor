@@ -21,8 +21,9 @@ from .transactions_status_poller import TransactionsStatusPoller
 
 
 class RequestsCache:
-    def __init__(self, pantheon: Pantheon, config):
+    def __init__(self, pantheon: Pantheon, config, dex):
         self.__logger = logging.getLogger('requests_cache')
+        self.__dex = dex
         self.pantheon = pantheon
         self.__requests: Dict[str, Request] = {}
         self.__redis = None
@@ -178,7 +179,7 @@ class RequestsCache:
             try:
                 for request in self.get_all():
                     if self.__can_finalize_pending_request_now(request):
-                        self.finalise_request(request.client_request_id, RequestStatus.FAILED)
+                        await self.__dex.on_request_status_update(request.client_request_id, RequestStatus.FAILED, None)
             except Exception as e:
                 self.__logger.exception(f"Error finalising pending requests {e}")
             await self.pantheon.sleep(25)

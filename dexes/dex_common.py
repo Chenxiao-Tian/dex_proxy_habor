@@ -39,7 +39,7 @@ class DexCommon(ABC):
         self._server = server
         self._event_sink = event_sink
 
-        self._request_cache = RequestsCache(pantheon, config['request_cache'])
+        self._request_cache = RequestsCache(pantheon, config['request_cache'], self)
         self._transactions_status_poller = TransactionsStatusPoller(pantheon, config['transactions_status_poller'], self)
 
         if 'max_allowed_gas_price_gwei' in config:
