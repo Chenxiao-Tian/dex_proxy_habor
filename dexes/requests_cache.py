@@ -1,14 +1,11 @@
 import json
 import logging
 import time
-from datetime import timedelta
 from collections import deque
+from datetime import timedelta
 from typing import Dict, List, Optional
 
 from pantheon import Pantheon
-
-from utils.redis_batch_executor import RedisBatchExecutor
-
 from pyutils.exchange_apis.dex_common import (
     RequestType,
     Request,
@@ -18,6 +15,7 @@ from pyutils.exchange_apis.dex_common import (
     ApproveRequest,
     WrapUnwrapRequest
 )
+from utils.redis_batch_executor import RedisBatchExecutor
 
 from .transactions_status_poller import TransactionsStatusPoller
 
@@ -32,6 +30,7 @@ class RequestsCache:
         self.__redis_request_key = pantheon.process_name + '.requests'
         self.__finalised_requests_cleanup_after_s = int(
             config['finalised_requests_cleanup_after_s'])
+        self.__pending_requests_cleanup_after_s = config.get('pending_requests_cleanup_after_s', None)
         self.__pending_add_in_redis = deque()
 
         # TODO: probably switch default to False in future
@@ -41,12 +40,14 @@ class RequestsCache:
         if self.__store_in_redis:
             self.__redis = self.pantheon.get_aioredis_connection()
             self.__redis_batch_executor = RedisBatchExecutor(self.pantheon, self.__logger, self.__redis,
-                                                            write_interval=timedelta(seconds=5), write_callback=None)
+                                                             write_interval=timedelta(seconds=5), write_callback=None)
 
             await self.__load_requests(transactions_status_poller)
             self.pantheon.spawn(self.__retry_failed_add_in_redis())
 
         self.pantheon.spawn(self.__finalised_requests_cleanup())
+        if self.__pending_requests_cleanup_after_s:
+            self.pantheon.spawn(self.__pending_requests_cleanup())
 
     def add(self, request: Request):
         if request.client_request_id in self.__requests:
@@ -168,6 +169,20 @@ class RequestsCache:
 
             await self.pantheon.sleep(25)
 
+    async def __pending_requests_cleanup(self):
+        self.__logger.debug(
+            f'Starting poller for finalising pending requests after {self.__pending_requests_cleanup_after_s}s')
+
+        while True:
+            self.__logger.debug('Polling for pending requests')
+            try:
+                for request in self.get_all():
+                    if self.__can_finalize_pending_request_now(request):
+                        self.finalise_request(request.client_request_id, RequestStatus.FAILED)
+            except Exception as e:
+                self.__logger.exception(f"Error finalising pending requests {e}")
+            await self.pantheon.sleep(25)
+
     # retries adding requests in redis which failed to be added in redis in all previous attempts
     async def __retry_failed_add_in_redis(self):
         self.__logger.debug(
@@ -184,6 +199,12 @@ class RequestsCache:
                     self.maybe_add_or_update_request_in_redis(client_request_id)
 
             await self.pantheon.sleep(10)
+
+    def __can_finalize_pending_request_now(self, request: Request):
+        now_ms = int(time.time() * 1000)
+        if request.received_at_ms + self.__pending_requests_cleanup_after_s * 1000 < now_ms:
+            return True
+        return False
 
     def __can_delete_request_now(self, request: Request):
         now_ms = int(time.time() * 1000)

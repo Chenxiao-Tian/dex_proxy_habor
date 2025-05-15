@@ -269,7 +269,8 @@ class UniswapV4(DexCommon):
 
         if request_status == RequestStatus.SUCCEEDED and request.request_type == RequestType.ORDER:
             self.__populate_orders_dex_specifics(request, mined_tx_hash)
-            self.__compute_exec_price(request, tx_receipt)
+            if tx_receipt:
+                self.__compute_exec_price(request, tx_receipt)
 
         if request.request_type == RequestType.ORDER:
             self.__orders_pre_finalisation_clean_up(request)
