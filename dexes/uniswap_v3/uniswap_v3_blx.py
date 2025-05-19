@@ -90,8 +90,7 @@ class UniswapV3Bloxroute(DexCommon):
 
         self.__block_time_s: int = config.get("block_time_s", 12)
         self.__order_deadline_buffer_s = config.get("order_deadline_buffer_s", 5)
-        self.__approval_allowed_tokens = config.get('approval_allowed_tokens', ['STETH'])
-        self.__token_approve_contract_address_map = dict()
+        self.__approval_allowed_tokens_contract_map = {'STETH': 'WSTETH'}
 
     def __split_symbol_to_base_quote_ccy(self, symbol):
         instrument = self.__instruments.get_instrument(
@@ -133,10 +132,15 @@ class UniswapV3Bloxroute(DexCommon):
                                                      gas_limit=request.gas_limit,
                                                      gas_price=gas_price_wei, nonce=request.nonce)
         elif transaction_type == RequestType.APPROVE:
-            built_tx = self._api.build_approve_tx(token_symbol=request.symbol, token_amount=request.amount,
-                                                  gas_limit=request.gas_limit,
-                                                  gas_price=gas_price_wei, nonce=request.nonce,
-                                                  approve_contract_address=request.approve_contract_address)
+            if request.request_path == '/private/approve-token-wrap':
+                built_tx = self._api.build_approve_wrap_tx(token_symbol=request.symbol, token_amount=request.amount,
+                                                           gas_limit=request.gas_limit,
+                                                           gas_price=gas_price_wei, nonce=request.nonce,
+                                                           approve_contract_address=request.approve_contract_address)
+            else:
+                built_tx = self._api.build_approve_tx(token_symbol=request.symbol, token_amount=request.amount,
+                                                      gas_limit=request.gas_limit,
+                                                      gas_price=gas_price_wei, nonce=request.nonce)
         elif transaction_type == RequestType.TRANSFER:
             built_tx = self._api.build_withdraw_tx(
                 token_symbol=request.symbol, address_to=request.address_to, amount=request.amount,
@@ -238,15 +242,17 @@ class UniswapV3Bloxroute(DexCommon):
             gas_price_wei = int(params['gas_price_wei'])
             gas_limit = int(params['gas_limit'])
 
-            assert token in self.__approval_allowed_tokens, 'Token not allowed for wrap_unwrap'
-            assert token in self.__token_approve_contract_address_map, 'Contract address for token approval not present'
+            assert token in self.__approval_allowed_tokens_contract_map, 'Token not allowed for wrap_unwrap'
+            approve_contract = self._api.get_erc20_contract(self.__approval_allowed_tokens_contract_map.get(
+                token))
+            assert approve_contract, 'Contract address for token approval not present'
 
             ok, reason = self._check_max_allowed_gas_price(gas_price_wei)
             if not ok:
                 return 400, {'error': {'message': reason}}
 
             request = ApproveRequest(client_request_id, token, amount, gas_limit, path, received_at_ms,
-                                     approve_contract_address=self.__token_approve_contract_address_map.get(token))
+                                     approve_contract_address=approve_contract.address)
             self._logger.debug(f'Approving={request}, gas_price_wei={gas_price_wei}')
 
             self._request_cache.add(request)
@@ -726,8 +732,6 @@ class UniswapV3Bloxroute(DexCommon):
                 for withdrawal_address in token_json["valid_withdrawal_addresses"]:
                     self._withdrawal_address_whitelists_from_res_file[symbol].add(
                         Web3.to_checksum_address(withdrawal_address))
-                if token_json.get('approve_contract_address'):
-                    self.__token_approve_contract_address_map[symbol] = token_json.get('approve_contract_address')
 
                 if symbol != self.__native_token:
                     self.__tokens_from_res_file[symbol] = ERC20Token(token_json["symbol"],

@@ -682,8 +682,7 @@
                   "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
                   "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
                   "0x5f8215ee653cb7225c741c7aa8591468d1f158b8"
-                ],
-                "approve_contract_address": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+                ]
             },
             {
                 "symbol": "LBTC",
@@ -717,8 +716,7 @@
             {
                 "symbol": "STETH",
                 "address": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
-                "valid_withdrawal_addresses": [],
-                "approve_contract_address": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+                "valid_withdrawal_addresses": []
             },
             {
                 "symbol": "ETH",
