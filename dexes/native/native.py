@@ -88,8 +88,8 @@ class Native(DexCommon):
                     self.__tokens_from_res_file[symbol] = ERC20Token(token_json["symbol"],
                                                                      Web3.to_checksum_address(token_json["address"]))
 
-    def _on_fireblocks_tokens_whitelist_refresh(self, tokens_from_fireblocks: dict):
-        for symbol, (_, address) in tokens_from_fireblocks.items():
+    def _on_tokens_whitelist_refresh(self, tokens: dict):
+        for symbol, (_, address) in tokens.items():
             if len(address) == 0:
                 assert symbol == self.__native_token
                 continue
@@ -97,7 +97,7 @@ class Native(DexCommon):
             address = Web3.to_checksum_address(address)
             if symbol in self.__tokens_from_res_file:
                 if address != self.__tokens_from_res_file[symbol].address:
-                    self._logger.error(f'Symbol={symbol} address did not match: Fireblocks: {address} Resources File: {self.__tokens_from_res_file[symbol].address}')
+                    self._logger.error(f'Symbol={symbol} address did not match: API: {address} Resources File: {self.__tokens_from_res_file[symbol].address}')
                 continue
 
             try:

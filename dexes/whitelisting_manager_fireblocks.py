@@ -12,7 +12,7 @@ from pyutils.exchange_apis.fireblocks_api import FireblocksApi
 from pyutils.exchange_connectors import ConnectorFactory, ConnectorType
 
 
-class WhitelistingManager:
+class WhitelistingManagerFireblocks:
     base_ex_msg = f"Error in getting whitelisted withdrawal addresses and tokens from fireblocks: %r"
     def __init__(self, pantheon: Pantheon, dex, config: dict):
         self.__pantheon = pantheon
@@ -21,7 +21,7 @@ class WhitelistingManager:
 
         self.__poll_interval_s: int = int(self.__config.get("poll_interval_s", 600))
 
-        self.__logger = logging.getLogger("whitelisting_manager")
+        self.__logger = logging.getLogger("whitelisting_manager_fireblocks")
         self.__first_value_fetched = asyncio.Event()
 
         api_factory = ApiFactory(ConnectorFactory(config.get("connectors")))
@@ -150,18 +150,18 @@ class WhitelistingManager:
         while True:
             try:
                 supported_tokens_id, tokens_from_fireblocks = await self.__get_supported_tokens_from_fireblocks()
-                self.__dex._on_fireblocks_tokens_whitelist_refresh(tokens_from_fireblocks)
+                self.__dex._on_tokens_whitelist_refresh(tokens_from_fireblocks)
 
                 fireblocks_withdrawal_address_whitelist = await self.__get_withdrawal_address_whitelist_from_fireblocks(supported_tokens_id)
-                self.__dex._on_fireblocks_withdrawal_whitelist_refresh(fireblocks_withdrawal_address_whitelist)
+                self.__dex._on_withdrawal_whitelist_refresh(fireblocks_withdrawal_address_whitelist)
 
                 self.__first_value_fetched.set()
             except asyncio.TimeoutError as timeout_ex:
-                self.__logger.debug(WhitelistingManager.base_ex_msg, timeout_ex)
+                self.__logger.debug(WhitelistingManagerFireblocks.base_ex_msg, timeout_ex)
                 await self.__pantheon.sleep(30)
                 continue
             except Exception as ex:
-                self.__logger.exception(WhitelistingManager.base_ex_msg, ex)
+                self.__logger.exception(WhitelistingManagerFireblocks.base_ex_msg, ex)
                 await self.__pantheon.sleep(30)
                 continue
             await self.__pantheon.sleep(self.__poll_interval_s)

@@ -301,7 +301,6 @@ class UniswapV4(DexCommon):
 
                 swap_log = self._api.get_swap_log(tx_receipt)
                 self._logger.debug(f'Swap_log={swap_log}')
-                
                 inst_def = self.__instruments.get_instrument(InstrumentId(self.__exchange_name, request.symbol))
                 _, base_ccy_addr, quote_ccy_addr = inst_def.native_code.split('-')
                 base_ccy_addr = Web3.to_checksum_address(base_ccy_addr)
@@ -328,8 +327,8 @@ class UniswapV4(DexCommon):
         except Exception as ex:
             self._logger.exception(f'Error occurred while computing execution price of request={request}: %r', ex)
 
-    def _on_fireblocks_tokens_whitelist_refresh(self, tokens_from_fireblocks: dict):
-        for symbol, (_, address) in tokens_from_fireblocks.items():
+    def _on_tokens_whitelist_refresh(self, tokens: dict):
+        for symbol, (_, address) in tokens.items():
             if symbol == 'ETHAETH':
                 symbol = self.__native_token
 
@@ -341,7 +340,7 @@ class UniswapV4(DexCommon):
             if symbol in self.__tokens_from_res_file:
                 if address != self.__tokens_from_res_file[symbol].address:
                     self._logger.error(
-                        f'Symbol={symbol} address did not match: Fireblocks: {address} Resources File: {self.__tokens_from_res_file[symbol].address}')
+                        f'Symbol={symbol} address did not match: API: {address} Resources File: {self.__tokens_from_res_file[symbol].address}')
                 continue
 
             try:
@@ -440,3 +439,4 @@ class UniswapV4(DexCommon):
 
         else:
             raise Exception(f"Cancelling not supported for the {request.request_type}")
+
