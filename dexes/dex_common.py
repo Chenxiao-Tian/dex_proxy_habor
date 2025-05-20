@@ -9,7 +9,8 @@ from pantheon import Pantheon
 
 from .requests_cache import RequestsCache
 from .transactions_status_poller import TransactionsStatusPoller
-from .whitelisting_manager import WhitelistingManager
+from .whitelisting_manager_fordefi import WhitelistingManagerFordefi
+from .whitelisting_manager_fireblocks import WhitelistingManagerFireblocks
 
 from pyutils.gas_pricing.eth import PriorityFee
 from pyutils.exchange_connectors import ConnectorFactory, ConnectorType
@@ -53,9 +54,9 @@ class DexCommon(ABC):
         self._withdrawal_address_whitelists_from_res_file = defaultdict(set)
         self._l2_withdrawal_address_whitelist_from_res_file = set()
 
-        # from resources file + fireblocks
+        # from resources file + API
         # symbol -> list of whitelisted withdrawal addresses
-        # whitelisted addresses from fireblocks will be refreshed periodically
+        # whitelisted addresses from API will be refreshed periodically
         self._withdrawal_address_whitelists = defaultdict(set)
 
         self._server.register('POST', '/private/approve-token', self.__approve_token)
@@ -134,8 +135,11 @@ class DexCommon(ABC):
         await self._transactions_status_poller.start()
         await self._request_cache.start(self._transactions_status_poller)
 
-        if "fireblocks" in self._config:
-            self.__whitelist_manager = WhitelistingManager(self.pantheon, self, self._config)
+        if "fordefi" in self._config:
+            self.__whitelist_manager = WhitelistingManagerFordefi(self.pantheon, self, self._config)
+            await self.__whitelist_manager.start()
+        elif "fireblocks" in self._config:
+            self.__whitelist_manager = WhitelistingManagerFireblocks(self.pantheon, self, self._config)
             await self.__whitelist_manager.start()
         else:
             self._withdrawal_address_whitelists = self._withdrawal_address_whitelists_from_res_file
@@ -456,16 +460,17 @@ class DexCommon(ABC):
                           f'={self.__max_allowed_gas_price_wei}'
         return True, ''
 
-    # If a dex needs fireblocks tokens whitelist then that dex should override this method
-    # tokens_from_fireblocks : token_symbol -> (fireblocks_token_id, token_address)
-    def _on_fireblocks_tokens_whitelist_refresh(self, tokens_from_fireblocks: dict):
+    # If a dex needs API tokens whitelist then that dex should override this method
+    # tokens : token_symbol -> (token_id, token_address)
+    def _on_tokens_whitelist_refresh(self, tokens: dict):
         return
 
-    def _on_fireblocks_withdrawal_whitelist_refresh(self, fireblocks_withdrawal_address_whitelist: defaultdict(set)):
+    def _on_withdrawal_whitelist_refresh(self, withdrawal_address_whitelist: defaultdict):
         self._withdrawal_address_whitelists = self._withdrawal_address_whitelists_from_res_file.copy()
-        for symbol in fireblocks_withdrawal_address_whitelist:
-            self._withdrawal_address_whitelists[symbol].update(fireblocks_withdrawal_address_whitelist[symbol])
+        for symbol in withdrawal_address_whitelist:
+            self._withdrawal_address_whitelists[symbol].update(withdrawal_address_whitelist[symbol])
 
     def assertRequiredFields(self, params: dict, required_fields: list):
         for field in required_fields:
             assert field in params, f'Missing required field: {field}'
+
