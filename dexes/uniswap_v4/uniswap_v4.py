@@ -38,7 +38,7 @@ class UniswapV4(DexCommon):
         self.__chain_name = config['chain_name']
         self.__native_token = config["native_token"]
         self.__contract_addresses_file_path = config["resources_file_path"]
-        self.__txn_gas_limit = 500000
+        self.__txn_gas_limit = 1000000
 
         self.__tx_hash_to_order_info: dict[str, OrderInfo] = {}
 
