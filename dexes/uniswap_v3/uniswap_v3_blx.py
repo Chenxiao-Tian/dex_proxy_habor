@@ -225,7 +225,6 @@ class UniswapV3Bloxroute(DexCommon):
 
     async def __wrap_unwrap_eth(self, path, params: dict, received_at_ms):
         params['token'] = 'WETH'
-        params['token_address'] = self._api.get_erc20_contract(params['token']).address
         return await self.__wrap_unwrap_token(path, params, received_at_ms)
 
     async def __approve_token_wrap(self, path, params: dict, received_at_ms):
@@ -291,15 +290,12 @@ class UniswapV3Bloxroute(DexCommon):
             gas_price_wei = int(params['gas_price_wei'])
             gas_limit = int(params['gas_limit'])
             token = params['token']
-            token_address = params['token_address']
+            token_address = self._api.get_erc20_contract(token).address
 
             assert token and token_address, \
                 'Unknown token or token_address, request params should include both token and token_address'
 
             assert token in self.WRAP_UNWRAP_ALLOWED_TOKENS, 'Token not allowed for wrap_unwrap'
-
-            assert token_address == self._api.get_erc20_contract(
-                token).address, f'Incorrect token address for specified token {token}'
 
             wrap_unwrap = WrapUnwrapRequest(client_request_id, request, amount, gas_limit, received_at_ms, token=token,
                                             token_address=token_address)
