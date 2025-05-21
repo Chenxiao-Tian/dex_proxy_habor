@@ -111,10 +111,8 @@ stages:
     ENVIRONMENT:  dev
   - PROCESS_NAME: dex_proxy-drft-1
     ENVIRONMENT:  prod
-  - PROCESS_NAME: dex_proxy-chainFlame-uni3-1
+  - PROCESS_NAME: dex_proxy-chainBera-kod3-1
     ENVIRONMENT:  prod
-  - PROCESS_NAME: dex_proxy-chainFlame-uni3-test
-    ENVIRONMENT:  dev
   - PROCESS_NAME: dex_proxy-uni4-uni-1
     ENVIRONMENT:  prod
 
