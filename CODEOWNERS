@@ -1,5 +1,5 @@
 # Only @team-infra can modify the .gitlab-ci.yml file. Please reach out to them for any changes.
-[team-infra][1] @ananda.das @jeremythomson @greg.markey @jim.mccoy1 @james.bowe @mark.hingston2 @adriaan.meeling 
+[team-infra][1] @auros/usergroups/infra @james.bowe @adriaan.meeling @mark.hingston2
 CODEOWNERS
 .gitlab-ci.yml
 Dockerfile
