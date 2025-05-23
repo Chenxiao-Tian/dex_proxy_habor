@@ -106,8 +106,13 @@
                 },
                 {
                     "symbol": "USDE",
+                    "bridge_type": "socket_v2",
                     "l1_token_address": "0x4c9edd5852cd905f086c759e8383e09bff1e68b3",
-                    "l2_token_address": "0x1569e57B9e1dA866f9b862Acd8b134ea16B234F5"
+                    "l2_token_address": "0x1569e57B9e1dA866f9b862Acd8b134ea16B234F5",
+                    "l1_socket_bridge_address": "0x26Cf1Dc84694E04277F2Fe4C13E43597c6010C2A",
+                    "l1_socket_bridge_connector_address": "0x254691C06Da387c1050C726cF498eFdA89083820",
+                    "l2_socket_bridge_address": "0x11f50642f845308C73ce6FE7df06FE52120345Bb",
+                    "l2_socket_bridge_connector_address": "0xA5019Aa47E038611a60F5D27cD2052c620B11B51"
                 },
                 {
                     "symbol": "CBBTC",
@@ -116,8 +121,13 @@
                 },
                 {
                     "symbol": "SUSDE",
+                    "bridge_type": "socket_v2",
                     "l1_token_address": "0x9d39a5de30e57443bff2a8307a4256c8797a3497",
-                    "l2_token_address": "0xb82d12742c3728a14eaa43ebe1c0d32bb62216eb"
+                    "l2_token_address": "0xb82d12742c3728a14eaa43ebe1c0d32bb62216eb",
+                    "l1_socket_bridge_address": "0xE3E96892D30E0ee1a8131BAf87c891201F7137bf",
+                    "l1_socket_bridge_connector_address": "0xfa8c07E28461eb7c65b33De024DB97eE4C052C97",
+                    "l2_socket_bridge_address": "0x12A3674207E345c79e1AD67F62e3988e6bb06287",
+                    "l2_socket_bridge_connector_address": "0x687E1c385740841a1a30eA53bF272664EDC57D9b"
                 },
                 {
                     "symbol": "OP",
@@ -141,8 +151,13 @@
                 },
                 {
                     "symbol": "LBTC",
+                    "bridge_type": "socket_v2",
                     "l1_token_address": "0x8236a87084f8B84306f72007F36F2618A5634494",
-                    "l2_token_address": "0x36b5C126A3D7B25F6032653A0d18823Ee48a890e"
+                    "l2_token_address": "0x36b5C126A3D7B25F6032653A0d18823Ee48a890e",
+                    "l1_socket_bridge_address": "0x76624ff43D610F64177Bb9c194A2503642e9B803",
+                    "l1_socket_bridge_connector_address": "0x457379de638CAFeB1759a22457fe893b288E2e89",
+                    "l2_socket_bridge_address": "0x5eFC527B2640681289E31E1e29f94EA397b6c589",
+                    "l2_socket_bridge_connector_address": "0x52CB41109b637F03B81b3FD6Dce4E3948b2F0923"
                 },
                 {
                     "symbol": "STDRV",
@@ -354,6 +369,18 @@
                 "valid_withdrawal_addresses": [
                     "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
                 ]
+            },
+            {
+                "symbol": "WBTC",
+                "valid_withdrawal_addresses": [
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                ]
+            },
+            {
+                "symbol": "WEETH",
+                "valid_withdrawal_addresses": [
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                ]
             }
         ],
         "whitelisted_bidding_wallets": [ "0xb4c4BbD9974D7F4D6e0814A7f9aA1f018F032818" ],
@@ -426,6 +453,22 @@
                     "l2_token_address": "0xdf77b286eDa539CCb6326e9eDB86aa69D83108a5",
                     "l2_socket_bridge_address": "0x760c8D80905dCE001E9f0982F3Eb7722C342DecF",
                     "l2_socket_bridge_connector_address": "0x122B8c35acC306f89191ceB76FD533620B9C8945"
+                },
+                {
+                    "symbol": "WBTC",
+                    "bridge_type": "socket_v1",
+                    "l1_token_address": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+                    "l2_token_address": "0x9b80ab732a6F1030326Af0014f106E12C4Db18EC",
+                    "l2_socket_bridge_address": "0xaf33761742beF3B7d0D0726671660CCF260fc5c3",
+                    "l2_socket_bridge_connector_address": "0x26E5CE884875ea3776a57f0B225b1Ea8D2E9bEeB"
+                },
+                {
+                    "symbol": "WEETH",
+                    "bridge_type": "socket_v2",
+                    "l1_token_address": "0x35751007a407ca6feffe80b3cb397736d2cf4dbe",
+                    "l2_token_address": "0x7B35b4c05a90Ea5f311AeC815BE4148b446a68a2",
+                    "l2_socket_bridge_address": "0xf58fF1Adc4d045e712a6D91e69d93B4092516659",
+                    "l2_socket_bridge_connector_address": "0x6Ee9b6ad1c97AdeeD071fd5f349cE65f91e43333"
                 }
             ]
         },
@@ -444,6 +487,16 @@
                 "symbol": "USDC.e",
                 "valid_withdrawal_addresses": [
                     "0x52c5233d3d12e9d5522759ace8b551d926b797d1"
+                ]
+            },
+            {
+                "symbol": "WBTC",
+                "valid_withdrawal_addresses": [
+                ]
+            },
+            {
+                "symbol": "WEETH",
+                "valid_withdrawal_addresses": [
                 ]
             }
         ],
@@ -468,6 +521,18 @@
             },
             {
                 "symbol": "WSTETH",
+                "valid_withdrawal_addresses": [
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                ]
+            },
+            {
+                "symbol": "WBTC",
+                "valid_withdrawal_addresses": [
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                ]
+            },
+            {
+                "symbol": "WEETH",
                 "valid_withdrawal_addresses": [
                     "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
                 ]
