@@ -38,6 +38,9 @@ class Vert(DexCommon):
         self.__process_pool = concurrent.futures.ProcessPoolExecutor(
             max_workers=config["max_signature_generators"]
         )
+        self.__cancel_all_recv_time_ms: int = config.get("cancel_all_recv_time_ms")
+        if self.__cancel_all_recv_time_ms is None:
+            raise RuntimeError("The key `dex.cancel_all_recv_time_ms` must be present in the dex_proxy config")
 
     def __register_endpoints(self, server: WebServer) -> None:
         # server.register("POST", "/private/perp-to-spot-usdc-transfer", self.__transfer_usdc_from_perp_to_spot)
@@ -52,7 +55,6 @@ class Vert(DexCommon):
         server.register("POST", "/private/sign_order", self.__get_order_signature)
         server.register("POST", "/private/sign_cancel_order", self.__get_cancel_order_signature)
         server.register("POST", "/private/sign_cancel_all", self.__get_cancel_all_signature)
-
         server.register("GET", "/public/chain_name", self.__get_chain_name)
 
     def __load_whitelist_and_tokens(self) -> list:
@@ -150,7 +152,27 @@ class Vert(DexCommon):
         raise NotImplementedError
 
     async def _cancel_all(self, path: str, params: dict, received_at_ms: int):
-        raise NotImplementedError
+        try:
+            self.assertRequiredFields(params, ["subaccount"])
+
+            subaccount = params["subaccount"]
+            recv_time_ms = self.__cancel_all_recv_time_ms
+            sender = self.__whitelisted_subaccounts.get(subaccount)
+            if sender is None:
+                raise RuntimeError(f"Subaccount={subaccount} is not present in the resources file for the dex_proxy")
+
+            self._logger.info("Cancelling all orders for subaccount=%s, sender=%s", subaccount, sender)
+
+            # The api method has code to check for a request which fails with status = "failure"
+            response = await self._api.cancel_all_orders(sender=sender, recv_time_ms=recv_time_ms)
+
+            cancelled_orders = [o["digest"] for o in response["data"]["cancelled_orders"]]
+
+            return 200, {"cancelled_orders": cancelled_orders}
+
+        except Exception as e:
+            traceback.print_exc()
+            return 400, {"error": {"message": str(e)}}
 
     def __is_subaccount_whitelisted_for_transfer(self, sub_alias: str, sub_id: str):
         if len(sub_id) != 66:
@@ -266,7 +288,7 @@ class Vert(DexCommon):
                 self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
                 return 400, {"error": {"code": result.error_type.value, "message": result.error_message}}
         except Exception as e:
-            self._logger.exception(f"Failed to transfer: %r", e)
+            self._logger.exception("Failed to transfer: %r", e)
             self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
             return 400, {"error": {"message": str(e)}}
 
@@ -308,7 +330,7 @@ class Vert(DexCommon):
                 self._request_cache.finalise_request(approve.client_request_id, RequestStatus.FAILED)
                 return 400, {"error": {"code": result.error_type.value, "message": result.error_message}}
         except Exception as e:
-            self._logger.exception(f"Failed to approve: %r", e)
+            self._logger.exception("Failed to approve: %r", e)
             self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
             return 400, {"error": {"message": str(e)}}
 
@@ -414,7 +436,7 @@ class Vert(DexCommon):
                 self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
                 return 400, {"error": {"code": result.error_type.value, "message": result.error_message}}
         except Exception as e:
-            self._logger.exception(f"Failed to bridge out: %r", e)
+            self._logger.exception("Failed to bridge out: %r", e)
             self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
             return 400, {"error": {"message": str(e)}}
 
