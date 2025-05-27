@@ -66,6 +66,7 @@
     "dex": {
         "name": "vert",
         "chain_name": "Sonic Blaze Testnet",
+        "cancel_all_recv_time_ms": 2000,
         "connectors": {
             "vertex": {
                 "web3": {
