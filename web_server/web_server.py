@@ -5,6 +5,8 @@ import weakref
 import time
 from typing import Callable, Awaitable, Optional, Type, List, Dict, Any
 
+import ujson
+
 import aiohttp
 from aiohttp import web, WSCloseCode
 from pydantic import BaseModel
@@ -110,10 +112,12 @@ class WebServer:
 
                 if request.method == "POST":
                     raw = await request.text()
+                    # This was changed to json.loads so that an empty body is a valid empty dict for the 
+                    # pydantic validator
                     try:
-                        params = json.loads(raw) if raw else {}
-                    except Exception:
-                        return web.json_response({"error": f"Malformed JSON: {raw}"}, status=400)
+                        params = ujson.loads(raw) if raw else {}
+                    except Exception as ee:
+                        return web.json_response({"error": f"failed to load json: {str(ee)}"}, status=400)
                 else:
                     params = dict(request.query)
 
