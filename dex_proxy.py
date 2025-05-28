@@ -8,7 +8,7 @@ from pantheon import Pantheon, StandardArgParser
 from pyutils.exchange_connectors import ConnectorType
 
 from web_server import WebServer
-from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex, Lyra, Per, Hype, Native, Vert, UniswapV4
+from dexes import Dexalot, UniswapV3, UniswapV3Bloxroute, Paradex, Lyra, Per, Hype, Native, Vert, UniswapV4, Edex
 
 from eth_account import Account
 
@@ -35,10 +35,12 @@ class DexProxy:
         # channel -> set of Subscription
         self.__subscriptions = defaultdict(set)
 
-        self.__server = WebServer(self.pantheon.config['server'], self)
-
-        dex_config = self.pantheon.config['dex']
+        # robfowler: re-ordered these as I want the WebServer to know the detais of the proxy running
+        # so the open API spec pages have a good label
+        dex_config = self.pantheon.config['dex']    
         name = dex_config['name']
+        self.__server = WebServer(self.pantheon.config['server'], self, name)
+
         if name == 'dexa':
             self.__exchange = Dexalot(
                 pantheon, dex_config, self.__server, self)
@@ -71,6 +73,8 @@ class DexProxy:
             self.__exchange = Vert(pantheon, dex_config, self.__server, self)
         elif name == "chainUni-uni4":
             self.__exchange = UniswapV4(pantheon, dex_config, self.__server, self)
+        elif name == "edex":
+            self.__exchange = Edex(pantheon, dex_config, self.__server, self)
         else:
             raise Exception(f'Exchange {name} not supported')
 

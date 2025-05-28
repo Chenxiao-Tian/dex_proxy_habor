@@ -30,6 +30,8 @@ from .signing import (OrderWire, order_request_to_order_wire,
                       sign_withdraw_from_bridge_action, sign_agent, sign_usd_class_transfer_action,
                       sign_spot_send)
 
+from . import schemas
+
 HYPERLIQUID = 'Hyperliquid'
 
 class Hype(DexCommon):
@@ -70,7 +72,14 @@ class Hype(DexCommon):
         server.register("POST", "/private/cancel-signature", self.__sign_cancel_order_request)
         server.register("POST", "/private/withdraw-from-exchange", self.__withdraw_from_exchange)
         server.register("POST", "/private/deposit-into-exchange", self.__deposit_into_exchange)
-        server.register("POST", "/private/update-leverage", self.__update_leverage)
+        
+        server.register("POST", "/private/update-leverage", self.__update_leverage,
+             request_model=schemas.UpdateLeverageRequest,
+            response_model=schemas.UpdateLeverageResponse,
+            summary="Update leverage factor",
+            tags=["private"]
+        )
+#        server.register("POST", "/private/update-leverage", self.__update_leverage)
         server.register("POST", "/private/spot-to-perp-usdc-transfer", self.__transfer_usdc_from_spot_to_perp)
         server.register("POST", "/private/perp-to-spot-usdc-transfer", self.__transfer_usdc_from_perp_to_spot)
         server.register("POST", "/private/send-spot-token", self.__transfer_spot_to_external_wallet)

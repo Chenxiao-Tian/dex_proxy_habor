@@ -17,6 +17,8 @@ from pyutils.exchange_connectors import ConnectorFactory, ConnectorType
 from pyutils.exchange_apis import ApiFactory
 from pyutils.exchange_apis.dex_common import *
 
+from dexes import common_schemas
+import schemas
 
 class DexCommon(ABC):
     """
@@ -59,14 +61,66 @@ class DexCommon(ABC):
         # whitelisted addresses from API will be refreshed periodically
         self._withdrawal_address_whitelists = defaultdict(set)
 
-        self._server.register('POST', '/private/approve-token', self.__approve_token)
-        self._server.register('POST', '/private/withdraw', self.transfer)
-        self._server.register('POST', '/private/amend-request', self.__amend_request)
-        self._server.register('DELETE', '/private/cancel-request', self.__cancel_request)
-        self._server.register('DELETE', '/private/cancel-all', self._cancel_all)
-        self._server.register('GET', '/public/get-all-open-requests', self._get_all_open_requests)
-        self._server.register('GET', '/public/get-request-status', self.__get_request_status)
-        self._server.register('GET', '/public/status', self.__get_status)
+        # Temporarily enable full schema for the following dexes
+        oapi_support=["edex"]   # TODO: use the name from common utils
+        self._server.register(
+            'POST', '/private/approve-token', self.__approve_token,
+            request_model=common_schemas.ApproveTokenRequest,
+            response_model=common_schemas.TxResponse,
+            summary="Approve ERC20 allowance",
+            tags=["private"],
+            oapi_in=oapi_support
+        )
+        self._server.register(
+            'POST', '/private/withdraw', self.transfer,
+            request_model=common_schemas.TransferParams,
+            response_model=common_schemas.TransferResponse,
+            summary="Submit a withdrawal transfer",
+            tags=["private"],
+            oapi_in=oapi_support
+        )
+        self._server.register('POST', '/private/amend-request', self.__amend_request,
+            request_model=schemas.AmendRequestParams,
+            response_model=schemas.AmendRequestSuccess, # TODO: this is a problem, these return varied types
+            summary="Amend order",
+            tags=["private"],
+            oapi_in=oapi_support
+        )
+        self._server.register('DELETE', '/private/cancel-request', self.__cancel_request,
+            request_model=schemas.CancelRequestParams,
+            response_model=schemas.CancelRequestResponse,
+            summary="Cancel by request id",
+            tags=["private"],
+            oapi_in=oapi_support
+        )
+        self._server.register('DELETE', '/private/cancel-all', self._cancel_all,
+            request_model=schemas.CancelAllParams,
+            response_model=schemas.CancelAllResponse,
+            summary="Cancel all",
+            tags=["private"],
+            oapi_in=oapi_support
+        )
+        self._server.register('GET', '/public/get-all-open-requests', self._get_all_open_requests,
+            request_model=schemas.GetAllOpenRequestsParams,
+            response_model=schemas.GetAllOpenRequestsResponse,
+            summary="Get orders, transfers, approvals or wrap/unwraps",
+            tags=["public"],
+            oapi_in=oapi_support
+        )
+        self._server.register('GET', '/public/get-request-status', self.__get_request_status,
+            request_model=schemas.GetRequestStatusParams,
+            response_model=schemas.GetRequestStatusResponse,
+            summary="Get the status of requests by client_request_id",
+            tags=["public"],
+            oapi_in=oapi_support
+        )
+        self._server.register('GET', '/public/status', self.__get_status,
+            request_model=schemas.StatusParams,
+            response_model=schemas.StatusResponse,
+            summary="Get the system status",
+            tags=["public"],
+            oapi_in=oapi_support
+        )
 
     @abstractmethod
     async def on_new_connection(self, ws):

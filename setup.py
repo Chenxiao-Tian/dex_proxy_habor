@@ -24,6 +24,7 @@ setuptools.setup(
         # workaround; discussion in link below
         # https://auros-group.slack.com/archives/C039ZE7QS56/p1740366619748929
         "kafka-python==2.0.2",
-        "pyutils @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.15.0"
+        "pyutils @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.14.10",
+        "fastopenapi"
     ]
 )

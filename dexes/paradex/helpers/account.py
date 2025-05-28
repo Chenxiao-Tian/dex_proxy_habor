@@ -10,9 +10,12 @@ from starknet_py.utils.typed_data import TypedData as TypedDataDataclass
 
 from .typed_data import TypedData
 
-import libsigner
+try:
+    import libsigner
+except ModuleNotFoundError:
+    # Error handling
+    pass
 
-import libsigner
 
 
 class Account(StarknetAccount):
