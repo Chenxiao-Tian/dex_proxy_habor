@@ -74,59 +74,72 @@ class WebServer:
 
             if request_model is not None:
                 async def endpoint(body: request_model):
+                    # begin debug
+                    request_id     = self.__get_next_request_id()
                     received_at_ms = int(time.time() * 1000)
-                    status, data = await handler(path, body.model_dump(by_alias=True), received_at_ms)
+                    params         = body.model_dump(by_alias=True)
+                    _logger.debug(
+                        f'[{request_id}] received_at_ms={received_at_ms}, '
+                        f'path={path}, params={params}'
+                    )
+                    # call handler
+                    status, data = await handler(path, params, received_at_ms)
+                    _logger.debug(f'[{request_id}] status={status}, data={data}')
+                    # respond
                     if status != 200:
-                        raise web.HTTPException(status_code=status, body=data)
-                    model = response_model(**data)
-                    return model.model_dump(mode="json")
+                        return web.json_response(data=data, status=status)
+                    model  = response_model(**data)
+                    result = model.model_dump(mode="json")
+                    _logger.debug(f'[{request_id}] returning result={result}')
+                    return result
+
             else:
                 async def endpoint():
+                    # begin debug
+                    request_id     = self.__get_next_request_id()
                     received_at_ms = int(time.time() * 1000)
+                    _logger.debug(
+                        f'[{request_id}] received_at_ms={received_at_ms}, '
+                        f'path={path}, params={{}}'
+                    )
+                    # call handler
                     status, data = await handler(path, {}, received_at_ms)
+                    _logger.debug(f'[{request_id}] status={status}, data={data}')
+                    # respond
                     if status != 200:
-                        raise web.HTTPException(status_code=status, body=data)
-                    model = response_model(**data)
-                    return model.model_dump(mode="json")
+                        return web.json_response(data=data, status=status)
+                    model  = response_model(**data)
+                    result = model.model_dump(mode="json")
+                    _logger.debug(f'[{request_id}] returning result={result}')
+                    return result
 
-            if summary:
-                endpoint.__doc__ = summary
-
-            decorator_args: Dict[str, Any] = {
-                "response_model": response_model,
-                "status_code": 200,
-                "tags": tags or [],
-            }
-            if request_model is None:
-                decorator_args["request_body"] = False
-            if responses:
-                decorator_args["responses"] = {code: {"model": mdl} for code, mdl in responses.items()}
-
-            getattr(self.__router, method.lower())(path, **decorator_args)(endpoint)
-            return
-
-        def _wrap(wrapped):
+        def wrapper(wrapped):
             async def inner(request: web.Request):
                 received_at_ms = int(time.time() * 1000)
                 request_id = self.__get_next_request_id()
 
-                if request.method == "POST":
-                    raw = await request.text()
-                    # This was changed to json.loads so that an empty body is a valid empty dict for the 
-                    # pydantic validator
-                    try:
-                        params = ujson.loads(raw) if raw else {}
-                    except Exception as ee:
-                        return web.json_response({"error": f"failed to load json: {str(ee)}"}, status=400)
-                else:
-                    params = dict(request.query)
+                try:
+                    if request.method == 'POST':
+                        raw_request = await request.text()
+                        # This was changed to json.loads so that an empty body is a valid empty dict for the pydantic validator
+                        params = ujson.loads(raw_request) if raw_request else {}
+                    else:
+                        params = dict(request.query)
+                    _logger.debug(
+                        f'[{request_id}] received_at_ms={received_at_ms}, remote={request.remote}, method={request.method}, path={request.path}, params={params}')
+                except Exception as e:
+                    _logger.error(
+                        f'[{request_id}] error=Malformed JSON, received_at_ms={received_at_ms}, remote={request.remote}, method={request.method}, path={request.path}, raw_request={raw_request}')
+                    return web.json_response(data={"error": f"Unable to parse request payload as JSON. payload={raw_request}, parsing_error={e}"}, status=400)
 
                 try:
                     status, data = await wrapped(request.path, params, received_at_ms)
                 except Exception as e:
-                    return web.json_response({"error": {"message": str(e)}}, status=500)
+                    return web.json_response(data={"error": {"message": str(e)}}, status=500)
 
+                _logger.debug(f'[{request_id}] status={status}, data={data}')
                 return web.json_response(data=data, status=status)
+
             return inner
 
         for route in self.__app.router.routes():
@@ -134,7 +147,7 @@ class WebServer:
                 route.method == method and str(route.resource) == path
             ), f"[WebServer] duplicate route: {method} {path}"
 
-        self.__app.add_routes([web.route(method, path, _wrap(handler))])
+        self.__app.add_routes([web.route(method, path, wrapper(handler))])
 
     async def start(self):
         _logger.info('Starting')
