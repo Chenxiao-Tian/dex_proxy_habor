@@ -94,8 +94,6 @@ class WebServer:
 
                 return response_model(**data).model_dump(mode="json")
 
-            if summary:
-                _common.__doc__ = summary
 
             decorator_args: Dict[str, Any] = {
                 "request_body":   request_model,
@@ -114,6 +112,9 @@ class WebServer:
             else:
                 async def endpoint():
                     return await _common({})
+
+            if summary:
+                endpoint.__doc__ = summary
 
             getattr(self.__router, method.lower())(path, **decorator_args)(endpoint)
             return
