@@ -43,15 +43,3 @@ class AmendRequestSuccess(BaseModel):
             }
         }
     }
-
-
-class AmendRequestErrorResponse(BaseModel):
-    """
-    Error response model (400, 404, etc.)
-    """
-    error: dict = Field(
-        ...,
-        description="Error code and/or message",
-        example={"message": "request not found"}
-    )
-
