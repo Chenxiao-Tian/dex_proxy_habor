@@ -63,7 +63,7 @@
         "port": 1958
     },
     "key_store_file_path": [
-      "./dexes/edex/test/wally.json"
+        "./dexes/edex/test/wally.json"
     ],
     "dex": {
         "name": "edex",
@@ -71,7 +71,7 @@
         "native_token": "BTC",
         "connectors": {
             "native": {
-             "api_key": "deadbeef"
+                "api_key": "deadbeef"
             },
             "fireblocks": {
                 "credentials": {

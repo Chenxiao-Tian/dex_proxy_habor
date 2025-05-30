@@ -69,49 +69,55 @@ class WebServer:
             and self.__name in oapi_in
             and response_model is not None
         )
+
+
         if use_openapi:
-            _logger.debug(f"[OpenAPI] {method} {path}  sig_req={request_model} sig_resp={response_model}")
+            async def _common(params: dict):
+                request_id     = self.__get_next_request_id()
+                received_at_ms = int(time.time() * 1000)
+                _logger.debug(
+                    f'oapi [{request_id}] received_at_ms={received_at_ms}, '
+                    f'path={path}, params={params}'
+                )
+
+                status, data = await handler(path, params, received_at_ms)
+                _logger.debug(f'[{request_id}] status={status}, data={data}')
+
+                if status != 200:
+                    try:
+                        ujson.dumps(data)
+                        safe = data
+                    except Exception:
+                        safe = {"message": str(data)}
+                    # return an error envelope; FastOpenAPI will serialize this safely
+                    return {"error": safe, "http_status": status}
+
+                return response_model(**data).model_dump(mode="json")
+
+            if summary:
+                _common.__doc__ = summary
+
+            decorator_args: Dict[str, Any] = {
+                "request_body":   request_model,
+                "response_model": response_model,
+                "status_code":    200,
+                "tags":           tags or [],
+            }
+            if responses:
+                decorator_args["responses"] = {
+                    code: {"model": mdl} for code, mdl in responses.items()
+                }
 
             if request_model is not None:
                 async def endpoint(body: request_model):
-                    # begin debug
-                    request_id     = self.__get_next_request_id()
-                    received_at_ms = int(time.time() * 1000)
-                    params         = body.model_dump(by_alias=True)
-                    _logger.debug(
-                        f'[{request_id}] received_at_ms={received_at_ms}, '
-                        f'path={path}, params={params}'
-                    )
-                    # call handler
-                    status, data = await handler(path, params, received_at_ms)
-                    _logger.debug(f'[{request_id}] status={status}, data={data}')
-                    # respond
-                    if status != 200:
-                        return web.json_response(data=data, status=status)
-                    model  = response_model(**data)
-                    result = model.model_dump(mode="json")
-                    _logger.debug(f'[{request_id}] returning result={result}')
-                    return result
-
+                    return await _common(body.model_dump(by_alias=True))
             else:
                 async def endpoint():
-                    # begin debug
-                    request_id     = self.__get_next_request_id()
-                    received_at_ms = int(time.time() * 1000)
-                    _logger.debug(
-                        f'[{request_id}] received_at_ms={received_at_ms}, '
-                        f'path={path}, params={{}}'
-                    )
-                    # call handler
-                    status, data = await handler(path, {}, received_at_ms)
-                    _logger.debug(f'[{request_id}] status={status}, data={data}')
-                    # respond
-                    if status != 200:
-                        return web.json_response(data=data, status=status)
-                    model  = response_model(**data)
-                    result = model.model_dump(mode="json")
-                    _logger.debug(f'[{request_id}] returning result={result}')
-                    return result
+                    return await _common({})
+
+            getattr(self.__router, method.lower())(path, **decorator_args)(endpoint)
+            return
+
 
         def wrapper(wrapped):
             async def inner(request: web.Request):

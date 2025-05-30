@@ -35,12 +35,3 @@ class GetRequestStatusResponse(BaseModel):
     finalised_at_ms: Optional[int] = None
 
 
-class ErrorResponse(BaseModel):
-    """
-    Error response payload
-    """
-    error: dict = Field(
-        ...,
-        example={"message": "Request not found"}
-    )
-

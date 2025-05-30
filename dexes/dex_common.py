@@ -17,7 +17,6 @@ from pyutils.exchange_connectors import ConnectorFactory, ConnectorType
 from pyutils.exchange_apis import ApiFactory
 from pyutils.exchange_apis.dex_common import *
 
-from dexes import common_schemas
 import schemas
 
 class DexCommon(ABC):
@@ -31,8 +30,9 @@ class DexCommon(ABC):
     def __init__(self, pantheon: Pantheon, connector_type: ConnectorType, config, server: "WebServer", event_sink: "DexProxy"):
         self.pantheon = pantheon
 
-        api_factory = ApiFactory(ConnectorFactory(config.get("connectors")))
-        self._api = api_factory.create(self.pantheon, connector_type)
+        if 'connectors' in config:
+            api_factory = ApiFactory(ConnectorFactory(config["connectors"]))
+            self._api = api_factory.create(self.pantheon, connector_type)
 
         self._logger = logging.getLogger(config['name'])
 
@@ -65,30 +65,50 @@ class DexCommon(ABC):
         oapi_support=["edex"]   # TODO: use the name from common utils
         self._server.register(
             'POST', '/private/approve-token', self.__approve_token,
-            request_model=common_schemas.ApproveTokenRequest,
-            response_model=common_schemas.TxResponse,
+            request_model=schemas.ApproveTokenRequest,
+            response_model=schemas.TxResponse,
+            responses={
+                400: {"model": schemas.ErrorResponse},
+                404: {"model": schemas.ErrorResponse},
+                408: {"model": schemas.ErrorResponse},
+            },
             summary="Approve ERC20 allowance",
             tags=["private"],
             oapi_in=oapi_support
         )
         self._server.register(
             'POST', '/private/withdraw', self.transfer,
-            request_model=common_schemas.TransferParams,
-            response_model=common_schemas.TransferResponse,
+            request_model=schemas.WithdrawRequest,
+            response_model=schemas.TxResponse,
+            responses={
+                400: {"model": schemas.ErrorResponse},
+                404: {"model": schemas.ErrorResponse},
+                408: {"model": schemas.ErrorResponse},
+            },
             summary="Submit a withdrawal transfer",
             tags=["private"],
             oapi_in=oapi_support
         )
         self._server.register('POST', '/private/amend-request', self.__amend_request,
             request_model=schemas.AmendRequestParams,
-            response_model=schemas.AmendRequestSuccess, # TODO: this is a problem, these return varied types
+            response_model=schemas.AmendRequestSuccess,
+            responses={
+                400: {"model": schemas.ErrorResponse},
+                404: {"model": schemas.ErrorResponse},
+                408: {"model": schemas.ErrorResponse},
+            },
             summary="Amend order",
             tags=["private"],
             oapi_in=oapi_support
         )
         self._server.register('DELETE', '/private/cancel-request', self.__cancel_request,
             request_model=schemas.CancelRequestParams,
-            response_model=schemas.CancelRequestResponse,
+            response_model=schemas.CancelSuccessResponse,
+            responses={
+                400: {"model": schemas.ErrorResponse},
+                404: {"model": schemas.ErrorResponse},
+                408: {"model": schemas.ErrorResponse},
+            },
             summary="Cancel by request id",
             tags=["private"],
             oapi_in=oapi_support
@@ -236,7 +256,7 @@ class DexCommon(ABC):
         else:
             return 503, {"status": "starting"}
 
-    async def __cancel_request(self, path, params: dict, received_at_ms):
+    async def __cancel_request(self, path, params: schemas.CancelRequestParams, received_at_ms):
         try:
             client_request_id = params['client_request_id']
             request = self.get_request(client_request_id)
@@ -295,7 +315,7 @@ class DexCommon(ABC):
             return 400, {'error': {'message': repr(e)}}
 
     @abstractmethod
-    async def _cancel_all(self, path, params, received_at_ms):
+    async def _cancel_all(self, path, params: schemas.CancelAllParams, received_at_ms):
         try:
             assert params['request_type'] == 'ORDER' or params['request_type'] == 'TRANSFER' \
                 or params['request_type'] == 'APPROVE' or params['request_type'] == 'WRAP_UNWRAP', \
