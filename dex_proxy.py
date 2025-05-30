@@ -55,8 +55,8 @@ class DexProxy:
                 pantheon, dex_config, self.__server, self, ConnectorType.UniswapV3)
         elif name == 'chainFlame-uni3':
             self.__exchange = UniswapV3(pantheon, dex_config, self.__server, self, ConnectorType.UniswapV3Astria)
-        elif name == "chainBera-uni3":
-            self.__exchange = UniswapV3(pantheon, dex_config, self.__server, self, ConnectorType.UniswapV3Bera)
+        elif name == "chainBera-kod3":
+            self.__exchange = UniswapV3(pantheon, dex_config, self.__server, self, ConnectorType.KodiakV3)
         elif name == 'pdex':
             self.__exchange = Paradex(
                 pantheon, dex_config, self.__server, self)
