@@ -42,6 +42,13 @@
         "valid_withdrawal_addresses": [
           "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
         ]
+      },
+      {
+        "symbol": "HONEY",
+        "address": "0xFCBD14DC51f0A4d49d5E53C2E0950e0bC26d0Dce",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+        ]
       }
     ],
     "uniswap_router_address": "0xe301E48F77963D3F7DbD2a4796962Bd7f3867Fb4"
