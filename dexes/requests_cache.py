@@ -178,6 +178,8 @@ class RequestsCache:
             self.__logger.debug('Polling for pending requests')
             try:
                 for request in self.get_all():
+                    if request.request_type == RequestType.TRANSFER:
+                        continue
                     if self.__can_finalize_pending_request_now(request):
                         await self.__dex.on_request_status_update(request.client_request_id, RequestStatus.FAILED, None)
             except Exception as e:
