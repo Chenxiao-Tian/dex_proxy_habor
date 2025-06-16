@@ -16,7 +16,8 @@
                 "CBBTC": "0xC1efE4c45B79250A29A5Dc66cCADc60DB0FcEEe8",
                 "SUSDE": "0x375804CdcF0D534FDD2657584A7c4Ff5AB14A2bb",
                 "OP": "0xDaffF9B244327d09dde1dDFcf9981ef0Df2D1568",
-                "RSETH": "0x35fdB6e79c05809ba6Dc3B2EF5FF7D0BB5D75020"
+                "RSETH": "0x35fdB6e79c05809ba6Dc3B2EF5FF7D0BB5D75020",
+                "LBTC": "0xeaF03Bb3280C609d35E7F84d24a996c7C0b74F5f"
             },
             "deposit_module_address": "0x9B3FE5E5a3bcEa5df4E08c41Ce89C4e3Ff01Ace3",
             "withdraw_module_address": "0x9d0E8f5b25384C7310CB8C6aE32C8fbeb645d083",
@@ -33,6 +34,8 @@
             },
             "l1_standard_bridge_address": "0x61E44dC0dae6888B5a301887732217d5725B0bFf",
             "l2_standard_bridge_address": "0x4200000000000000000000000000000000000010",
+            "__socket_v1_bridge_details": "https://github.com/0xdomrom/socket-plugs/blob/355dfe70f456610ce3b1e6361c110fef67535679/deployments/superbridge/prod_lyra-old_addresses.json",
+            "__socket_v2_bridge_details": "https://github.com/0xdomrom/socket-plugs/blob/355dfe70f456610ce3b1e6361c110fef67535679/deployments/superbridge/prod_lyra_addresses.json",
             "tokens": [
                 {
                     "symbol": "USDC",
