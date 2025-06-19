@@ -344,12 +344,43 @@ class Edex(DexCommon):
     ) -> Any:
         raise NotImplementedError("get-gas-price stub")
 
+
     async def _get_all_open_requests(
-        self, path: str, params: Dict[str, Any], received_at_ms: int
-    ) -> Tuple[int, Dict[str, Any]]:
-        _logger.debug(f"test {inspect.currentframe().f_code.co_name}] "
-            f"received_at_ms={received_at_ms}, path={path}, params={params}")
-        return 200, {"requests": []}
+        self,
+        path: str,
+        params: Dict[str, Any],
+        received_at_ms: int
+    ) -> Tuple[int, Any]:
+        _logger.debug(
+            f"test {inspect.currentframe().f_code.co_name}] "
+            f"received_at_ms={received_at_ms}, path={path}, params={params}"
+        )
+
+        try:
+            validated_params = (
+                schemas.get_all_open_requests.GetAllOpenRequestsParams
+                .model_validate(params)
+            )
+        except ValidationError as err:
+            _logger.error("Parameter validation failed: %s", err.errors())
+            return 400, {"validation_errors": err.errors()}
+
+        filtered_requests = [
+            req
+            for req in schemas.get_all_open_requests.EXAMPLE_OPEN_REQUESTS
+            if req["request_type"] == validated_params.request_type
+        ]
+
+        try:
+            response_model = (
+                schemas.get_all_open_requests.GetAllOpenRequestsResponse
+                .model_validate({"requests": filtered_requests})
+            )
+        except ValidationError as err:
+            _logger.error("Response validation failed: %s", err.errors())
+            return 500, {"validation_errors": err.errors()}
+
+        return 200, response_model.model_dump(mode="json")
 
     async def _cancel_all(
         self, path: str, params: Dict[str, Any], received_at_ms: int
