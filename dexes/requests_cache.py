@@ -31,7 +31,8 @@ class RequestsCache:
         self.__redis_request_key = pantheon.process_name + '.requests'
         self.__finalised_requests_cleanup_after_s = int(
             config['finalised_requests_cleanup_after_s'])
-        self.__pending_requests_cleanup_after_s = config.get('pending_requests_cleanup_after_s', None)
+        self.__pending_order_cleanup_after_s = config.get('pending_order_cleanup_after_s', None)
+        self.__pending_transfer_cleanup_after_s = config.get('pending_transfer_cleanup_after_s', None)
         self.__pending_add_in_redis = deque()
 
         # TODO: probably switch default to False in future
@@ -178,8 +179,6 @@ class RequestsCache:
             self.__logger.debug('Polling for pending requests')
             try:
                 for request in self.get_all():
-                    if request.request_type == RequestType.TRANSFER:
-                        continue
                     if self.__can_finalize_pending_request_now(request):
                         await self.__dex.on_request_status_update(request.client_request_id, RequestStatus.FAILED, None)
             except Exception as e:
@@ -205,7 +204,8 @@ class RequestsCache:
 
     def __can_finalize_pending_request_now(self, request: Request):
         now_ms = int(time.time() * 1000)
-        if request.received_at_ms + self.__pending_requests_cleanup_after_s * 1000 < now_ms:
+        deadline_time_s = self.__pending_order_cleanup_after_s if request.request_type == RequestType.ORDER else self.__pending_transfer_cleanup_after_s
+        if request.received_at_ms + deadline_time_s * 1000 < now_ms:
             return True
         return False
 
