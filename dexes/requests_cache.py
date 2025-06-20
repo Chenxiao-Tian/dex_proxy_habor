@@ -48,7 +48,7 @@ class RequestsCache:
             self.pantheon.spawn(self.__retry_failed_add_in_redis())
 
         self.pantheon.spawn(self.__finalised_requests_cleanup())
-        if self.__pending_requests_cleanup_after_s:
+        if self.__pending_order_cleanup_after_s or self.__pending_transfer_cleanup_after_s:
             self.pantheon.spawn(self.__pending_requests_cleanup())
 
     def add(self, request: Request):
@@ -173,7 +173,9 @@ class RequestsCache:
 
     async def __pending_requests_cleanup(self):
         self.__logger.debug(
-            f'Starting poller for finalising pending requests after {self.__pending_requests_cleanup_after_s}s')
+            f'Starting poller for finalising pending orders after {self.__pending_order_cleanup_after_s}s')
+        self.__logger.debug(
+            f'Starting poller for finalising pending transfers after {self.__pending_transfer_cleanup_after_s}s')
 
         while True:
             self.__logger.debug('Polling for pending requests')
