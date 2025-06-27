@@ -382,7 +382,14 @@
             {
                 "symbol": "WEETH",
                 "valid_withdrawal_addresses": [
-                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B",
+                    "0x8B285654D562105bE5b850Dd9AE149FCC25Ac945"
+                ]
+            },
+            {
+                "symbol": "OP",
+                "valid_withdrawal_addresses": [
+                    "0x8B285654D562105bE5b850Dd9AE149FCC25Ac945"
                 ]
             }
         ],
