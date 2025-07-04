@@ -31,7 +31,7 @@ class UniswapV3(DexCommon):
         self.msg_queue = asyncio.Queue()
 
         self._server.register('POST', '/private/insert-order', self.__insert_order)
-        self._server.register("POST", "/private/wrap-unwrap-native", self.__wrap_unwrap_native_token)
+        self._server.register("POST", "/private/wrap-unwrap-token", self.__wrap_unwrap_token)
 
         self.__instruments: InstrumentsLiveSource = None
         self.__exchange_name = config["name"]
@@ -456,7 +456,7 @@ class UniswapV3(DexCommon):
 
         self.started = True
 
-    async def __wrap_unwrap_native_token(self, path, params: dict, received_at_ms):
+    async def __wrap_unwrap_token(self, path, params: dict, received_at_ms):
         client_request_id = ''
         try:
             client_request_id = params['client_request_id']
@@ -465,7 +465,14 @@ class UniswapV3(DexCommon):
             amount = Decimal(params['amount'])
             gas_price_wei = int(params['gas_price_wei'])
             gas_limit = int(params['gas_limit'])
-            wrap_unwrap = WrapUnwrapRequest(client_request_id, request, amount, gas_limit, received_at_ms)
+
+            token = params['token']
+            assert token == 'W' + self.__native_token, "Invalid token in request"
+            token_address = self._api.get_erc20_contract(token).address
+
+            wrap_unwrap = WrapUnwrapRequest(
+                client_request_id, request, amount, gas_limit, received_at_ms, token=token, token_address=token_address)
+
             self._logger.debug(
                 f'{"Wrapping" if wrap_unwrap.request == "wrap" else "Unwrapping"}={wrap_unwrap}, gas_price_wei={gas_price_wei}')
             self._request_cache.add(wrap_unwrap)
@@ -476,9 +483,9 @@ class UniswapV3(DexCommon):
                 return 400, {"error": {"message": reason}}
 
             if request == "wrap":
-                result = await self._api.wrap('W' + self.__native_token, amount, gas_limit, gas_price_wei)
+                result = await self._api.wrap(token, amount, gas_limit, gas_price_wei)
             else:
-                result = await self._api.unwrap("W" + self.__native_token, amount, gas_limit, gas_price_wei)
+                result = await self._api.unwrap(token, amount, gas_limit, gas_price_wei)
 
             if result.error_type == ErrorType.NO_ERROR:
                 wrap_unwrap.tx_hashes.append((result.tx_hash, RequestType.WRAP_UNWRAP.name))
