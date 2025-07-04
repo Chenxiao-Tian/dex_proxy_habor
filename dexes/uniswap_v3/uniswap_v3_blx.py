@@ -53,9 +53,6 @@ class UniswapV3Bloxroute(DexCommon):
         self._server.register(
             'POST', '/private/insert-order', self.__insert_order)
 
-        # TODO: maybe move this endpoint to dex_common
-        self._server.register(
-            'POST', '/private/wrap-unwrap-eth', self.__wrap_unwrap_eth)
         self._server.register(
             'POST', '/private/wrap-unwrap-token', self.__wrap_unwrap_token)
         self._server.register(
@@ -222,10 +219,6 @@ class UniswapV3Bloxroute(DexCommon):
             self.__orders_pre_finalisation_clean_up(order)
             self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
             return 400, {'error': {'message': repr(e)}}
-
-    async def __wrap_unwrap_eth(self, path, params: dict, received_at_ms):
-        params['token'] = 'WETH'
-        return await self.__wrap_unwrap_token(path, params, received_at_ms)
 
     async def __approve_token_wrap(self, path, params: dict, received_at_ms):
         client_request_id = ''
