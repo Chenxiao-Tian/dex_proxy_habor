@@ -364,7 +364,7 @@ class UniswapV3(DexCommon):
                 message = await self.msg_queue.get()
                 self._logger.info("[WS] [MESSAGE] %s", message)
 
-                tx_hash = message['params']['result']['transaction']['hash']
+                tx_hash = message['params']['result']['hash']
                 await self._transactions_status_poller.poll_for_status([tx_hash])
             except Exception as e:
                 self._logger.exception(
