@@ -36,6 +36,8 @@ stages:
     ENVIRONMENT: prod
   - PROCESS_NAME: dex_proxy-pdex-main-4
     ENVIRONMENT: prod
+  - PROCESS_NAME: dex_proxy-pdex-rpi
+    ENVIRONMENT: prod
   - PROCESS_NAME: dex_proxy-pdex-testnet
     ENVIRONMENT: dev
   - PROCESS_NAME: dex_proxy-lyra-testnet
