@@ -14,11 +14,11 @@ The FastOpenAPI-powered aiohttp server listens on **port `1958`** and supports b
 
 ### Directory Structure and Schema Layout
 
-Each DEX has its own module under `dexes/` with a structure similar to:
+Each DEX has its own module with a structure similar to:
 
 ```
-dexes/
 ├── edex/
+│   ├── edex_dex_proxy.py     # The entry point
 │   ├── edex.py               # The aiohttp handler/registration logic
 │   ├── edex.config.json      # DEX-specific configuration
 │   ├── schemas/              # Pydantic models for this DEX's endpoints
@@ -36,7 +36,7 @@ dexes/
 Shared/common Pydantic types live in:
 
 ```
-common_schemas.py
+py_dex_common/py_dex_common/schemas
 ```
 
 This file contains widely used request and response models such as:

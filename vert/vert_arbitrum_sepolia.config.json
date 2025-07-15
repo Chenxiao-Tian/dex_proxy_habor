@@ -1,0 +1,123 @@
+{
+    "logging": {
+        "level": "debug",
+        "overrides": [
+            {
+                "logger_name": "aio_pika",
+                "level": "info"
+            },
+            {
+                "logger_name": "botocore",
+                "level": "info"
+            },
+            {
+                "logger_name": "aiormq.connection",
+                "level": "info"
+            },
+            {
+                "logger_name": "aiormq.channel",
+                "level": "critical"
+            },
+            {
+                "logger_name": "urllib3.connectionpool",
+                "level": "info"
+            },
+            {
+                "logger_name": "web3.RequestManager",
+                "level": "info"
+            },
+            {
+                "logger_name": "web3.providers.HTTPProvider",
+                "level": "info"
+            },
+            {
+                "logger_name": "pantheon.app_health",
+                "level": "info"
+            },
+            {
+                "logger_name": "aio_pika.exchange",
+                "level": "info"
+            },
+            {
+                "logger_name": "aiohttp.access",
+                "level": "warn"
+            },
+            {
+                "logger_name": "websockets",
+                "level": "info"
+            },
+            {
+                "logger_name": "gas_tracker",
+                "level": "warn"
+            }
+        ]
+    },
+    "RabbitMQ": {
+        "url": "amqp://dev-sng-rmq.kdev"
+    },
+    "Redis": {
+        "host": "redis",
+        "port": 6379
+    },
+    "server": {
+        "port": 1958
+    },
+    "key_store_file_path": "dex_proxy/secrets/wallet.json",
+    "dex": {
+        "name": "vert",
+        "chain_name": "Arbitrum Sepolia Testnet",
+        "cancel_all_recv_time_ms": 2000,
+        "connectors": {
+            "vertex": {
+                "web3": {
+                    "http": "https://sepolia-rollup.arbitrum.io/rpc"
+                },
+                "websocket": {
+                    "base_uri": "",
+                    "api_path": "",
+                    "ws_ping_interval": 60
+                },
+                "rest": {
+                    "base_uri": "https://gateway.sepolia-test.vertexprotocol.com",
+                    "api_path": "v1",
+                    "request_timeout": 60
+                }
+            },
+            "fireblocks": {
+                "credentials": {
+                    "api_key": "da08a2cd-fec5-434e-9833-535d8207cbea",
+                    "api_private_key": "-----BEGIN PRIVATE KEY-----\n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\nKddhRrPogQxGl0y0LgW9z+YFyhNo4A==\n-----END PRIVATE KEY-----\n"
+                },
+                "rest": {
+                    "base_uri": "https://api.fireblocks.io",
+                    "api_path": "",
+                    "request_timeout": 10,
+                    "rate_limits": {
+                        "limits": [
+                            {
+                                "key": "api.fireblocks.io",
+                                "interval": 6,
+                                "limit": 10
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "max_signature_generators": 2,
+        "request_cache": {
+            "finalised_requests_cleanup_after_s": 600,
+            "store_in_redis": false
+        },
+        "transactions_status_poller": {
+            "poll_interval_s": 15
+        },
+        "fireblocks": {
+            "native_asset": "ETH",
+            "token_types": [
+                "ERC20",
+                "BASE_ASSET"
+            ]
+        }
+    }
+}
