@@ -18,10 +18,13 @@ log_error() {
 }
 
 [[ "${PROCESS_NAME}" ]] || log_error "PROCESS_NAME environment variable not set"
+[[ "${SOURCE_PATH}" ]] || log_error "SOURCE_PATH environment variable not set"
 
 . /app/auros/bin/activate
 
+cd ${SOURCE_PATH}
+
 # /app/auros/config will be cloned by an enclave init process.
-python3 -u -m dex_proxy --process-name ${PROCESS_NAME} -c /app/auros/config/${PROCESS_NAME}.json -s
+python3 -u -m dex_proxy.main --process-name ${PROCESS_NAME} -c /app/auros/config/${PROCESS_NAME}.json -s
 
 exit $?

@@ -6,6 +6,8 @@ RUN apt-get update \
   && mkdir -p ~/.ssh \
   && ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts \
   && python3 -m venv /app/venv \
+  && . /app/venv/bin/activate \
+  && pip3 install --upgrade pip==22.3.1 \
   && mkdir /var/run/sshd \
   && chmod 0755 /var/run/sshd \
   && passwd -d root \

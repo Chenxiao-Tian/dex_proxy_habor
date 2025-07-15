@@ -57,3 +57,5 @@ gpgout.log
 gitout.log
 
 dex_proxy.egg-info
+py_dex_common.egg-info
+gte_dex_proxy.egg-info

@@ -2,8 +2,11 @@
 FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:dcc12ea35886641ad46771c037f8541585ba105a0bc2634845df082b8748f1bf as builder
 
 ARG SSH_PRIVATE_KEY_BASE64
+ARG SOURCE_PATH
 
 RUN /bin/bash -c '[[ "${SSH_PRIVATE_KEY_BASE64}" ]] || { echo "SSH_PRIVATE_KEY_BASE64 build argument not set"; exit 1; }'
+# Temporary test to ensure SOURCE_PATH is set.
+RUN /bin/bash -c '[[ "${SOURCE_PATH}" ]] || { echo "SOURCE_PATH build argument not set"; exit 1; }'
 
 COPY . /app/auros
 
@@ -20,7 +23,8 @@ RUN apt-get update \
   && ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts \
   && python3 -m venv /app/auros \
   && . /app/auros/bin/activate \
-  && pip3 install . \
+  && pip3 install --upgrade pip==22.3.1 \
+  && pip3 install ./${SOURCE_PATH} \
   && rm -f /build/private/key \
   && rm -rf /app/auros/.git
 
@@ -41,6 +45,7 @@ FROM registry.gitlab.com/auros/baseimg/ubuntu@sha256:bdee4974abbd767e5db14879c1e
 # Context ID is unique to this enclave.
 ARG CONTEXT_ID
 ARG PROCESS_NAME
+ARG SOURCE_PATH
 ARG VAULT_APPROLE_ID
 ARG VAULT_SECRET_ID
 ARG VAULT_WALLET_NAME
@@ -51,6 +56,7 @@ ARG CONFIG_REPO_URI
 
 ENV CONTEXT_ID=${CONTEXT_ID}
 ENV PROCESS_NAME=${PROCESS_NAME}
+ENV SOURCE_PATH=${SOURCE_PATH}
 ENV VAULT_APPROLE_ID=${VAULT_APPROLE_ID}
 ENV VAULT_SECRET_ID=${VAULT_SECRET_ID}
 ENV VAULT_WALLET_NAME=${VAULT_WALLET_NAME}
