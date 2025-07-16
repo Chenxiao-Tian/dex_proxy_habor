@@ -85,15 +85,9 @@ stages:
   - PROCESS_NAME: dex_proxy-per-testnet
     ENVIRONMENT:  dev
     SOURCE_PATH: per
-  - PROCESS_NAME: dex_proxy-per-main
-    ENVIRONMENT:  prod
-    SOURCE_PATH: per
-  - PROCESS_NAME: dex_proxy-per-mode
-    ENVIRONMENT:  prod
-    SOURCE_PATH: per
-  - PROCESS_NAME: dex_proxy-per-eth
-    ENVIRONMENT:  prod
-    SOURCE_PATH: per
+  #- PROCESS_NAME: dex_proxy-per-sol  # This is running off a special per-sol branch
+  #  ENVIRONMENT:  prod
+  #  SOURCE_PATH: per
   - PROCESS_NAME: dex_proxy-chainEth-native-test
     ENVIRONMENT:  dev
     SOURCE_PATH: native
