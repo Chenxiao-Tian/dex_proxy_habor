@@ -56,7 +56,7 @@ class DexCommon(ABC):
         self._withdrawal_address_whitelists = defaultdict(set)
 
         # Temporarily enable full schema for the following dexes
-        oapi_support=["edex", "gte", "hype", "pdex", "lyra", "vert", "drift"]   # TODO: use the name from common utils
+        oapi_support=["edex", "gte"]   # TODO: use the name from common utils
         self._server.register(
             'POST', '/private/approve-token', self.__approve_token,
             request_model=schemas.ApproveTokenRequest,

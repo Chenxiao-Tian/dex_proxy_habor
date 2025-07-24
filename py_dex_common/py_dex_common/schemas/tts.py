@@ -23,7 +23,7 @@ GAS_PRICE_WEI_FIELD = Field(
     example=25_000_000_000,
 )
 GAS_LIMIT_FIELD = Field(
-    ...,
+    default=None,
     description="Gas limit for the on-chain transaction",
     example=500_000,
 )
@@ -56,7 +56,7 @@ class ApproveTokenRequest(BaseModel):
     symbol: str = SYMBOL_FIELD
     amount: Decimal = AMOUNT_FIELD
     gas_price_wei: int = GAS_PRICE_WEI_FIELD
-    gas_limit: int = GAS_LIMIT_FIELD
+    gas_limit: Optional[int] = GAS_LIMIT_FIELD
 
     class Config:
         json_encoders = {Decimal: lambda v: str(v)}
