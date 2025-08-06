@@ -6,6 +6,11 @@
         "type": "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
         "scalar": 1000000
       },
+      "IKA": {
+        "address": "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa",
+        "type": "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA",
+        "scalar": 1000000000
+      },
       "NS": {
         "address": "0x5145494a5f5100e645e4b0aa950fa6b68f614e8c59e17bc5ded3495123a79178",
         "type": "0x5145494a5f5100e645e4b0aa950fa6b68f614e8c59e17bc5ded3495123a79178::ns::NS",
@@ -56,6 +61,11 @@
       "DEEP_USDC": {
         "address": "0xf948981b806057580f91622417534f491da5f61aeaf33d0ed8e69fd5691c95ce",
         "baseCoin": "DEEP",
+        "quoteCoin": "USDC"
+      },
+      "IKA_USDC": {
+        "address": "0xfa732993af2b60d04d7049511f801e79426b2b6a5103e22769c0cead982b0f47",
+        "baseCoin": "IKA",
         "quoteCoin": "USDC"
       },
       "NS_SUI": {
@@ -184,6 +194,11 @@
         "type": "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
         "scalar": 1000000
       },
+      "IKA": {
+        "address": "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa",
+        "type": "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA",
+        "scalar": 1000000000
+      },
       "NS": {
         "address": "0x5145494a5f5100e645e4b0aa950fa6b68f614e8c59e17bc5ded3495123a79178",
         "type": "0x5145494a5f5100e645e4b0aa950fa6b68f614e8c59e17bc5ded3495123a79178::ns::NS",
@@ -234,6 +249,11 @@
       "DEEP_USDC": {
         "address": "0xf948981b806057580f91622417534f491da5f61aeaf33d0ed8e69fd5691c95ce",
         "baseCoin": "DEEP",
+        "quoteCoin": "USDC"
+      },
+      "IKA_USDC": {
+        "address": "0xfa732993af2b60d04d7049511f801e79426b2b6a5103e22769c0cead982b0f47",
+        "baseCoin": "IKA",
         "quoteCoin": "USDC"
       },
       "NS_SUI": {
