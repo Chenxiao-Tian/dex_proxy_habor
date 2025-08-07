@@ -183,6 +183,15 @@
           "0x8feb43c930f6041df75e2d1f50aa172c83903b7fe7ca0ca665f75c1a9bebf4ed",
           "0x607fd67c24fbd09154ab60b0f049cca51635bcc2d4d1306bc793b08d8e4091f1"
         ]
+      },
+      {
+        "coin_type": "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA",
+        "valid_withdrawal_addresses": [
+          "0x402d13cb9cac1c7a4c8115bb81869ad147447953759a1b7bb832913270162110",
+          "0x8feb43c930f6041df75e2d1f50aa172c83903b7fe7ca0ca665f75c1a9bebf4ed",
+          "0x607fd67c24fbd09154ab60b0f049cca51635bcc2d4d1306bc793b08d8e4091f1",
+          "0x9fecd959d1535ec848767e206a56863bb8e4ba045be3a826ab56779c452ea938"
+        ]
       }
     ]
   },
