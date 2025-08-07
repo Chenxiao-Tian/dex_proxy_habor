@@ -27,7 +27,7 @@ stages:
     SOURCE_PATH: uniswap_v3
   - PROCESS_NAME: dex_proxy-chainEth-uni3-main-1
     ENVIRONMENT: prod
-    SOURCE_PATH: uniswap_v3
+    SOURCE_PATH: uniswap_v3_blx
   - PROCESS_NAME: dex_proxy-eth-uni3-2
     ENVIRONMENT: prod
     SOURCE_PATH: uniswap_v3
