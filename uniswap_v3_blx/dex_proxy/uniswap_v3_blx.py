@@ -860,7 +860,7 @@ class UniswapV3Bloxroute(DexCommon):
 
         bundle_jobs = []
         for builder_rpc_url in self.__builders_rpc:
-            if "flashbots" in builder_rpc_url or "titanbuilder" in builder_rpc_url:
+            if "buildernet" in builder_rpc_url or "flashbots" in builder_rpc_url or "titanbuilder" in builder_rpc_url:
                 if signed_header is None:
                     sign_begin_at_ms = int(time.time() * 1_000)
 
