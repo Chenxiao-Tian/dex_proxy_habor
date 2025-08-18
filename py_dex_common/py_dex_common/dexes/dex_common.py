@@ -61,7 +61,7 @@ class DexCommon(ABC):
             'POST', '/private/approve-token', self.__approve_token,
             request_model=schemas.ApproveTokenRequest,
             response_model=schemas.TxResponse,
-            responses={
+            response_errors={
                 400: {"model": schemas.ErrorResponse},
                 404: {"model": schemas.ErrorResponse},
                 408: {"model": schemas.ErrorResponse},
@@ -74,7 +74,7 @@ class DexCommon(ABC):
             'POST', '/private/withdraw', self.transfer,
             request_model=schemas.WithdrawRequest,
             response_model=schemas.TxResponse,
-            responses={
+            response_errors={
                 400: {"model": schemas.ErrorResponse},
                 404: {"model": schemas.ErrorResponse},
                 408: {"model": schemas.ErrorResponse},
@@ -86,7 +86,7 @@ class DexCommon(ABC):
         self._server.register('POST', '/private/amend-request', self.__amend_request,
             request_model=schemas.AmendRequestParams,
             response_model=schemas.AmendRequestSuccess,
-            responses={
+            response_errors={
                 400: {"model": schemas.ErrorResponse},
                 404: {"model": schemas.ErrorResponse},
                 408: {"model": schemas.ErrorResponse},
@@ -98,7 +98,7 @@ class DexCommon(ABC):
         self._server.register('DELETE', '/private/cancel-request', self.__cancel_request,
             request_model=schemas.CancelRequestParams,
             response_model=schemas.CancelSuccessResponse,
-            responses={
+            response_errors={
                 400: {"model": schemas.ErrorResponse},
                 404: {"model": schemas.ErrorResponse},
                 408: {"model": schemas.ErrorResponse},

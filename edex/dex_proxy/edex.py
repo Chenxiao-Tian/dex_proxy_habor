@@ -1,12 +1,9 @@
-import asyncio
 import logging
 import inspect
-from typing import Any, Dict, Optional, Set, Tuple
 
 from py_dex_common.dexes.dex_common import DexCommon
 
 from pydantic import ValidationError
-from pyutils.exchange_connectors import ConnectorType
 
 import asyncio
 from typing import Any, Dict, Optional, Set, Tuple
@@ -83,7 +80,7 @@ class Edex(DexCommon):
             self._cancel_order,
             request_model=schemas.CancelOrderParams,
             response_model=schemas.CancelOrderSuccess,
-            responses={
+            response_errors={
                 400: {"model": schemas.CancelOrderErrorResponse},
                 404: {"model": schemas.CancelOrderErrorResponse},
             },
@@ -106,7 +103,7 @@ class Edex(DexCommon):
             self._query_order,
             request_model=schemas.QueryOrderParams,
             response_model=schemas.QueryOrderResponse,
-            responses={404: {"model": schemas.CancelOrderErrorResponse}},
+            response_errors={404: {"model": schemas.CancelOrderErrorResponse}},
             summary="Get a single order",
             tags=["public"],
             oapi_in=["edex"],
@@ -238,6 +235,8 @@ class Edex(DexCommon):
     async def _query_order(
         self, path: str, params: Dict[str, Any], received_at_ms: int
     ) -> Tuple[int, Dict[str, Any]]:
+        if params["client_order_id"] == "invalid_order_id":
+            raise ValueError("Invalid order ID")
         _logger.debug(f"test {inspect.currentframe().f_code.co_name}] "
             f"received_at_ms={received_at_ms}, path={path}, params={params}")
         return 200, schemas.QueryOrderResponse.model_config["json_schema_extra"]["example"]  # type: ignore

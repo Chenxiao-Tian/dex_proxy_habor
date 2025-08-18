@@ -111,6 +111,9 @@
         },
         "fireblocks": {
             "native_asset": "ETH"
+        },
+        "order_poller": {
+            "orders_polling_interval_s": 5
         }
     }
 }
