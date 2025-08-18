@@ -14,6 +14,9 @@ from fastopenapi.routers import AioHttpRouter
 
 from pantheon.utils import receive_json
 
+from py_dex_common.web_server.dexproxy_aiohtttp_router import DexProxyAioHttpRouter
+from py_dex_common.web_server.error_handling import DexProxyGenericAPIError
+
 _logger = logging.getLogger('WebServer')
 
 
@@ -25,7 +28,7 @@ class WebServer:
         self.__name = name
         self.__app = web.Application()
 
-        self.__router = AioHttpRouter(
+        self.__router = DexProxyAioHttpRouter(
             app=self.__app,
             title=f"DEX Proxy for '{name}'",
             version=f"1.0.6",
@@ -58,7 +61,7 @@ class WebServer:
         *,
         request_model: Optional[Type[BaseModel]] = None,
         response_model: Optional[Type[BaseModel]] = None,
-        responses: Optional[Dict[int, Type[BaseModel]]] = None,
+        response_errors: Optional[Dict[int, Type[BaseModel]]] = None,
         summary: Optional[str] = None,
         tags: Optional[List[str]] = None,
         oapi_in: Optional[List[str]] = None,
@@ -73,26 +76,40 @@ class WebServer:
 
         if use_openapi:
             async def _common(params: dict):
-                request_id     = self.__get_next_request_id()
-                received_at_ms = int(time.time() * 1000)
-                _logger.debug(
-                    f'oapi [{request_id}] received_at_ms={received_at_ms}, '
-                    f'path={path}, params={params}'
-                )
+                try:
+                    request_id     = self.__get_next_request_id()
+                    received_at_ms = int(time.time() * 1000)
+                    _logger.debug(
+                        f'oapi [{request_id}] received_at_ms={received_at_ms}, '
+                        f'path={path}, params={params}'
+                    )
 
-                status, data = await handler(path, params, received_at_ms)
-                _logger.debug(f'[{request_id}] status={status}, data={data}')
+                    status, data = await handler(path, params, received_at_ms)
+                    _logger.debug(f'[{request_id}] status={status}, data={data}')
 
-                if status != 200:
-                    try:
-                        ujson.dumps(data)
-                        safe = data
-                    except Exception:
-                        safe = {"message": str(data)}
-                    # return an error envelope; FastOpenAPI will serialize this safely
-                    return {"error": safe, "http_status": status}
+                    if status != 200:
+                        if isinstance(data, BaseModel):
+                            raise DexProxyGenericAPIError(data, status)
+                        else:
+                            try:
+                                ujson.dumps(data)
+                                safe = data
+                            except Exception as e:
+                                _logger.exception(f'[{request_id}] status={status}, data={str(data)}')
+                                safe = {"message": str(data)}
 
-                return response_model(**data).model_dump(mode="json")
+                            raise DexProxyGenericAPIError(safe, status)
+
+                    if isinstance(data, BaseModel):
+                        model = data
+                    else:
+                        model = response_model(**data)
+
+                    model_json = model.model_dump(mode="json")
+                except Exception as e:
+                    _logger.exception("Error occurred during request handling")
+                    raise e
+                return model_json
 
 
             decorator_args: Dict[str, Any] = {
@@ -101,9 +118,9 @@ class WebServer:
                 "status_code":    200,
                 "tags":           tags or [],
             }
-            if responses:
-                decorator_args["responses"] = {
-                    code: {"model": mdl} for code, mdl in responses.items()
+            if response_errors:
+                decorator_args["response_errors"] = {
+                    code: {"model": mdl} for code, mdl in response_errors.items()
                 }
 
             if request_model is not None:

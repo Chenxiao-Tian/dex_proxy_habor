@@ -49,7 +49,7 @@ class Gte(DexCommon):
             self._cancel_order,
             request_model=schemas.CancelOrderParams,
             response_model=schemas.CancelOrderSuccess,
-            responses={
+            response_errors={
                 400: {"model": schemas.CancelOrderErrorResponse},
                 404: {"model": schemas.CancelOrderErrorResponse},
             },
@@ -72,7 +72,7 @@ class Gte(DexCommon):
             self.__get_order,
             request_model=schemas.QueryOrderParams,
             response_model=schemas.QueryOrderResponse,
-            responses={404: {"model": schemas.CancelOrderErrorResponse}},
+            response_errors={404: {"model": schemas.CancelOrderErrorResponse}},
             summary="Get a single order",
             tags=["public"],
             oapi_in=["gte"],
