@@ -1,18 +1,17 @@
-import asyncio
 import concurrent
+import json
 import logging
-import weakref
 import time
+import weakref
 from typing import Callable, Awaitable, Optional, Type, List, Dict, Any
 
 import ujson
-
-import aiohttp
 from aiohttp import web, WSCloseCode
-from pydantic import BaseModel
 from fastopenapi.routers import AioHttpRouter
-
 from pantheon.utils import receive_json
+from pydantic import BaseModel
+
+from .utils import json_type_formatter
 
 from py_dex_common.web_server.dexproxy_aiohtttp_router import DexProxyAioHttpRouter
 from py_dex_common.web_server.error_handling import DexProxyGenericAPIError
@@ -52,32 +51,30 @@ class WebServer:
     def app(self):
         return self.__app
 
-
     def register(
-        self,
-        method: str,
-        path: str,
-        handler: Callable[[str, Dict[str, Any], int], Awaitable[tuple[int, Dict[str, Any]]]],
-        *,
-        request_model: Optional[Type[BaseModel]] = None,
-        response_model: Optional[Type[BaseModel]] = None,
-        response_errors: Optional[Dict[int, Type[BaseModel]]] = None,
-        summary: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        oapi_in: Optional[List[str]] = None,
+            self,
+            method: str,
+            path: str,
+            handler: Callable[[str, Dict[str, Any], int], Awaitable[tuple[int, Dict[str, Any]]]],
+            *,
+            request_model: Optional[Type[BaseModel]] = None,
+            response_model: Optional[Type[BaseModel]] = None,
+            response_errors: Optional[Dict[int, Type[BaseModel]]] = None,
+            summary: Optional[str] = None,
+            tags: Optional[List[str]] = None,
+            oapi_in: Optional[List[str]] = None,
     ) -> None:
 
         use_openapi = (
-            oapi_in is not None
-            and self.__name in oapi_in
-            and response_model is not None
+                oapi_in is not None
+                and self.__name in oapi_in
+                and response_model is not None
         )
-
 
         if use_openapi:
             async def _common(params: dict):
                 try:
-                    request_id     = self.__get_next_request_id()
+                    request_id = self.__get_next_request_id()
                     received_at_ms = int(time.time() * 1000)
                     _logger.debug(
                         f'oapi [{request_id}] received_at_ms={received_at_ms}, '
@@ -111,12 +108,11 @@ class WebServer:
                     raise e
                 return model_json
 
-
             decorator_args: Dict[str, Any] = {
-                "request_body":   request_model,
+                "request_body": request_model,
                 "response_model": response_model,
-                "status_code":    200,
-                "tags":           tags or [],
+                "status_code": 200,
+                "tags": tags or [],
             }
             if response_errors:
                 decorator_args["response_errors"] = {
@@ -136,7 +132,6 @@ class WebServer:
             getattr(self.__router, method.lower())(path, **decorator_args)(endpoint)
             return
 
-
         def wrapper(wrapped):
             async def inner(request: web.Request):
                 received_at_ms = int(time.time() * 1000)
@@ -154,7 +149,9 @@ class WebServer:
                 except Exception as e:
                     _logger.error(
                         f'[{request_id}] error=Malformed JSON, received_at_ms={received_at_ms}, remote={request.remote}, method={request.method}, path={request.path}, raw_request={raw_request}')
-                    return web.json_response(data={"error": f"Unable to parse request payload as JSON. payload={raw_request}, parsing_error={e}"}, status=400)
+                    return web.json_response(data={
+                        "error": f"Unable to parse request payload as JSON. payload={raw_request}, parsing_error={e}"},
+                                             status=400)
 
                 try:
                     status, data = await wrapped(request.path, params, received_at_ms)
@@ -162,13 +159,14 @@ class WebServer:
                     return web.json_response(data={"error": {"message": str(e)}}, status=500)
 
                 _logger.debug(f'[{request_id}] status={status}, data={data}')
-                return web.json_response(data=data, status=status)
+                return web.json_response(data=data, status=status,
+                                         dumps=lambda x: json.dumps(x, default=json_type_formatter))
 
             return inner
 
         for route in self.__app.router.routes():
             assert not (
-                route.method == method and str(route.resource) == path
+                    route.method == method and str(route.resource) == path
             ), f"[WebServer] duplicate route: {method} {path}"
 
         self.__app.add_routes([web.route(method, path, wrapper(handler))])

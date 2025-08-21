@@ -2,7 +2,7 @@ from pantheon import Pantheon, StandardArgParser
 from py_dex_common.dex_proxy import DexProxy
 from py_dex_common.web_server import WebServer
 
-from .uniswap_v4 import UniswapV4
+from uniswap_shared.uniswap_v4 import UniswapV4
 
 
 class Main(DexProxy):

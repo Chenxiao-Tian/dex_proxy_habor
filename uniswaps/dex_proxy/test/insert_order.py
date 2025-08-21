@@ -17,7 +17,7 @@ def insert(client_request_id: str):
     data = {
         "client_request_id": str(client_request_id),
         "dex": "v4",
-        "symbol": "AMM-WETH/USDC-Pool915",
+        "symbol": "AMM-WETH/USDC-Pool935",
         "base_ccy_qty": "0.000022",
         "quote_ccy_qty": "0.088",
         "side": "SELL",

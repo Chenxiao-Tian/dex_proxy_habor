@@ -1,0 +1,13 @@
+{
+    "Arbitrum Mainnet": {
+        "tokens": [],
+        "__tokens_comment": "tokens are loaded automatically from fordefi",
+        "chain_id": 42161,
+        "pool_manager_address": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+        "__pool_manager_comment": "Uniswap V4 use centralized pool manager for swapping, no more individual pool address",
+        "universal_router_address": "0xa51afafe0263b40edaef0df8781ea9aa03e381a3",
+        "__universal_router_comment": "V4 only supports universal router, no specific router like V3",
+        "permit2_address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "__permit2_comment": "universal router requires permit2 for token allowance"
+    }
+}

@@ -17,6 +17,7 @@ from pyutils.exchange_apis.dex_common import *
 
 import py_dex_common.schemas as schemas
 
+
 class DexCommon(ABC):
     """
     The DexCommon class is a base class for all common request handlers to inherit from.
@@ -37,7 +38,8 @@ class DexCommon(ABC):
         self._event_sink = event_sink
 
         self._request_cache = RequestsCache(pantheon, config['request_cache'], self)
-        self._transactions_status_poller = TransactionsStatusPoller(pantheon, config['transactions_status_poller'], self)
+        self._transactions_status_poller = TransactionsStatusPoller(pantheon, config['transactions_status_poller'],
+                                                                    self)
 
         if 'max_allowed_gas_price_gwei' in config:
             self.__max_allowed_gas_price_wei = config['max_allowed_gas_price_gwei'] * 10 ** 9
@@ -56,7 +58,7 @@ class DexCommon(ABC):
         self._withdrawal_address_whitelists = defaultdict(set)
 
         # Temporarily enable full schema for the following dexes
-        oapi_support=["edex", "gte"]   # TODO: use the name from common utils
+        oapi_support = ["edex", "gte"]  # TODO: use the name from common utils
         self._server.register(
             'POST', '/private/approve-token', self.__approve_token,
             request_model=schemas.ApproveTokenRequest,
@@ -84,57 +86,57 @@ class DexCommon(ABC):
             oapi_in=oapi_support
         )
         self._server.register('POST', '/private/amend-request', self.__amend_request,
-            request_model=schemas.AmendRequestParams,
-            response_model=schemas.AmendRequestSuccess,
-            response_errors={
-                400: {"model": schemas.ErrorResponse},
-                404: {"model": schemas.ErrorResponse},
-                408: {"model": schemas.ErrorResponse},
-            },
-            summary="Amend order",
-            tags=["private"],
-            oapi_in=oapi_support
-        )
+                              request_model=schemas.AmendRequestParams,
+                              response_model=schemas.AmendRequestSuccess,
+                              response_errors={
+                                  400: {"model": schemas.ErrorResponse},
+                                  404: {"model": schemas.ErrorResponse},
+                                  408: {"model": schemas.ErrorResponse},
+                              },
+                              summary="Amend order",
+                              tags=["private"],
+                              oapi_in=oapi_support
+                              )
         self._server.register('DELETE', '/private/cancel-request', self.__cancel_request,
-            request_model=schemas.CancelRequestParams,
-            response_model=schemas.CancelSuccessResponse,
-            response_errors={
-                400: {"model": schemas.ErrorResponse},
-                404: {"model": schemas.ErrorResponse},
-                408: {"model": schemas.ErrorResponse},
-            },
-            summary="Cancel by request id",
-            tags=["private"],
-            oapi_in=oapi_support
-        )
+                              request_model=schemas.CancelRequestParams,
+                              response_model=schemas.CancelSuccessResponse,
+                              response_errors={
+                                  400: {"model": schemas.ErrorResponse},
+                                  404: {"model": schemas.ErrorResponse},
+                                  408: {"model": schemas.ErrorResponse},
+                              },
+                              summary="Cancel by request id",
+                              tags=["private"],
+                              oapi_in=oapi_support
+                              )
         self._server.register('DELETE', '/private/cancel-all', self._cancel_all,
-            request_model=schemas.CancelAllParams,
-            response_model=schemas.CancelAllResponse,
-            summary="Cancel all",
-            tags=["private"],
-            oapi_in=oapi_support
-        )
+                              request_model=schemas.CancelAllParams,
+                              response_model=schemas.CancelAllResponse,
+                              summary="Cancel all",
+                              tags=["private"],
+                              oapi_in=oapi_support
+                              )
         self._server.register('GET', '/public/get-all-open-requests', self._get_all_open_requests,
-            request_model=schemas.GetAllOpenRequestsParams,
-            response_model=schemas.GetAllOpenRequestsResponse,
-            summary="Get orders, transfers, approvals or wrap/unwraps",
-            tags=["public"],
-            oapi_in=oapi_support
-        )
+                              request_model=schemas.GetAllOpenRequestsParams,
+                              response_model=schemas.GetAllOpenRequestsResponse,
+                              summary="Get orders, transfers, approvals or wrap/unwraps",
+                              tags=["public"],
+                              oapi_in=oapi_support
+                              )
         self._server.register('GET', '/public/get-request-status', self.__get_request_status,
-            request_model=schemas.GetRequestStatusParams,
-            response_model=schemas.GetRequestStatusResponse,
-            summary="Get the status of requests by client_request_id",
-            tags=["public"],
-            oapi_in=oapi_support
-        )
+                              request_model=schemas.GetRequestStatusParams,
+                              response_model=schemas.GetRequestStatusResponse,
+                              summary="Get the status of requests by client_request_id",
+                              tags=["public"],
+                              oapi_in=oapi_support
+                              )
         self._server.register('GET', '/public/status', self.__get_status,
-            request_model=schemas.StatusParams,
-            response_model=schemas.StatusResponse,
-            summary="Get the system status",
-            tags=["public"],
-            oapi_in=oapi_support
-        )
+                              request_model=schemas.StatusParams,
+                              response_model=schemas.StatusResponse,
+                              summary="Get the system status",
+                              tags=["public"],
+                              oapi_in=oapi_support
+                              )
 
     @abstractmethod
     async def on_new_connection(self, ws):
@@ -188,7 +190,8 @@ class DexCommon(ABC):
         pass
 
     @abstractmethod
-    def on_request_status_update(self, client_request_id, request_status: RequestStatus, tx_receipt: dict, mined_tx_hash: str = None):
+    def on_request_status_update(self, client_request_id, request_status: RequestStatus, tx_receipt: dict,
+                                 mined_tx_hash: str = None):
         """
         Called when a request status is changed, usually by `TransactionsStatusPoller`
         """
@@ -233,7 +236,7 @@ class DexCommon(ABC):
     async def _get_all_open_requests(self, path, params, received_at_ms):
         try:
             assert params['request_type'] == 'ORDER' or params['request_type'] == 'TRANSFER' or \
-                params['request_type'] == 'APPROVE' or params['request_type'] == 'WRAP_UNWRAP', \
+                   params['request_type'] == 'APPROVE' or params['request_type'] == 'WRAP_UNWRAP', \
                 'Unknown request type'
             request_type = RequestType[params['request_type']]
 
@@ -291,7 +294,8 @@ class DexCommon(ABC):
                 if result.tx_hash is not None:
                     request.tx_hashes.append((result.tx_hash, RequestType.CANCEL.name))
                     request.used_gas_prices_wei.append(gas_price_wei)
-                    self._transactions_status_poller.add_for_polling(result.tx_hash, client_request_id, RequestType.CANCEL)
+                    self._transactions_status_poller.add_for_polling(result.tx_hash, client_request_id,
+                                                                     RequestType.CANCEL)
                 self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
                 if result.pending_task:
                     await result.pending_task
@@ -312,7 +316,7 @@ class DexCommon(ABC):
     async def _cancel_all(self, path, params: schemas.CancelAllParams, received_at_ms):
         try:
             assert params['request_type'] == 'ORDER' or params['request_type'] == 'TRANSFER' \
-                or params['request_type'] == 'APPROVE' or params['request_type'] == 'WRAP_UNWRAP', \
+                   or params['request_type'] == 'APPROVE' or params['request_type'] == 'WRAP_UNWRAP', \
                 'Unknown transaction type'
             request_type = RequestType[params['request_type']]
 
@@ -338,7 +342,6 @@ class DexCommon(ABC):
                                 f'as cancel with greater than or equal to the gas_price_wei={gas_price_wei} already in progress')
                             cancel_requested.append(request.client_request_id)
                             continue
-
 
                     if gas_price_wei and len(request.used_gas_prices_wei) > 0:
                         gas_price_wei = max(gas_price_wei, int(1.1 * request.used_gas_prices_wei[-1]))
@@ -370,7 +373,8 @@ class DexCommon(ABC):
                 except Exception as ex:
                     self._logger.exception(f'Failed to cancel request={request.client_request_id}: %r', ex)
                     failed_cancels.append(request.client_request_id)
-            return 400 if failed_cancels else 200, {'cancel_requested': cancel_requested, 'failed_cancels': failed_cancels}
+            return 400 if failed_cancels else 200, {'cancel_requested': cancel_requested,
+                                                    'failed_cancels': failed_cancels}
 
         except Exception as e:
             self._logger.exception(f'Failed to cancel all: %r', e)
@@ -393,7 +397,10 @@ class DexCommon(ABC):
             if not ok:
                 return 400, {'error': {'message': reason}}
 
-            request = ApproveRequest(client_request_id, symbol, amount, gas_limit, path, received_at_ms)
+            request = ApproveRequest(client_request_id, symbol, amount, gas_limit, path, received_at_ms,
+                                     dex_specific={
+                                         'dex': params.get('dex')
+                                     })
             self._logger.debug(f'Approving={request}, gas_price_wei={gas_price_wei}')
 
             self._request_cache.add(request)
@@ -442,7 +449,10 @@ class DexCommon(ABC):
             if not ok:
                 return 400, {'error': {'message': reason}}
 
-            transfer = TransferRequest(client_request_id, symbol, amount, address_to, gas_limit, path, received_at_ms)
+            transfer = TransferRequest(client_request_id, symbol, amount, address_to, gas_limit, path, received_at_ms,
+                                       dex_specific={
+                                           'dex': params.get('dex')
+                                       })
             self._logger.debug(f'Transferring={transfer}, request_path={path}, gas_price_wei={gas_price_wei}')
 
             self._request_cache.add(transfer)
@@ -541,4 +551,3 @@ class DexCommon(ABC):
     def assertRequiredFields(self, params: dict, required_fields: list):
         for field in required_fields:
             assert field in params, f'Missing required field: {field}'
-

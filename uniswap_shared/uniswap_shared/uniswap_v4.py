@@ -30,12 +30,12 @@ class UniswapV4(DexCommon):
 
     CHANNELS = ['ORDER']
 
-    def __init__(self, pantheon: Pantheon, config, server, event_sink):
+    def __init__(self, pantheon: Pantheon, config, server, event_sink, connector_type=ConnectorType.UniswapV4):
         super().__init__(pantheon, config, server, event_sink)
-        
+
         api_factory = ApiFactory(ConnectorFactory(config["connectors"]))
-        self._api = api_factory.create(self.pantheon, ConnectorType.UniswapV4)
-        
+        self._api = api_factory.create(self.pantheon, connector_type)
+
         self.msg_queue = asyncio.Queue()
 
         self._server.register('POST', '/private/insert-order', self._insert_order)
@@ -446,4 +446,3 @@ class UniswapV4(DexCommon):
 
         else:
             raise Exception(f"Cancelling not supported for the {request.request_type}")
-

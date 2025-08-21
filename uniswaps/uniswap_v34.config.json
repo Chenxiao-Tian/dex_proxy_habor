@@ -1,0 +1,152 @@
+{
+    "logging": {
+        "level": "info",
+        "overrides": [
+            {
+                "logger_name": "whitelisting_manager",
+                "level": "error"
+            },
+            {
+                "logger_name": "transaction_status_poller",
+                "level": "error"
+            }
+        ]
+    },
+    "RabbitMQ": {
+        "url": "amqp://dev-sng-rmq.kdev"
+    },
+    "Redis": {
+        "host": "localhost",
+        "port": 6379
+    },
+    "server": {
+        "port": 1958
+    },
+    "key_store_file_path": "dex_proxy/test/wallet.json",
+    "dex": {
+        "name": "Uniswap V3 V4",
+        "request_cache": {
+            "finalised_requests_cleanup_after_s": 1000,
+            "pending_requests_cleanup_after_s": 2000,
+            "store_in_redis": false
+        },
+        "transactions_status_poller": {
+            "poll_interval_s": 0.2
+        },
+        "v3": {
+            "name": "chainArb-uni3",
+            "chain_name": "Arbitrum Mainnet",
+            "native_token": "ETH",
+            "resources_file_path": "/resources/uni3_arb_contracts_address.json",
+            "connectors": {
+                "uniswap_v3_arb_new": {
+                    "web3": {
+                        "http": "https://arbitrum-mainnet.infura.io/v3/7caed52cb5f943a6977f49447ab73e4d"
+                    },
+                    "websocket": {
+                        "base_uri": "wss://arb-mainnet.g.alchemy.com/v2/kfvUzi6e5YMNjOkVQ9-613Ye8hoqAe0a"
+                    }
+                },
+                "atl": {
+                    "credentials": {
+                        "api_key": "eyJhbGciOiJFZERTQSIsImtpZCI6ImZ3MFc3aVpocUc0SUEzaXV4ZmhQIiwidHlwIjoiSldUIn0.eyJpc3MiOiJodHRwczovL2FwaS5mb3JkZWZpLmNvbS8iLCJzdWIiOiI1ODZjZWMwNS01MzIzLTRhOGYtODc0OC0zYzVlYzhiYmJjNmJAZm9yZGVmaSIsImF1ZCI6WyJodHRwczovL2FwaS5mb3JkZWZpLmNvbS9hcGkvIl0sImV4cCI6MjA0NzUzMDMwMywiaWF0IjoxNzMyMTcwMzAzLCJqdGkiOiJhZDEyMTA5Ni00N2NhLTQ1YjItYjZiOS1iYjI3ODc4NmY5MTQifQ.rM67SFqSrQZPu2CWMHEcpyB1PXoFtJKlyT3AmWJunA23dxgHH0RWVM0fHpdw5TUnLVCisc8WZwSTIgqWPZTACQ"
+                    },
+                    "rest": {
+                        "base_uri": "https://api.fordefi.com/",
+                        "api_path": "/api",
+                        "request_timeout": 60,
+                        "rate_limits": {
+                            "limits": [
+                                {
+                                    "key": "api.fordefi.com",
+                                    "interval": 1,
+                                    "limit": 5
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "max_allowed_gas_price_gwei": 50,
+            "request_cache": {
+                "finalised_requests_cleanup_after_s": 1000,
+                "store_in_redis": false
+            },
+            "transactions_status_poller": {
+                "poll_interval_s": 0.2
+            },
+            "fordefi": {
+                "connectors": [
+                    "atl"
+                ],
+                "poll_interval_s": 600,
+                "blockchain": "evm_arbitrum_mainnet",
+                "token_types": [
+                    "erc20"
+                ]
+            }
+        },
+        "v4": {
+            "name": "chainArb-uni4",
+            "chain_name": "Arbitrum Mainnet",
+            "native_token": "ETH",
+            "resources_file_path": "/resources/uni4_arb_contracts_address.json",
+            "connectors": {
+                "uniswap_v4_new": {
+                    "web3": {
+                        "http": "https://arbitrum-mainnet.infura.io/v3/7caed52cb5f943a6977f49447ab73e4d"
+                    },
+                    "websocket": {
+                        "base_uri": "wss://arb-mainnet.g.alchemy.com/v2/kfvUzi6e5YMNjOkVQ9-613Ye8hoqAe0a"
+                    }
+                },
+                "atl": {
+                    "credentials": {
+                        "api_key": "eyJhbGciOiJFZERTQSIsImtpZCI6ImZ3MFc3aVpocUc0SUEzaXV4ZmhQIiwidHlwIjoiSldUIn0.eyJpc3MiOiJodHRwczovL2FwaS5mb3JkZWZpLmNvbS8iLCJzdWIiOiI1ODZjZWMwNS01MzIzLTRhOGYtODc0OC0zYzVlYzhiYmJjNmJAZm9yZGVmaSIsImF1ZCI6WyJodHRwczovL2FwaS5mb3JkZWZpLmNvbS9hcGkvIl0sImV4cCI6MjA0NzUzMDMwMywiaWF0IjoxNzMyMTcwMzAzLCJqdGkiOiJhZDEyMTA5Ni00N2NhLTQ1YjItYjZiOS1iYjI3ODc4NmY5MTQifQ.rM67SFqSrQZPu2CWMHEcpyB1PXoFtJKlyT3AmWJunA23dxgHH0RWVM0fHpdw5TUnLVCisc8WZwSTIgqWPZTACQ"
+                    },
+                    "rest": {
+                        "base_uri": "https://api.fordefi.com/",
+                        "api_path": "/api",
+                        "request_timeout": 60,
+                        "rate_limits": {
+                            "limits": [
+                                {
+                                    "key": "api.fordefi.com",
+                                    "interval": 1,
+                                    "limit": 5
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "fireblocks": {
+                "poll_interval_s": 600,
+                "native_asset": "ETH-AETH",
+                "token_types": [
+                    "ERC20",
+                    "BASE_ASSET"
+                ]
+            },
+            "max_allowed_gas_price_gwei": 50,
+            "request_cache": {
+                "finalised_requests_cleanup_after_s": 1000,
+                "pending_requests_cleanup_after_s": 2000,
+                "store_in_redis": false
+            },
+            "transactions_status_poller": {
+                "poll_interval_s": 0.2
+            },
+            "fordefi": {
+                "connectors": [
+                    "atl"
+                ],
+                "poll_interval_s": 600,
+                "blockchain": "evm_arbitrum_mainnet",
+                "token_types": [
+                    "erc20"
+                ]
+            }
+        }
+    }
+}
