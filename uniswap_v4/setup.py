@@ -23,6 +23,7 @@ tag = get_version_from_git_tag(tag)
 rev = run('git', 'rev-parse', '--short=8', 'HEAD')
 
 py_dex_common_path = os.path.abspath("../py_dex_common")
+uniswap_shared_path = os.path.abspath("../uniswap_shared")
 
 setuptools.setup(
     name="dex_proxy",
@@ -30,6 +31,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         f"py_dex_common @ file://{py_dex_common_path}",
-        "pyutils[web3] @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.17.4"
+        f"uniswap_shared @ file://{uniswap_shared_path}",
+        "pyutils[web3] @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.0"
     ]
 )

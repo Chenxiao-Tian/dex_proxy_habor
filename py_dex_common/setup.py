@@ -29,7 +29,7 @@ setuptools.setup(
     install_requires=[
         'msgpack==1.0.8',
         'orjson==3.10.18',
-        "pyutils @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.17.4",
+        "pyutils @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.0",
         "fastopenapi"
     ]
 )

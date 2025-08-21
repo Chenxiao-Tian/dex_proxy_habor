@@ -83,47 +83,53 @@ stages:
     ENVIRONMENT: prod
     SOURCE_PATH: hype
   - PROCESS_NAME: dex_proxy-per-testnet
-    ENVIRONMENT:  dev
+    ENVIRONMENT: dev
     SOURCE_PATH: per
   #- PROCESS_NAME: dex_proxy-per-sol  # This is running off a special per-sol branch
   #  ENVIRONMENT:  prod
   #  SOURCE_PATH: per
   - PROCESS_NAME: dex_proxy-chainEth-native-test
-    ENVIRONMENT:  dev
+    ENVIRONMENT: dev
     SOURCE_PATH: native
   - PROCESS_NAME: dex_proxy-chainArb-native-test
-    ENVIRONMENT:  dev
+    ENVIRONMENT: dev
     SOURCE_PATH: native
   - PROCESS_NAME: dex_proxy-chainEth-native-main
-    ENVIRONMENT:  prod
+    ENVIRONMENT: prod
     SOURCE_PATH: native
   - PROCESS_NAME: dex_proxy-chainArb-native-main
-    ENVIRONMENT:  prod
+    ENVIRONMENT: prod
     SOURCE_PATH: native
   - PROCESS_NAME: dex_proxy-uni3-arb-1
-    ENVIRONMENT:  prod
+    ENVIRONMENT: prod
     SOURCE_PATH: uniswap_v3
+  - PROCESS_NAME: dex_proxy-uni4-arb-1
+    ENVIRONMENT: prod
+    SOURCE_PATH: uniswap_v4
   - PROCESS_NAME: dex_proxy-vert-1-sonic
-    ENVIRONMENT:  prod
+    ENVIRONMENT: prod
     SOURCE_PATH: vert
   - PROCESS_NAME: dex_proxy-vert-1-arbitrum
-    ENVIRONMENT:  prod
+    ENVIRONMENT: prod
     SOURCE_PATH: vert
   - PROCESS_NAME: dex_proxy-vert-test-1
-    ENVIRONMENT:  dev
+    ENVIRONMENT: dev
     SOURCE_PATH: vert
   - PROCESS_NAME: dex_proxy-chainBera-kod3-1
-    ENVIRONMENT:  prod
+    ENVIRONMENT: prod
     SOURCE_PATH: uniswap_v3
   - PROCESS_NAME: dex_proxy-uni4-uni-1
-    ENVIRONMENT:  prod
+    ENVIRONMENT: prod
     SOURCE_PATH: uniswap_v4
   - PROCESS_NAME: dex_proxy-chainBase-aero-1
-    ENVIRONMENT:  prod
+    ENVIRONMENT: prod
     SOURCE_PATH: uniswap_v3
   - PROCESS_NAME: dex_proxy-gte-test
-    ENVIRONMENT:  dev
+    ENVIRONMENT: dev
     SOURCE_PATH: gte
+  - PROCESS_NAME: dex_proxy-uni34-arb-1
+    ENVIRONMENT: prod
+    SOURCE_PATH: uniswaps
 
 
 # Typescript enclaves.
@@ -185,7 +191,7 @@ variables:
 default:
   image:
     name: $ENCLAVE_BUILD_IMAGE
-    entrypoint: [""]
+    entrypoint: [ "" ]
   services:
     # library/docker:24-dind
     - name: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker@sha256:962ad28b5cddb82c7cadbf222a71c403bd97ef1814005624bd8a3697cbb58bba
