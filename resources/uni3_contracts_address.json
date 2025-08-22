@@ -700,6 +700,11 @@
                   "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974",
                   "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD"
                 ]
+            },
+            {
+              "symbol": "USD1",
+              "address": "0x8d0d000ee44948fc98c9b98a4fa4921476f08b0d",
+              "valid_withdrawal_addresses": []
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
