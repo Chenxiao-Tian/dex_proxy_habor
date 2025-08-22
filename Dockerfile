@@ -23,8 +23,8 @@ RUN apt-get update \
   && ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts \
   && python3 -m venv /app/auros \
   && . /app/auros/bin/activate \
-  && pip3 install --upgrade pip==22.3.1 \
-  && pip3 install ./${SOURCE_PATH} \
+  && pip3 install uv \
+  && uv pip install ./${SOURCE_PATH} \
   && rm -f /build/private/key \
   && rm -rf /app/auros/.git
 

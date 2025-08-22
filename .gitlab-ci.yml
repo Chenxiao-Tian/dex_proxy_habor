@@ -103,18 +103,6 @@ stages:
   - PROCESS_NAME: dex_proxy-uni3-arb-1
     ENVIRONMENT: prod
     SOURCE_PATH: uniswap_v3
-  - PROCESS_NAME: dex_proxy-uni4-arb-1
-    ENVIRONMENT: prod
-    SOURCE_PATH: uniswap_v4
-  - PROCESS_NAME: dex_proxy-vert-1-sonic
-    ENVIRONMENT: prod
-    SOURCE_PATH: vert
-  - PROCESS_NAME: dex_proxy-vert-1-arbitrum
-    ENVIRONMENT: prod
-    SOURCE_PATH: vert
-  - PROCESS_NAME: dex_proxy-vert-test-1
-    ENVIRONMENT: dev
-    SOURCE_PATH: vert
   - PROCESS_NAME: dex_proxy-chainBera-kod3-1
     ENVIRONMENT: prod
     SOURCE_PATH: uniswap_v3
