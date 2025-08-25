@@ -18,8 +18,8 @@ class Main(DexProxy):
             connector_type = ConnectorType.UniswapV3Astria
         elif name == 'chainBera-kod3':
             connector_type = ConnectorType.KodiakV3
-        elif name == 'chainBase-uni3':
-            connector_type = ConnectorType.UniswapV3Base
+        elif name == 'chainBase-aero':
+            connector_type = ConnectorType.Aerodrome
         
         super().__init__(pantheon, web_server, UniswapV3(pantheon, dex_config, web_server, self, connector_type))
 
