@@ -705,6 +705,11 @@
               "symbol": "USD1",
               "address": "0x8d0d000ee44948fc98c9b98a4fa4921476f08b0d",
               "valid_withdrawal_addresses": []
+            },
+            {
+              "symbol": "MORPHO",
+              "address": "0x58d97b57bb95320f9a05dc918aef65434969c2b2",
+              "valid_withdrawal_addresses": []
             }
         ],
         "_comment_0": "https://docs.uniswap.org/contracts/v3/reference/deployments",
