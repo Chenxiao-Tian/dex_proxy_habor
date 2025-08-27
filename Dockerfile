@@ -75,5 +75,7 @@ COPY --from=builder /app/auros/ /app/auros/
 COPY --from=builder /tmp/libsigner.so /app/auros/lib64/python3.10/site-packages/libsigner.so
 COPY container/run /app/auros/run
 COPY container/egress-implicit-internal-websocket-8900.toml /etc/horust/services/
+COPY container/egress-implicit-arbnitro-http-8547.toml /etc/horust/services/
+COPY container/egress-implicit-arbnitro-ws-8548.toml /etc/horust/services/
 
 ENTRYPOINT [ "/init" ]
