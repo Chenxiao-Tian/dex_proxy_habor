@@ -99,8 +99,13 @@
                 },
                 {
                     "symbol": "WEETH",
+                    "bridge_type": "socket_v2",
                     "l1_token_address": "0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee",
-                    "l2_token_address": "0x7B35b4c05a90Ea5f311AeC815BE4148b446a68a2"
+                    "l2_token_address": "0x7B35b4c05a90Ea5f311AeC815BE4148b446a68a2",
+                    "l1_socket_bridge_address": "0x8180EcCC825b692ef65FF099a0A387743788bf78",
+                    "l1_socket_bridge_connector_address": "0xCc958F84DaF36d3eC20BcBee7E99C073B882efc3",
+                    "l2_socket_bridge_address": "0xf58fF1Adc4d045e712a6D91e69d93B4092516659",
+                    "l2_socket_bridge_connector_address": "0x1a22ec8Af98c39075afDf671a1e52bb569F74215"
                 },
                 {
                     "symbol": "DAI",
