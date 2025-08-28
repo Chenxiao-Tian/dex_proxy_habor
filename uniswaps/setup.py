@@ -32,6 +32,6 @@ setuptools.setup(
     install_requires=[
         f"py_dex_common @ file://{py_dex_common_path}",
         f"uniswap_shared @ file://{uniswap_shared_path}",
-        "pyutils[web3] @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.0",
+        "pyutils[web3] @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.4",
     ]
 )

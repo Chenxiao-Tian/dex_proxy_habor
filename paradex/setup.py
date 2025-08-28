@@ -30,6 +30,6 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         f"py_dex_common @ file://{py_dex_common_path}",
-        "pyutils[web3,starknet] @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.0"
+        "pyutils[web3,starknet] @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.4"
     ]
 )
