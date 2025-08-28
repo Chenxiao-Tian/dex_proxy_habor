@@ -62,7 +62,7 @@
   "server": {
     "port": 1958
   },
-  "key_store_file_path": "./dexes/uniswap_v3/test/wallet.json",
+  "key_store_file_path": "./dex_proxy/test/wallet.json",
   "dex": {
     "name": "chainBase-aero",
     "chain_name": "Basechain",
