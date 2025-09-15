@@ -86,6 +86,7 @@ class Hype(DexCommon):
         self.__symbol_address = {}
         self.__hype_withdrawal_address_whitelists_from_res_file = defaultdict(set)
         self.__tokens_from_res_file = {}
+        self.__unit_withdrawal_address_mappings = defaultdict(dict)
 
         self.__load_whitelist()
 
@@ -166,10 +167,15 @@ class Hype(DexCommon):
                 self.__symbol_address[symbol] = token_json['address']
 
             for withdrawal_address in token_json["valid_withdrawal_addresses"]:
-                    withdraw_whitelist[symbol].add(Web3.to_checksum_address(withdrawal_address))
+                withdraw_whitelist[symbol].add(Web3.to_checksum_address(withdrawal_address))
+            
+            if "unit_withdrawal_address_mappings" in token_json:
+                for native_address, unit_address in token_json["unit_withdrawal_address_mappings"].items():
+                    self.__unit_withdrawal_address_mappings[symbol][native_address] = Web3.to_checksum_address(unit_address)
 
             if symbol != self.__native_token and chain == self.__chain_name :
                 self.__tokens_from_res_file[symbol] = ERC20Token(token_json["symbol"], Web3.to_checksum_address(token_json["address"]))
+                
         return withdraw_whitelist
 
     # We don't need to do anything special on a new client connection
@@ -713,6 +719,15 @@ class Hype(DexCommon):
             client_request_id = params['client_request_id']
             destination = params['destination']
             token = params['token']
+            
+            # Special case for UNIT bridging tokens
+            if token in self.__unit_withdrawal_address_mappings:
+                if destination not in self.__unit_withdrawal_address_mappings[token]:
+                    return 400, {'error': {'message': f'Unknown UNIT withdrawal_address={destination} for token={token}'}}
+                
+                old_destination = destination
+                destination = self.__unit_withdrawal_address_mappings[token][destination]
+                self._logger.info(f'Received spot_to_external request for {token} to {old_destination}, remapping to UNIT address {destination}')
 
             ok, reason = self.__allow_spot_withdraw(client_request_id, token, destination)
             if not ok:
@@ -760,7 +775,7 @@ class Hype(DexCommon):
             )
             if result['status'] == 'ok':
                 self._request_cache.finalise_request(client_request_id, RequestStatus.SUCCEEDED)
-                return 200, {'status': 'ok'}
+                return 200, result
             else:
                 self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
                 return 400, {'error': {'code': result['status'], 'message': result}}
