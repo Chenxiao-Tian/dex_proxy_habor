@@ -8,12 +8,12 @@ from typing import Optional, cast, Dict, List, Tuple, Union
 from eth_account import Account
 from kuru_sdk import ClientOrderExecutor, TxOptions
 from py_dex_common.schemas import OrderResponse, CreateOrderRequest, QueryLiveOrdersResponse, OrderErrorResponse, \
-    CancelAllOrdersResponse
+    CancelAllOrdersResponse, CancelOrderParams, QueryOrderParams
 from py_dex_common.schemas.cancel_orders import CancelAllOrdersErrorResponse
 from web3 import AsyncHTTPProvider, AsyncWeb3, Web3, HTTPProvider
 
 from .pantheon_utils import get_current_timestamp_ns
-from .schemas import ErrorCode, OrderStatus, OrderIn, CancelOrderIn
+from .schemas import ErrorCode, OrderStatus, kuru_order_side_to_common, kuru_order_type_to_common, kuru_order_status_to_common, kuru_error_code_to_common
 from .validators import ValidationError, validate_and_map_to_kuru_order_request, validate_order_request
 from .web3_request_manager import Web3RequestManager
 from .ws_order_manager import WsOrderManager
@@ -62,7 +62,7 @@ class KuruHandler:
 
     async def order(self, path, params, received_at_ms) -> Tuple[int, OrderResponse | dict]:
         """Get a single order from cache by client_order_id"""
-        order_input = cast(OrderIn, params)
+        order_input = QueryOrderParams(**params)
         try:
             client_order_id = validate_order_request(order_input)
         except ValidationError as e:
@@ -70,7 +70,7 @@ class KuruHandler:
 
             # TODO: add error respnose object
             return 400, {
-                "error_code": ErrorCode.INVALID_PARAMETER,
+                "error_code": kuru_error_code_to_common(ErrorCode.INVALID_PARAMETER),
                 "error_message": f"Input params are invalid: {', '.join(e.args[0])}",
             }
         
@@ -79,7 +79,7 @@ class KuruHandler:
         else:
             # TODO: add error response object
             return 404, {
-                "error_code": ErrorCode.ORDER_NOT_FOUND,
+                "error_code": kuru_error_code_to_common(ErrorCode.ORDER_NOT_FOUND),
                 "error_message": f"Order with client_order_id {client_order_id} not found"
             }
 
@@ -133,7 +133,7 @@ class KuruHandler:
         except ValidationError as e:
             self._logger.error(e)
             return 400, OrderErrorResponse(
-                error_code=ErrorCode.INVALID_PARAMETER,
+                error_code=kuru_error_code_to_common(ErrorCode.INVALID_PARAMETER),
                 error_message=f"Input params are invalid: {', '.join(e.args[0])}"
             )
 
@@ -190,7 +190,7 @@ class KuruHandler:
             quantity=order_request.size or "0",
             total_exec_quantity="0",
             last_update_timestamp_ns=get_current_timestamp_ns(),
-            status=OrderStatus.OPEN,
+            status=kuru_order_status_to_common(OrderStatus.OPEN),
             trades=[],
             order_type=order_input.order_type,
             symbol=order_input.symbol,
@@ -209,7 +209,7 @@ class KuruHandler:
     async def cancel_order(self, path, params, received_at_ms) \
             -> Tuple[int, Union[OrderErrorResponse, List[OrderResponse]]]:
         """Cancel a single order by client_order_id"""
-        cancel_order_input = cast(CancelOrderIn, params)
+        cancel_order_input = CancelOrderParams(**params)
         
         status_code, error_response, validated_data = await self._validate_cancel_order_request(cancel_order_input)
         if status_code is not None:
@@ -308,14 +308,14 @@ class KuruHandler:
 
 
 
-    async def _validate_cancel_order_request(self, cancel_order_input: CancelOrderIn) \
+    async def _validate_cancel_order_request(self, cancel_order_input: CancelOrderParams) \
             -> Tuple[Optional[int], Optional[OrderErrorResponse], Optional[Tuple[str, int, OrderResponse]]]:
         try:
             client_order_id = validate_order_request(cancel_order_input)
         except ValidationError as e:
             self._logger.error(e)
             return 400, OrderErrorResponse(
-                error_code=ErrorCode.INVALID_PARAMETER,
+                error_code=kuru_error_code_to_common(ErrorCode.INVALID_PARAMETER),
                 error_message=f"Input params are invalid: {', '.join(e.args[0])}"
             ), None
 

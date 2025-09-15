@@ -2,9 +2,9 @@ from typing import cast
 import pytest
 from kuru_sdk.types import OrderRequest as KuruOrderRequest
 
-from dexes.kuru.handler.schemas import CreateOrderIn, OrderSide, OrderType, OrderIn
+from dexes.kuru.handler.schemas import OrderSide, OrderType
 from dexes.kuru.handler.validators import validate_and_map_to_kuru_order_request, validate_order_request, ValidationError
-from schemas import CreateOrderRequest
+from py_dex_common.schemas import CreateOrderRequest, QueryOrderParams
 
 
 class TestValidateAndMapToKuruOrderRequest:

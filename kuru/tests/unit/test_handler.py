@@ -4,8 +4,8 @@ import pytest
 import pytest_asyncio
 
 from dexes.kuru.handler.handler import KuruHandler, KuruHandlerSingleton
-from dexes.kuru.handler.schemas import OrderSide, OrderType, OrderStatus, CreateOrderOut, ErrorCode
-from schemas import OrderResponse
+from dexes.kuru.handler.schemas import OrderSide, OrderType, OrderStatus, ErrorCode
+from py_dex_common.schemas import OrderResponse
 
 
 @pytest.fixture
@@ -401,7 +401,7 @@ class TestKuruHandler:
             "quantity": "10",
             "total_exec_quantity": "0",
             "last_update_timestamp_ns": 1234567890,
-            "status": "OPEN",
+            "status": OrderStatus.OPEN,
             "trades": [],
             "order_type": "LIMIT",
             "symbol": "0xmarket1",
@@ -416,7 +416,7 @@ class TestKuruHandler:
             "quantity": "20",
             "total_exec_quantity": "0",
             "last_update_timestamp_ns": 1234567891,
-            "status": "OPEN",
+            "status": OrderStatus.OPEN,
             "trades": [],
             "order_type": "LIMIT",
             "symbol": "0xmarket2",
@@ -495,7 +495,7 @@ class TestKuruHandler:
             "quantity": "10",
             "total_exec_quantity": "0",
             "last_update_timestamp_ns": 1234567890,
-            "status": "OPEN",
+            "status": OrderStatus.OPEN,
             "trades": [],
             "order_type": "LIMIT",
             "symbol": "0xmarket1",

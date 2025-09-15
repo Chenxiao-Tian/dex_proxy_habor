@@ -1,17 +1,17 @@
 from kuru_sdk.types import OrderRequest
 
-from py_dex_common.schemas import CreateOrderRequest
-from .schemas import CreateOrderIn, OrderIn, OrderType, OrderSide
+from py_dex_common.schemas import CreateOrderRequest, QueryOrderParams, CancelOrderParams
+from .schemas import OrderType, OrderSide
 
 class ValidationError(Exception):
     pass
 
-def validate_order_request(order_input: OrderIn) -> str:
+def validate_order_request(order_input) -> str:
     """
     Validate order request parameters and return the client_order_id as string.
     
     Args:
-        order_input: OrderIn containing client_order_id
+        order_input: Object with client_order_id attribute (QueryOrderParams or CancelOrderParams)
         
     Returns:
         str: The validated client_order_id as string
@@ -21,10 +21,10 @@ def validate_order_request(order_input: OrderIn) -> str:
     """
     errors = []
     
-    if "client_order_id" not in order_input:
+    if not hasattr(order_input, 'client_order_id') or order_input.client_order_id is None:
         errors.append("client_order_id is required")
     else:
-        client_order_id = order_input["client_order_id"]
+        client_order_id = order_input.client_order_id
         
         if not client_order_id:
             errors.append("client_order_id cannot be empty")
@@ -40,7 +40,7 @@ def validate_order_request(order_input: OrderIn) -> str:
     if errors:
         raise ValidationError(errors)
     
-    return str(order_input["client_order_id"])
+    return str(order_input.client_order_id)
 
 def validate_and_map_to_kuru_order_request(order_input: CreateOrderRequest) -> OrderRequest:
     errors = []
@@ -48,21 +48,21 @@ def validate_and_map_to_kuru_order_request(order_input: CreateOrderRequest) -> O
     post_only_flag: bool = False
 
     input_order_type = order_input.order_type
-    if input_order_type == OrderType.LIMIT:
+    if input_order_type == "LIMIT":
         kuru_order_type = "limit"
-    elif input_order_type == OrderType.LIMIT_POST_ONLY:
+    elif input_order_type == "LIMIT_POST_ONLY":
         kuru_order_type = "limit"
         post_only_flag = True
-    elif input_order_type == OrderType.MARKET:
+    elif input_order_type == "MARKET":
         kuru_order_type = "market"
     else:
         errors.append(f"Invalid order type: {input_order_type}")
     
     # Map the side to lowercase for Kuru SDK
     kuru_side = "buy"
-    if order_input.side == OrderSide.BUY:
+    if order_input.side == "BUY":
         kuru_side = "buy"
-    elif order_input.side == OrderSide.SELL:
+    elif order_input.side == "SELL":
         kuru_side = "sell"
     else:
         errors.append(f"Invalid order side: {order_input.side}")

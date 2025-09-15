@@ -1,23 +1,21 @@
 from enum import Enum
-from typing import TypedDict
+from typing import Literal
 
-class ErrorCode(str, Enum):
+class KuruErrorCode(str, Enum):
     EXCHANGE_REJECTION = "EXCHANGE_REJECTION"
     INVALID_PARAMETER = "INVALID_PARAMETER"
     ORDER_NOT_FOUND = "ORDER_NOT_FOUND"
 
-class OrderType(str, Enum):
+class KuruOrderType(str, Enum):
     MARKET = "MARKET"
     LIMIT = "LIMIT"
     LIMIT_POST_ONLY = "LIMIT_POST_ONLY"
 
-
-class OrderSide(str, Enum):
+class KuruOrderSide(str, Enum):
     BUY = "BUY"
     SELL = "SELL"
 
-
-class OrderStatus(str, Enum):
+class KuruOrderStatus(str, Enum):
     OPEN = "OPEN"
     EXPIRED = "EXPIRED"
     CANCELLED = "CANCELLED"
@@ -25,32 +23,25 @@ class OrderStatus(str, Enum):
     CANCELLED_PENDING = "CANCELLED_PENDING"
     REJECTED = "REJECTED"
 
+# Legacy aliases for backward compatibility
+ErrorCode = KuruErrorCode
+OrderType = KuruOrderType
+OrderSide = KuruOrderSide
+OrderStatus = KuruOrderStatus
 
-class CreateOrderIn(TypedDict):
-    price: str
-    quantity: str
-    client_order_id: str
-    side: OrderSide
-    order_type: OrderType
-    symbol: str
+# Conversion functions for mapping to py_dex_common standard values
+def kuru_order_side_to_common(kuru_side: KuruOrderSide) -> Literal["BUY", "SELL"]:
+    """Convert Kuru order side to py_dex_common standard format"""
+    return kuru_side.value  # type: ignore
 
-class OrderIn(TypedDict):
-    client_order_id: str
+def kuru_order_type_to_common(kuru_type: KuruOrderType) -> str:
+    """Convert Kuru order type to py_dex_common standard format"""
+    return kuru_type.value
 
-class CancelOrderIn(TypedDict):
-    client_order_id: str
+def kuru_order_status_to_common(kuru_status: KuruOrderStatus) -> str:
+    """Convert Kuru order status to py_dex_common standard format"""
+    return kuru_status.value
 
-class CreateOrderOut(TypedDict):
-    client_order_id: int
-    order_id: str
-    price: str
-    quantity: str
-    total_exec_quantity: str
-    last_update_timestamp_ns: int
-    status: str
-    trades: list[dict]
-    order_type: str
-    symbol: str
-    side: str
-    send_timestamp_ns: int
-    tx_hash: str
+def kuru_error_code_to_common(kuru_error: KuruErrorCode) -> str:
+    """Convert Kuru error code to py_dex_common standard format"""
+    return kuru_error.value
