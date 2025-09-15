@@ -35,7 +35,24 @@ class DexProxy:
         self.__exchange = exchange
 
     def __get_private_key(self):
-        key_store_file_path = self.pantheon.config['key_store_file_path']
+        if (
+            "key_store_file_path" not in self.pantheon.config
+            and "solana_secret_file_path" not in self.pantheon.config
+        ):
+            return None
+
+        if "solana_secret_file_path" in self.pantheon.config:
+            assert (
+                "key_store_file_path" not in self.pantheon.config
+            ), "can't have both eth and solana secret present"
+
+            with open(
+                self.pantheon.config["solana_secret_file_path"]
+            ) as solana_secret_file:
+                solana_secret = solana_secret_file.read()
+                return [int(num) for num in solana_secret[1:-1].split(",")]
+
+        key_store_file_path = self.pantheon.config["key_store_file_path"]
 
         def get_private_key_from_file(file_path):
             with open(file_path) as keyfile:
@@ -153,4 +170,3 @@ class DexProxy:
         app_health.stopped()
 
         await self.pantheon.sleep(1)
-

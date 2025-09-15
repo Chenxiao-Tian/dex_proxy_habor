@@ -118,6 +118,12 @@ stages:
   - PROCESS_NAME: dex_proxy-uni34-arb-1
     ENVIRONMENT: prod
     SOURCE_PATH: uniswaps
+  - PROCESS_NAME: dex_proxy-drft-1
+    ENVIRONMENT: prod
+    SOURCE_PATH: drft
+  - PROCESS_NAME: dex_proxy-drft-test-1
+    ENVIRONMENT: dev
+    SOURCE_PATH: drft
 
 
 # Typescript enclaves.
