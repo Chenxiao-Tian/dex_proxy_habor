@@ -1,6 +1,5 @@
 import os
 import subprocess
-import sys
 import re
 import setuptools
 
@@ -22,14 +21,16 @@ tag = run('git', 'for-each-ref', '--format=%(refname:short)', '--sort=-authordat
 tag = get_version_from_git_tag(tag)
 rev = run('git', 'rev-parse', '--short=8', 'HEAD')
 
+py_dex_common_path = os.path.abspath("../py_dex_common")
+
 setuptools.setup(
-    name="py_dex_common",
-    version=f'{tag}+g{rev}',
+    name="dex_proxy",
+    version=f"{tag}+g{rev}",
     packages=setuptools.find_packages(),
     install_requires=[
-        'msgpack==1.0.8',
-        'orjson==3.10.18',
-        "pyutils @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.4",
-        "fastopenapi"
-    ]
+        f"py_dex_common @ file://{py_dex_common_path}",
+        "pyutils[web3] @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.4",
+        "anchorpy==0.21.0",
+        "driftpy==0.8.68"
+    ],
 )

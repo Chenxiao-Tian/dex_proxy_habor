@@ -37,9 +37,15 @@ class DexCommon(ABC):
         self._server = server
         self._event_sink = event_sink
 
-        self._request_cache = RequestsCache(pantheon, config['request_cache'], self)
-        self._transactions_status_poller = TransactionsStatusPoller(pantheon, config['transactions_status_poller'],
-                                                                    self)
+        self._request_cache = None
+        if "request_cache" in config:
+            self._request_cache = RequestsCache(pantheon, config["request_cache"], self)
+
+        self._transactions_status_poller = None
+        if "transactions_status_poller" in config:
+            self._transactions_status_poller = TransactionsStatusPoller(
+                pantheon, config["transactions_status_poller"], self
+            )
 
         if 'max_allowed_gas_price_gwei' in config:
             self.__max_allowed_gas_price_wei = config['max_allowed_gas_price_gwei'] * 10 ** 9
@@ -202,9 +208,12 @@ class DexCommon(ABC):
             self._request_cache.finalise_request(client_request_id, request_status)
 
     @abstractmethod
-    async def start(self, private_key):
-        await self._transactions_status_poller.start()
-        await self._request_cache.start(self._transactions_status_poller)
+    async def start(self, private_key=None):
+        if self._transactions_status_poller:
+            await self._transactions_status_poller.start()
+
+        if self._request_cache:
+            await self._request_cache.start(self._transactions_status_poller)
 
         if "fordefi" in self._config:
             self.__whitelist_manager = WhitelistingManagerFordefi(self.pantheon, self, self._config)
@@ -464,15 +473,30 @@ class DexCommon(ABC):
                 transfer.tx_hashes.append((result.tx_hash, RequestType.TRANSFER.name))
                 transfer.used_gas_prices_wei.append(gas_price_wei)
 
-                self._transactions_status_poller.add_for_polling(
-                    result.tx_hash, client_request_id, RequestType.TRANSFER)
-                self._request_cache.maybe_add_or_update_request_in_redis(client_request_id)
+                if self._transactions_status_poller:
+                    self._transactions_status_poller.add_for_polling(
+                        result.tx_hash, client_request_id, RequestType.TRANSFER
+                    )
+
+                self._request_cache.maybe_add_or_update_request_in_redis(
+                    client_request_id
+                )
+
                 if result.pending_task:
                     await result.pending_task
-                return 200, {'tx_hash': result.tx_hash}
+
+                return 200, {"tx_hash": result.tx_hash}
+
             else:
-                self._request_cache.finalise_request(client_request_id, RequestStatus.FAILED)
-                return 400, {'error': {'code': result.error_type.value, 'message': result.error_message}}
+                self._request_cache.finalise_request(
+                    client_request_id, RequestStatus.FAILED
+                )
+                return 400, {
+                    "error": {
+                        "code": result.error_type.value,
+                        "message": result.error_message,
+                    }
+                }
 
         except Exception as e:
             self._logger.exception(f'Failed to transfer: %r', e)
