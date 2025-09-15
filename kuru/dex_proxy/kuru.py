@@ -18,7 +18,7 @@ class Kuru(DexCommon):
     CHANNELS = ["ORDER", "TRADE"]
 
     def __init__(self, pantheon: Pantheon, config: dict, server: WebServer, event_sink):
-        super().__init__(pantheon, ConnectorType.Kuru, config, server, event_sink)
+        super().__init__(pantheon, config, server, event_sink)
 
         self._kuru_handler = KuruHandlerSingleton.get_instance(config)
 

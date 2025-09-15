@@ -6,7 +6,7 @@ from eth_account import Account
 from web3 import Web3, HTTPProvider
 import json
 
-from dexes.kuru.util.margin import add_margin_balance
+from kuru.util.margin import add_margin_balance
 
 async def main():
     with open('../../kuru.local.config.json', 'r') as f:
@@ -44,7 +44,7 @@ async def main():
     print(response.status_code)
     pprint.pprint(response.json())
     assert response.status_code == 200
-    assert len(response.json()['tx_hash']) > 0
+    assert response.json()['status'] == 'OPEN'
 
 if __name__ == "__main__":
     asyncio.run(main())
