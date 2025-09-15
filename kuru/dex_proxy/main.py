@@ -1,7 +1,7 @@
 from pantheon import Pantheon, StandardArgParser
 from py_dex_common.dex_proxy import DexProxy
 from py_dex_common.web_server import WebServer
-from kuru import Kuru
+from .kuru import Kuru
 
 
 class Main(DexProxy):

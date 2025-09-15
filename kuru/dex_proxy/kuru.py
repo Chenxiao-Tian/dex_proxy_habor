@@ -5,10 +5,10 @@ from pyutils.exchange_apis.dex_common import RequestStatus
 from pyutils.exchange_connectors import ConnectorType
 from pyutils.gas_pricing.eth import PriorityFee
 
-import schemas
-from dexes.dex_common import DexCommon
-from dexes.kuru.handler.handler import KuruHandlerSingleton
-from web_server import WebServer
+from py_dex_common.dexes.dex_common import DexCommon
+from .handler.handler import KuruHandlerSingleton
+from py_dex_common.web_server import WebServer
+import py_dex_common.schemas as schemas
 
 
 

@@ -1,6 +1,6 @@
 from kuru_sdk.types import OrderRequest
 
-from schemas import CreateOrderRequest
+from py_dex_common.schemas import CreateOrderRequest
 from .schemas import CreateOrderIn, OrderIn, OrderType, OrderSide
 
 class ValidationError(Exception):
