@@ -12,10 +12,12 @@ class Main(DexProxy):
         
         super().__init__(pantheon, web_server, Kuru(pantheon, dex_config, web_server, self))
 
-
-if __name__ == '__main__':
+def main():
     pt = Pantheon('kuru_dex_proxy')
     parser = StandardArgParser('Kuru Dex Proxy')
     pt.load_args_and_config(parser)
     proxy = Main(pt)
     pt.run_app(proxy.run())
+
+if __name__ == '__main__':
+    main()
