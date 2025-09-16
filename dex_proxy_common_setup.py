@@ -19,7 +19,7 @@ def setup(install_requires: List[str], name: str = "dex_proxy"):
 
     setuptools.setup(
         name=name,
-        version=version,
+        version=f"0.0.0+{version}",
         packages=setuptools.find_packages(),
         install_requires=install_requires,
     )
