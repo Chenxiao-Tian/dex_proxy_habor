@@ -1,36 +1,14 @@
 import os
-import subprocess
-import re
-import setuptools
+import sys
 
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, parent_dir)
+from dex_proxy_common_setup import setup
 
-def get_version_from_git_tag(tag):
-    match = re.search(r'(\d+\.\d+\.\d+(?:[^\s]*)?)$', tag)
-    if not match:
-        raise ValueError(f"Could not extract version from tag: {tag}")
-    return match.group(1)
-
-
-def run(*cmd):
-    wd = os.path.dirname(os.path.abspath(__file__))
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, cwd=wd)
-    return p.stdout.read().decode().rstrip()
-
-
-tag = run('git', 'for-each-ref', '--format=%(refname:short)', '--sort=-authordate', '--count=1', 'refs/tags')
-tag = get_version_from_git_tag(tag)
-rev = run('git', 'rev-parse', '--short=8', 'HEAD')
-
-py_dex_common_path = os.path.abspath("../py_dex_common")
-
-setuptools.setup(
-    name="dex_proxy",
-    version=f"{tag}+g{rev}",
-    packages=setuptools.find_packages(),
-    install_requires=[
-        f"py_dex_common @ file://{py_dex_common_path}",
+setup(
+    [
         "pyutils[web3] @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.4",
         "anchorpy==0.21.0",
-        "driftpy==0.8.68"
-    ],
+        "driftpy==0.8.68",
+    ]
 )
