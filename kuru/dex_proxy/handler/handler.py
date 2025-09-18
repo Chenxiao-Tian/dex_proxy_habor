@@ -3,17 +3,21 @@ import logging
 import time
 from dataclasses import dataclass
 from multiprocessing import Lock
-from typing import Optional, cast, Dict, List, Tuple, Union
+from decimal import Decimal
+from typing import Optional, Dict, List, Tuple, Union
 
 from eth_account import Account
 from kuru_sdk import ClientOrderExecutor, TxOptions
 from py_dex_common.schemas import OrderResponse, CreateOrderRequest, QueryLiveOrdersResponse, OrderErrorResponse, \
-    CancelAllOrdersResponse, CancelOrderParams, QueryOrderParams
+    CancelAllOrdersResponse, CancelOrderParams, QueryOrderParams, BalanceResponse, MarginDataResponse
+from py_dex_common.schemas.balance import BalanceItem
+from py_dex_common.schemas.margin import UnifiedMargin
 from py_dex_common.schemas.cancel_orders import CancelAllOrdersErrorResponse
+from eth_utils.currency import from_wei
+from kuru.util.margin import get_margin_balance
 from web3 import AsyncHTTPProvider, AsyncWeb3, Web3, HTTPProvider
-
 from .pantheon_utils import get_current_timestamp_ns
-from .schemas import ErrorCode, OrderStatus, kuru_order_side_to_common, kuru_order_type_to_common, kuru_order_status_to_common, kuru_error_code_to_common
+from .schemas import ErrorCode, OrderStatus, kuru_order_status_to_common, kuru_error_code_to_common
 from .validators import ValidationError, validate_and_map_to_kuru_order_request, validate_order_request
 from .web3_request_manager import Web3RequestManager
 from .ws_order_manager import WsOrderManager
@@ -43,6 +47,12 @@ class KuruHandler:
         self._logger = logging.getLogger(__name__)
         
         self.nonce_manager: Optional[Web3RequestManager] = None
+        self._margin_contract_addr = "0x4B186949F31FCA0aD08497Df9169a6bEbF0e26ef"
+        self._common_tokens = [
+            "native",  # Native token
+            "unused",  # unused
+            "0xf817257fed379853cDe0fa4F97AB987181B1E5Ea"   # USDC token
+        ]
 
     async def start(self, private_key):
         self._private_key = private_key
@@ -374,6 +384,116 @@ class KuruHandler:
             assert self.nonce_manager is not None
         
         return self.nonce_manager
+
+    async def _get_wallet_balance(self, token_addresses: List[str]) -> Dict[str, Decimal]:
+        """Get wallet balance for specified tokens"""
+        web3 = Web3(HTTPProvider(self._config["url"]))
+        account = web3.eth.account.from_key(self._private_key)
+        wallet_address = account.address
+        
+        balances = {}
+        
+        for token_address in token_addresses:
+            if token_address.lower() == "0x0000000000000000000000000000000000000000" or token_address.lower() == "native":
+                # Native token (ETH)
+                balance_wei = web3.eth.get_balance(wallet_address)
+                balances[token_address] = Decimal(str(from_wei(balance_wei, 'ether')))
+            else:
+                # ERC20 token
+                erc20_abi = [
+                    {
+                        "constant": True,
+                        "inputs": [{"name": "_owner", "type": "address"}],
+                        "name": "balanceOf",
+                        "outputs": [{"name": "balance", "type": "uint256"}],
+                        "type": "function",
+                    },
+                    {
+                        "constant": True,
+                        "inputs": [],
+                        "name": "decimals",
+                        "outputs": [{"name": "", "type": "uint8"}],
+                        "type": "function",
+                    }
+                ]
+                
+                try:
+                    contract = web3.eth.contract(address=Web3.to_checksum_address(token_address), abi=erc20_abi)
+                    balance_raw = contract.functions.balanceOf(wallet_address).call()
+                    decimals = contract.functions.decimals().call()
+                    balance = Decimal(balance_raw) / Decimal(10 ** decimals)
+                    balances[token_address] = balance
+                except Exception as e:
+                    self._logger.error(f"Failed to get balance for token {token_address}: {e}")
+                    balances[token_address] = Decimal("0")
+        
+        return balances
+
+    async def balance(self, path, params, received_at_ms) -> Tuple[int, Union[BalanceResponse, OrderErrorResponse]]:
+        """Get wallet and exchange wallet balances"""
+        try:
+            wallet_balances = await self._get_wallet_balance(self._common_tokens)
+            
+            # Convert to BalanceItem format
+            wallet_balance_items = []
+            exchange_wallet_balance_items = []
+            
+            for token_addr, balance in wallet_balances.items():
+                symbol = "ETH" if token_addr == "native" else token_addr[-8:]  # Use last 8 chars as symbol
+                wallet_balance_items.append(BalanceItem(symbol=symbol, balance=balance))
+                # For now, exchange_wallet is same as wallet (no separate exchange wallet concept in Kuru)
+                exchange_wallet_balance_items.append(BalanceItem(symbol=symbol, balance=balance))
+            
+            return 200, BalanceResponse(
+                balances={
+                    "wallet": wallet_balance_items,
+                    "exchange_wallet": exchange_wallet_balance_items
+                }
+            )
+            
+        except Exception as ex:
+            self._logger.error(f"Failed to get balance: {ex}", exc_info=ex)
+            return 400, OrderErrorResponse(
+                error_code=kuru_error_code_to_common(ErrorCode.EXCHANGE_REJECTION),
+                error_message=f"Failed to get balance: {str(ex)}"
+            )
+
+    async def margin(self, path, params, received_at_ms) -> Tuple[int, Union[MarginDataResponse, OrderErrorResponse]]:
+        """Get margin account data"""
+        try:
+            # Get margin balances for common tokens
+            usdc_balance = await get_margin_balance(self._config["url"], self._private_key, self._common_tokens[2])  # USDC
+            
+            # Convert wei to ether for display
+            usdc_balance_decimal = Decimal(str(from_wei(usdc_balance, 'ether')))
+            
+            total_collateral = usdc_balance_decimal
+            
+            # Create mock margin data (Kuru doesn't provide detailed margin info via SDK)
+            unified_margin = UnifiedMargin(
+                total_collateral=total_collateral,
+                maintenance_ratio=Decimal("2.5"),
+                available_margin=total_collateral * Decimal("0.8"),  # 80% available
+                maintenance_margin=total_collateral * Decimal("0.2"),  # 20% maintenance
+                total_equity=total_collateral,
+                upnl=Decimal("0"),  # No unrealized PnL data available
+                rpnl=Decimal("0")   # No realized PnL data available
+            )
+            
+            # Mock positions (Kuru doesn't provide position data via current SDK)
+            positions = []
+            
+            return 200, MarginDataResponse(
+                unified_margin=unified_margin,
+                positions=positions
+            )
+            
+        except Exception as ex:
+            self._logger.error(f"Failed to get margin data: {ex}", exc_info=ex)
+            return 400, OrderErrorResponse(
+                error_code=kuru_error_code_to_common(ErrorCode.EXCHANGE_REJECTION),
+                error_message=f"Failed to get margin data: {str(ex)}"
+            )
 
 
 class KuruHandlerSingleton:

@@ -72,3 +72,5 @@ async def get_margin_balance(url: str, private_key: str, token: str):
     log.info(f"Margin account balance: {from_wei(balance, 'ether')} for token {token}")
 
     return balance
+
+

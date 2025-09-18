@@ -90,6 +90,32 @@ class Kuru(DexCommon):
             oapi_in=["kuru"],
         )
 
+        self._server.register(
+            "GET",
+            "/public/balance",
+            self._kuru_handler.balance,
+            response_model=schemas.BalanceResponse,
+            response_errors={
+                400: {"model": schemas.OrderErrorResponse},
+            },
+            summary="Get wallet and exchange wallet balances",
+            tags=["public", "balance"],
+            oapi_in=["kuru"],
+        )
+
+        self._server.register(
+            "GET",
+            "/public/margin",
+            self._kuru_handler.margin,
+            response_model=schemas.MarginDataResponse,
+            response_errors={
+                400: {"model": schemas.OrderErrorResponse},
+            },
+            summary="Get margin account data",
+            tags=["public", "margin"],
+            oapi_in=["kuru"],
+        )
+
 
     async def start(self, private_key = None):
         """
