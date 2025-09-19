@@ -30,7 +30,9 @@
             "risk_manager_addresses": {
                 "SM": "0x28c9ddF9A3B29c2E6a561c1BC520954e5A33de5D",
                 "PM_BTC": "0x45DA02B9cCF384d7DbDD7b2b13e705BADB43Db0D",
-                "PM_ETH": "0xe7cD9370CdE6C9b5eAbCe8f86d01822d3de205A0"
+                "PM_ETH": "0xe7cD9370CdE6C9b5eAbCe8f86d01822d3de205A0",
+                "PM2_BTC": "0xC7adAB7A2b92019098dA55Ba4C5A8C65Ae7e52DC",
+                "PM2_ETH": "0xc755DAe3fd295A687adf3e192387163f813F0598"
             },
             "l1_standard_bridge_address": "0x61E44dC0dae6888B5a301887732217d5725B0bFf",
             "l2_standard_bridge_address": "0x4200000000000000000000000000000000000010",
