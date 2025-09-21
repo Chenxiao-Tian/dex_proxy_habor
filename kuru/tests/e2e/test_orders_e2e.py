@@ -8,7 +8,7 @@ import requests
 from web3 import Web3
 
 from dexes.kuru.handler.schemas import CreateOrderOut, ErrorCode, OrderStatus
-from dexes.kuru.util.margin import get_margin_balance
+from dexes.kuru.handler.handler import KuruHandlerSingleton
 
 log = logging.getLogger(__name__)
 
@@ -364,10 +364,13 @@ class TestOrdersE2E:
 
     @pytest.mark.asyncio
     async def test_get_margin_balance_e2e(self, config_data_module, private_key_hex_module):
-        rpc_url = config_data_module.get("dex", {}).get("url", "")
-        balance = await get_margin_balance(rpc_url, private_key_hex_module, Web3.to_checksum_address("0x7e9953a11e606187be268c3a6ba5f36635149c81"))
-        assert balance is not None
-
-        balance = await get_margin_balance(rpc_url, private_key_hex_module, Web3.to_checksum_address("0x94b72620e65577de5fb2b8a8b93328caf6ca161b"))
-        assert balance is not None
+        handler = KuruHandlerSingleton.get_instance(config_data_module)
+        await handler.start(private_key_hex_module)
+        
+        # Test the margin endpoint which includes balance information
+        status_code, response = await handler.margin("", {}, 0)
+        assert status_code == 200
+        assert response is not None
+        assert hasattr(response, 'unified_margin')
+        assert response.unified_margin.total_collateral is not None
 

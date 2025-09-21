@@ -6,30 +6,31 @@ from eth_account import Account
 from web3 import Web3, HTTPProvider
 import json
 
-from kuru.util.margin import add_margin_balance
-
 async def main():
-    with open('../../kuru.local.config.json', 'r') as f:
-        config_data = json.load(f)
-        
-    rpc_url = config_data['dex']['url']
-
-    with(open('../../test-local-wallet.json')) as f:
-        wallet_data = json.load(f)
-
-    private_key = Account.decrypt(wallet_data, "")
-
-
     orderbook_contract_addr = "0x05e6f736b5dedd60693fa806ce353156a1b73cf3" # CHOG/MON
     price = "0.00000283"
     size = "10000"
-    num_orders = 1
 
-    await add_margin_balance(rpc_url, price, size, num_orders, private_key.hex())
-    await asyncio.sleep(6)
-
+    # Deposit funds using the dex proxy handler
     host = "http://localhost"
     port = "1958"
+    deposit_endpoint = "/private/deposit"
+    
+    # Calculate required margin for the order
+    order_value = float(price) * float(size)
+    margin_amount = str(order_value * 2)  # 2x margin for safety
+    
+    deposit_data = {
+        "amount": margin_amount,
+        "currency": "MON"  # Required field
+    }
+    deposit_response = requests.post(url=host + ":" + port + deposit_endpoint, json=deposit_data)
+    print(f"Deposit status: {deposit_response.status_code}")
+    pprint.pprint(deposit_response.json())
+    assert deposit_response.status_code == 200
+    
+    await asyncio.sleep(6)
+
     endpoint = "/private/create-order"
 
     data = {

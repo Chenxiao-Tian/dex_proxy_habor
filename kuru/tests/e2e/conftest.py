@@ -5,7 +5,7 @@ import os
 from xprocess import ProcessStarter
 
 from dexes.kuru.tests.common import configure_test_logging, read_config
-from dexes.kuru.util.margin import add_margin_balance, clear_margin_balance
+from dexes.kuru.handler.handler import KuruHandlerSingleton
 
 configure_test_logging()
 
@@ -23,18 +23,24 @@ def private_key_hex_module():
 
 @pytest_asyncio.fixture(scope="module", autouse=True, loop_scope="module")
 async def margin_balance_manager(config_data_module, private_key_hex_module):
-    rpc_url = config_data_module.get("dex", {}).get("url", "")
-    price = "0.00000283"
-    size = "10000"
-    num_orders = 100
+    handler = KuruHandlerSingleton.get_instance(config_data_module)
+    await handler.start(private_key_hex_module)
+    
+    params = {
+        "amount": "1000.0",  # $1000 USDC for testing
+        "currency": "USDC"
+    }
 
-    log.info(f"Adding margin balance for {num_orders} orders")
-    await add_margin_balance(rpc_url, price, size, num_orders, private_key_hex_module)
+    log.info(f"Depositing funds: {params['amount']} {params['currency']}")
+    status_code, response = await handler.deposit("", params, 0)
+    assert status_code == 200, f"Failed to deposit: {response}"
     
     yield  # Tests run here
     
-    log.info("Clearing margin account balance")
-    await clear_margin_balance(rpc_url, private_key_hex_module)
+    log.info("Withdrawing funds from margin account")
+    withdraw_params = {"currency": "USDC"}
+    status_code, response = await handler.withdraw("", withdraw_params, 0)
+    assert status_code == 200, f"Failed to withdraw: {response}"
 
 @pytest.fixture(scope="module") # Changed to module scope, common for xprocess
 def dex_proxy_service(xprocess, request, margin_balance_manager):

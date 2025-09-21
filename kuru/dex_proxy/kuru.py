@@ -116,6 +116,30 @@ class Kuru(DexCommon):
             oapi_in=["kuru"],
         )
 
+        self._server.register(
+            "POST",
+            "/private/deposit",
+            self._kuru_handler.deposit,
+            response_errors={
+                400: {"model": schemas.OrderErrorResponse},
+            },
+            summary="Deposit funds to margin account",
+            tags=["private", "margin"],
+            oapi_in=["kuru"],
+        )
+
+        self._server.register(
+            "POST",
+            "/private/withdraw",
+            self._kuru_handler.withdraw,
+            response_errors={
+                400: {"model": schemas.OrderErrorResponse},
+            },
+            summary="Withdraw funds from margin account to wallet",
+            tags=["private", "margin"],
+            oapi_in=["kuru"],
+        )
+
 
     async def start(self, private_key = None):
         """

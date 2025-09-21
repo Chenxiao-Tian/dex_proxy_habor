@@ -7,7 +7,7 @@ import pytest_asyncio
 
 from dexes.kuru.handler.handler import KuruHandlerSingleton
 from dexes.kuru.handler.schemas import OrderStatus
-from dexes.kuru.util.margin import add_margin_balance
+# Removed direct import of margin utilities - using handler methods instead
 from dexes.kuru.tests.common import read_config
 from schemas import QueryLiveOrdersResponse
 
@@ -35,7 +35,14 @@ class TestOrdersIT:
         size = "10000"
         num_orders = 1
 
-        await add_margin_balance(config_data['dex']['url'], price, size, num_orders, private_key_hex)
+        # Add margin balance using handler
+        
+        # Calculate margin needed for the order
+        order_value = float(price) * float(size) * num_orders
+        margin_amount = str(order_value * 2)  # 2x margin for safety
+        margin_params = {"amount": margin_amount, "currency": "USDC"}
+        status_code, response = await handler.deposit("", margin_params, 0)
+        assert status_code == 200
 
         data = {
             "symbol": orderbook_contract_addr,
@@ -46,8 +53,6 @@ class TestOrdersIT:
             "client_order_id": "123"
         }
 
-        handler = KuruHandlerSingleton.get_instance({"url": config_data['dex']['url']})
-        await handler.start(private_key_hex)
 
         status, response = await handler.create_order("", data, 12345)
 
@@ -78,10 +83,14 @@ class TestOrdersIT:
         size = "10000"
         num_orders = 1
 
-        await add_margin_balance(config_data['dex']['url'], price, size, num_orders, private_key_hex)
-
-        handler = KuruHandlerSingleton.get_instance({"url": config_data['dex']['url']})
-        await handler.start(private_key_hex)
+        # Setup handler and add margin balance
+        
+        # Calculate margin needed for the order
+        order_value = float(price) * float(size) * num_orders
+        margin_amount = str(order_value * 2)  # 2x margin for safety
+        margin_params = {"amount": margin_amount, "currency": "USDC"}
+        status_code, response = await handler.deposit("", margin_params, 0)
+        assert status_code == 200
 
         # Get initial orders (should only include OPEN orders)
         status, response = await handler.orders("", {}, 12345)
@@ -147,11 +156,16 @@ class TestOrdersIT:
         size = "10000"
         num_orders = 1
 
-        await add_margin_balance(config_data['dex']['url'], price, size, num_orders, private_key_hex)
+        # Add margin balance using handler
+        
+        # Calculate margin needed for the order
+        order_value = float(price) * float(size) * num_orders
+        margin_amount = str(order_value * 2)  # 2x margin for safety
+        margin_params = {"amount": margin_amount, "currency": "USDC"}
+        status_code, response = await handler.deposit("", margin_params, 0)
+        assert status_code == 200
 
 
-        handler = KuruHandlerSingleton.get_instance({"url": config_data['dex']['url']})
-        await handler.start(private_key_hex)
 
         # Try to get a non-existent order
         params = {"client_order_id": "9999"}
@@ -220,10 +234,15 @@ class TestOrdersIT:
         size = "10000"
         num_orders = 1
 
-        await add_margin_balance(config_data['dex']['url'], price, size, num_orders, private_key_hex)
+        # Add margin balance using handler
+        
+        # Calculate margin needed for the order
+        order_value = float(price) * float(size) * num_orders
+        margin_amount = str(order_value * 2)  # 2x margin for safety
+        margin_params = {"amount": margin_amount, "currency": "USDC"}
+        status_code, response = await handler.deposit("", margin_params, 0)
+        assert status_code == 200
 
-        handler = KuruHandlerSingleton.get_instance({"url": config_data['dex']['url']})
-        await handler.start(private_key_hex)
 
         # Create an order first
         create_data = {
@@ -270,10 +289,15 @@ class TestOrdersIT:
         size = "5000"  # Smaller size for multiple orders
         num_orders = 3
 
-        await add_margin_balance(config_data['dex']['url'], price, size, num_orders, private_key_hex)
+        # Add margin balance using handler
+        
+        # Calculate margin needed for the order
+        order_value = float(price) * float(size) * num_orders
+        margin_amount = str(order_value * 2)  # 2x margin for safety
+        margin_params = {"amount": margin_amount, "currency": "USDC"}
+        status_code, response = await handler.deposit("", margin_params, 0)
+        assert status_code == 200
 
-        handler = KuruHandlerSingleton.get_instance({"url": config_data['dex']['url']})
-        await handler.start(private_key_hex)
 
         # Create multiple orders
         client_order_ids = []

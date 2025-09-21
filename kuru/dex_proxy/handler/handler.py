@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 import time
 from dataclasses import dataclass
 from multiprocessing import Lock
@@ -7,14 +8,14 @@ from decimal import Decimal
 from typing import Optional, Dict, List, Tuple, Union
 
 from eth_account import Account
-from kuru_sdk import ClientOrderExecutor, TxOptions
+from kuru_sdk import ClientOrderExecutor, TxOptions, MarginAccount
 from py_dex_common.schemas import OrderResponse, CreateOrderRequest, QueryLiveOrdersResponse, OrderErrorResponse, \
     CancelAllOrdersResponse, CancelOrderParams, QueryOrderParams, BalanceResponse, MarginDataResponse
 from py_dex_common.schemas.balance import BalanceItem
 from py_dex_common.schemas.margin import UnifiedMargin
 from py_dex_common.schemas.cancel_orders import CancelAllOrdersErrorResponse
-from eth_utils.currency import from_wei
-from kuru.util.margin import get_margin_balance
+from eth_typing import HexStr
+from eth_utils.currency import from_wei, to_wei
 from web3 import AsyncHTTPProvider, AsyncWeb3, Web3, HTTPProvider
 from .pantheon_utils import get_current_timestamp_ns
 from .schemas import ErrorCode, OrderStatus, kuru_order_status_to_common, kuru_error_code_to_common
@@ -48,16 +49,27 @@ class KuruHandler:
         
         self.nonce_manager: Optional[Web3RequestManager] = None
         self._margin_contract_addr = "0x4B186949F31FCA0aD08497Df9169a6bEbF0e26ef"
-        self._common_tokens = [
-            "native",  # Native token
-            "unused",  # unused
-            "0xf817257fed379853cDe0fa4F97AB987181B1E5Ea"   # USDC token
-        ]
+        self._margin_account: Optional[MarginAccount] = None
+        # TODO: Read token configurations from resources/ directory
+        # This should include token addresses, decimals, symbols, and other metadata
+        self._common_tokens = {
+            "MON": {
+                "address": "0x0000000000000000000000000000000000000000",  # Native token (MON)
+                "decimals": 18,
+                "symbol": "MON"
+            },
+            "USDC": {
+                "address": "0xf817257fed379853cDe0fa4F97AB987181B1E5Ea",  # USDC token
+                "decimals": 6,
+                "symbol": "USDC"
+            }
+        }
 
     async def start(self, private_key):
         self._private_key = private_key
 
         self.nonce_manager = await self._init_nonce_manager()
+        self._margin_account = await self._init_margin_account()
 
     async def orders(self, path, params, received_at_ms) -> Tuple[int, QueryLiveOrdersResponse]:
         """Get all orders with OPEN status from cache"""
@@ -385,7 +397,20 @@ class KuruHandler:
         
         return self.nonce_manager
 
-    async def _get_wallet_balance(self, token_addresses: List[str]) -> Dict[str, Decimal]:
+    async def _init_margin_account(self) -> MarginAccount:
+        if self._margin_account is None:
+            self._logger.info(f"Initializing margin account for contract {self._margin_contract_addr}")
+            web3 = Web3(HTTPProvider(self._config["url"]))
+            self._margin_account = MarginAccount(
+                web3=web3, 
+                contract_address=self._margin_contract_addr, 
+                private_key=self._private_key
+            )
+            assert self._margin_account is not None
+        
+        return self._margin_account
+
+    async def _get_wallet_balance(self, token_configs: Dict[str, dict]) -> Dict[str, Decimal]:
         """Get wallet balance for specified tokens"""
         web3 = Web3(HTTPProvider(self._config["url"]))
         account = web3.eth.account.from_key(self._private_key)
@@ -393,11 +418,15 @@ class KuruHandler:
         
         balances = {}
         
-        for token_address in token_addresses:
-            if token_address.lower() == "0x0000000000000000000000000000000000000000" or token_address.lower() == "native":
-                # Native token (ETH)
+        for token_name, token_config in token_configs.items():
+            token_address = token_config["address"]
+            token_decimals = token_config["decimals"]
+            
+            if token_address.lower() == "0x0000000000000000000000000000000000000000":
+                # Native token
                 balance_wei = web3.eth.get_balance(wallet_address)
-                balances[token_address] = Decimal(str(from_wei(balance_wei, 'ether')))
+                balance = Decimal(str(from_wei(balance_wei, 'ether')))
+                balances[token_name] = balance
             else:
                 # ERC20 token
                 erc20_abi = [
@@ -407,25 +436,17 @@ class KuruHandler:
                         "name": "balanceOf",
                         "outputs": [{"name": "balance", "type": "uint256"}],
                         "type": "function",
-                    },
-                    {
-                        "constant": True,
-                        "inputs": [],
-                        "name": "decimals",
-                        "outputs": [{"name": "", "type": "uint8"}],
-                        "type": "function",
                     }
                 ]
                 
                 try:
                     contract = web3.eth.contract(address=Web3.to_checksum_address(token_address), abi=erc20_abi)
                     balance_raw = contract.functions.balanceOf(wallet_address).call()
-                    decimals = contract.functions.decimals().call()
-                    balance = Decimal(balance_raw) / Decimal(10 ** decimals)
-                    balances[token_address] = balance
+                    balance = Decimal(balance_raw) / Decimal(10 ** token_decimals)
+                    balances[token_name] = balance
                 except Exception as e:
-                    self._logger.error(f"Failed to get balance for token {token_address}: {e}")
-                    balances[token_address] = Decimal("0")
+                    self._logger.error(f"Failed to get balance for token {token_name} ({token_address}): {e}")
+                    balances[token_name] = Decimal("0")
         
         return balances
 
@@ -438,8 +459,9 @@ class KuruHandler:
             wallet_balance_items = []
             exchange_wallet_balance_items = []
             
-            for token_addr, balance in wallet_balances.items():
-                symbol = "ETH" if token_addr == "native" else token_addr[-8:]  # Use last 8 chars as symbol
+            for token_name, balance in wallet_balances.items():
+                token_config = self._common_tokens[token_name]
+                symbol = token_config["symbol"]
                 wallet_balance_items.append(BalanceItem(symbol=symbol, balance=balance))
                 # For now, exchange_wallet is same as wallet (no separate exchange wallet concept in Kuru)
                 exchange_wallet_balance_items.append(BalanceItem(symbol=symbol, balance=balance))
@@ -461,38 +483,224 @@ class KuruHandler:
     async def margin(self, path, params, received_at_ms) -> Tuple[int, Union[MarginDataResponse, OrderErrorResponse]]:
         """Get margin account data"""
         try:
-            # Get margin balances for common tokens
-            usdc_balance = await get_margin_balance(self._config["url"], self._private_key, self._common_tokens[2])  # USDC
+            # Get margin balances for all common tokens
+            balances = {}
+            total_collateral = Decimal("0")
             
-            # Convert wei to ether for display
-            usdc_balance_decimal = Decimal(str(from_wei(usdc_balance, 'ether')))
+            for token_name, token_config in self._common_tokens.items():
+                token_address = token_config["address"]
+                token_decimals = token_config["decimals"]
+                
+                balance_wei = await self._margin_account.get_balance(str(self._margin_account.wallet_address), token_address)
+                
+                # Convert balance using proper decimals
+                if token_decimals == 18:
+                    balance_decimal = Decimal(str(from_wei(balance_wei, 'ether')))
+                else:
+                    balance_decimal = Decimal(balance_wei) / Decimal(10 ** token_decimals)
+                
+                balances[token_name] = balance_decimal
+                self._logger.info(f"Margin account balance: {balance_decimal} for token {token_name}")
+                
+                # For total collateral calculation, we'll use USDC as base and add native token
+                # In a real scenario, you'd apply proper conversion rates
+                if token_name == 'USDC':
+                    total_collateral += balance_decimal
+                elif token_name == 'NATIVE':
+                    # For demo, assume 1 MON = 1 USD (in reality you'd use price oracle)
+                    total_collateral += balance_decimal
             
-            total_collateral = usdc_balance_decimal
-            
-            # Create mock margin data (Kuru doesn't provide detailed margin info via SDK)
+            # Create unified margin with actual collateral data
             unified_margin = UnifiedMargin(
                 total_collateral=total_collateral,
-                maintenance_ratio=Decimal("2.5"),
-                available_margin=total_collateral * Decimal("0.8"),  # 80% available
-                maintenance_margin=total_collateral * Decimal("0.2"),  # 20% maintenance
+                maintenance_ratio=Decimal("0"),  # Kuru doesn't provide this data
+                available_margin=total_collateral,  # All collateral is available for now
+                maintenance_margin=Decimal("0"),  # Kuru doesn't provide this data
                 total_equity=total_collateral,
-                upnl=Decimal("0"),  # No unrealized PnL data available
-                rpnl=Decimal("0")   # No realized PnL data available
+                upnl=Decimal("0"),  # Kuru doesn't provide unrealized PnL
+                rpnl=Decimal("0")   # Kuru doesn't provide realized PnL
             )
             
-            # Mock positions (Kuru doesn't provide position data via current SDK)
+            # Kuru doesn't provide position data via current SDK
             positions = []
             
-            return 200, MarginDataResponse(
+            # Add individual token balances to the response
+            margin_response = MarginDataResponse(
                 unified_margin=unified_margin,
                 positions=positions
             )
+            
+            # Add token balances as additional metadata (if the schema supports it)
+            # For now, we'll include it in the unified_margin total_collateral
+            return 200, margin_response
             
         except Exception as ex:
             self._logger.error(f"Failed to get margin data: {ex}", exc_info=ex)
             return 400, OrderErrorResponse(
                 error_code=kuru_error_code_to_common(ErrorCode.EXCHANGE_REJECTION),
                 error_message=f"Failed to get margin data: {str(ex)}"
+            )
+
+    async def deposit(self, path, params, received_at_ms) -> Tuple[int, Union[dict, OrderErrorResponse]]:
+        """Deposit funds to margin account"""
+        try:
+            # Extract amount parameter
+            amount = params.get('amount')
+            if amount is None:
+                return 400, OrderErrorResponse(
+                    error_code=kuru_error_code_to_common(ErrorCode.INVALID_PARAMETER),
+                    error_message="Missing required parameter 'amount'"
+                )
+            
+            # Extract currency parameter (required)
+            currency = params.get('currency')
+            if currency is None:
+                return 400, OrderErrorResponse(
+                    error_code=kuru_error_code_to_common(ErrorCode.INVALID_PARAMETER),
+                    error_message="Missing required parameter 'currency'"
+                )
+            
+            token = currency.upper()
+            if token not in self._common_tokens:
+                return 400, OrderErrorResponse(
+                    error_code=kuru_error_code_to_common(ErrorCode.INVALID_PARAMETER),
+                    error_message=f"Unsupported currency '{currency}'. Supported currencies: {list(self._common_tokens.keys())}"
+                )
+            
+            token_config = self._common_tokens[token]
+            token_address = token_config["address"]
+            token_decimals = token_config["decimals"]
+            
+            # Convert to float and validate
+            try:
+                amount_decimal = float(amount)
+                if amount_decimal <= 0:
+                    return 400, OrderErrorResponse(
+                        error_code=kuru_error_code_to_common(ErrorCode.INVALID_PARAMETER),
+                        error_message="Amount must be greater than 0"
+                    )
+            except (ValueError, TypeError):
+                return 400, OrderErrorResponse(
+                    error_code=kuru_error_code_to_common(ErrorCode.INVALID_PARAMETER),
+                    error_message="Invalid amount format"
+                )
+            
+            # Convert to token's native units (considering decimals)
+            if token_decimals == 18:
+                # Use ether for 18 decimal tokens
+                size_wei = to_wei(amount_decimal, "ether")
+            else:
+                # For other decimals (like USDC with 6 decimals)
+                size_wei = int(amount_decimal * (10 ** token_decimals))
+            
+            size_wei = 10 * math.ceil(float(size_wei) / 10)
+            
+            self._logger.info(f"Depositing to margin account: Contract: {self._margin_account.contract_address}, Amount: {amount_decimal} {currency}, Wei: {size_wei}")
+            
+            # Perform deposit
+            margin_deposit_tx_hash = await self._margin_account.deposit(token_address, size_wei)
+            self._logger.info(f"Deposit transaction hash: {margin_deposit_tx_hash}")
+            
+            assert margin_deposit_tx_hash is not None
+            assert len(margin_deposit_tx_hash) > 0
+            
+            # Wait for confirmation
+            web3 = Web3(HTTPProvider(self._config["url"]))
+            tx_receipt = web3.eth.wait_for_transaction_receipt(HexStr(margin_deposit_tx_hash))
+            assert tx_receipt["status"] == 1, "Deposit transaction failed"
+            self._logger.info(f"Deposit transaction confirmed, block_number: {tx_receipt['blockNumber']}")
+            
+            return 200, {
+                "tx_hash": margin_deposit_tx_hash,
+                "amount": amount_decimal,
+                "currency": token,
+                "block_number": tx_receipt['blockNumber'],
+                "status": "confirmed"
+            }
+            
+        except Exception as ex:
+            self._logger.error(f"Failed to deposit: {ex}", exc_info=ex)
+            return 400, OrderErrorResponse(
+                error_code=kuru_error_code_to_common(ErrorCode.EXCHANGE_REJECTION),
+                error_message=f"Failed to deposit: {str(ex)}"
+            )
+
+    async def withdraw(self, path, params, received_at_ms) -> Tuple[int, Union[dict, OrderErrorResponse]]:
+        """Withdraw funds from margin account to wallet"""
+        try:
+            # Extract currency parameter (required)
+            currency = params.get('currency')
+            if currency is None:
+                return 400, OrderErrorResponse(
+                    error_code=kuru_error_code_to_common(ErrorCode.INVALID_PARAMETER),
+                    error_message="Missing required parameter 'currency'"
+                )
+            
+            token = currency.upper()
+            if token not in self._common_tokens:
+                return 400, OrderErrorResponse(
+                    error_code=kuru_error_code_to_common(ErrorCode.INVALID_PARAMETER),
+                    error_message=f"Unsupported currency '{currency}'. Supported currencies: {list(self._common_tokens.keys())}"
+                )
+            
+            token_config = self._common_tokens[token]
+            token_address = token_config["address"]
+            token_decimals = token_config["decimals"]
+            
+            # Get current balance
+            balance = await self._margin_account.get_balance(str(self._margin_account.wallet_address), token_address)
+            
+            # Convert from token's native units to decimal format
+            if token_decimals == 18:
+                balance_decimal = from_wei(balance, 'ether')
+            else:
+                balance_decimal = balance / (10 ** token_decimals)
+            
+            self._logger.info(f"Withdrawing from margin account: {balance_decimal} {currency}")
+            
+            if balance > 0:
+                # Perform withdrawal
+                tx_hash = await self._margin_account.withdraw(token_address, balance)
+                self._logger.info(f"Withdraw transaction hash: {tx_hash}")
+                assert tx_hash is not None
+                assert len(tx_hash) > 0
+                
+                # Wait for confirmation
+                web3 = Web3(HTTPProvider(self._config["url"]))
+                receipt = web3.eth.wait_for_transaction_receipt(HexStr(tx_hash))
+                assert receipt["status"] == 1, f"Withdraw transaction failed {receipt}"
+                
+                # Verify balance is cleared
+                new_balance = await self._margin_account.get_balance(str(self._margin_account.wallet_address), token_address)
+                
+                # Convert new balance using proper decimals
+                if token_decimals == 18:
+                    new_balance_decimal = from_wei(new_balance, 'ether')
+                else:
+                    new_balance_decimal = new_balance / (10 ** token_decimals)
+                
+                self._logger.info(f"New margin account balance: {new_balance_decimal} {currency}")
+                assert new_balance == 0
+                
+                return 200, {
+                    "tx_hash": tx_hash,
+                    "withdrawn_amount": balance_decimal,
+                    "currency": currency,
+                    "block_number": receipt['blockNumber'],
+                    "status": "withdrawn"
+                }
+            else:
+                return 200, {
+                    "message": f"Balance already zero for {currency}",
+                    "currency": currency,
+                    "status": "already_empty"
+                }
+                
+        except Exception as ex:
+            self._logger.error(f"Failed to withdraw: {ex}", exc_info=ex)
+            return 400, OrderErrorResponse(
+                error_code=kuru_error_code_to_common(ErrorCode.EXCHANGE_REJECTION),
+                error_message=f"Failed to withdraw: {str(ex)}"
             )
 
 
