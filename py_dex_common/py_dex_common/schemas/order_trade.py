@@ -38,7 +38,7 @@ class CreateOrderRequest(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "client_order_id": 123,
+                "client_order_id": "123",
                 "symbol": "BTC/USDC",
                 "price": "50000.0",
                 "quantity": "0.1",
