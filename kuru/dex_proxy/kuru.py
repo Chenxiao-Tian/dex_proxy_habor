@@ -103,18 +103,6 @@ class Kuru(DexCommon):
             oapi_in=["kuru"],
         )
 
-        self._server.register(
-            "GET",
-            "/public/margin",
-            self._kuru_handler.margin,
-            response_model=schemas.MarginDataResponse,
-            response_errors={
-                400: {"model": schemas.OrderErrorResponse},
-            },
-            summary="Get margin account data",
-            tags=["public", "margin"],
-            oapi_in=["kuru"],
-        )
 
         self._server.register(
             "POST",

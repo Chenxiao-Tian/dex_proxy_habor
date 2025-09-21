@@ -10,9 +10,8 @@ from typing import Optional, Dict, List, Tuple, Union
 from eth_account import Account
 from kuru_sdk import ClientOrderExecutor, TxOptions, MarginAccount
 from py_dex_common.schemas import OrderResponse, CreateOrderRequest, QueryLiveOrdersResponse, OrderErrorResponse, \
-    CancelAllOrdersResponse, CancelOrderParams, QueryOrderParams, BalanceResponse, MarginDataResponse
+    CancelAllOrdersResponse, CancelOrderParams, QueryOrderParams, BalanceResponse
 from py_dex_common.schemas.balance import BalanceItem
-from py_dex_common.schemas.margin import UnifiedMargin
 from py_dex_common.schemas.cancel_orders import CancelAllOrdersErrorResponse
 from eth_typing import HexStr
 from eth_utils.currency import from_wei, to_wei
@@ -64,6 +63,17 @@ class KuruHandler:
                 "symbol": "USDC"
             }
         }
+        
+        # Initialize ERC20 ABI for token balance queries
+        self._erc20_abi = [
+            {
+                "constant": True,
+                "inputs": [{"name": "_owner", "type": "address"}],
+                "name": "balanceOf",
+                "outputs": [{"name": "balance", "type": "uint256"}],
+                "type": "function",
+            }
+        ]
 
     async def start(self, private_key):
         self._private_key = private_key
@@ -429,18 +439,8 @@ class KuruHandler:
                 balances[token_name] = balance
             else:
                 # ERC20 token
-                erc20_abi = [
-                    {
-                        "constant": True,
-                        "inputs": [{"name": "_owner", "type": "address"}],
-                        "name": "balanceOf",
-                        "outputs": [{"name": "balance", "type": "uint256"}],
-                        "type": "function",
-                    }
-                ]
-                
                 try:
-                    contract = web3.eth.contract(address=Web3.to_checksum_address(token_address), abi=erc20_abi)
+                    contract = web3.eth.contract(address=Web3.to_checksum_address(token_address), abi=self._erc20_abi)
                     balance_raw = contract.functions.balanceOf(wallet_address).call()
                     balance = Decimal(balance_raw) / Decimal(10 ** token_decimals)
                     balances[token_name] = balance
@@ -451,20 +451,43 @@ class KuruHandler:
         return balances
 
     async def balance(self, path, params, received_at_ms) -> Tuple[int, Union[BalanceResponse, OrderErrorResponse]]:
-        """Get wallet and exchange wallet balances"""
+        """Get wallet and margin account balances"""
         try:
+            # Get wallet balances
             wallet_balances = await self._get_wallet_balance(self._common_tokens)
+            
+            # Get margin account balances 
+            margin_balances = {}
+            for token_name, token_config in self._common_tokens.items():
+                token_address = token_config["address"]
+                token_decimals = token_config["decimals"]
+                
+                balance_wei = await self._margin_account.get_balance(str(self._margin_account.wallet_address), token_address)
+                
+                # Convert balance using proper decimals
+                if token_decimals == 18:
+                    balance_decimal = Decimal(str(from_wei(balance_wei, 'ether')))
+                else:
+                    balance_decimal = Decimal(balance_wei) / Decimal(10 ** token_decimals)
+                
+                margin_balances[token_name] = balance_decimal
+                self._logger.info(f"Margin account balance: {balance_decimal} for token {token_name}")
             
             # Convert to BalanceItem format
             wallet_balance_items = []
             exchange_wallet_balance_items = []
             
-            for token_name, balance in wallet_balances.items():
+            for token_name in self._common_tokens.keys():
                 token_config = self._common_tokens[token_name]
                 symbol = token_config["symbol"]
-                wallet_balance_items.append(BalanceItem(symbol=symbol, balance=balance))
-                # For now, exchange_wallet is same as wallet (no separate exchange wallet concept in Kuru)
-                exchange_wallet_balance_items.append(BalanceItem(symbol=symbol, balance=balance))
+                
+                # Wallet balance
+                wallet_balance = wallet_balances.get(token_name, Decimal("0"))
+                wallet_balance_items.append(BalanceItem(symbol=symbol, balance=wallet_balance))
+                
+                # Exchange wallet balance (margin account)
+                margin_balance = margin_balances.get(token_name, Decimal("0"))
+                exchange_wallet_balance_items.append(BalanceItem(symbol=symbol, balance=margin_balance))
             
             return 200, BalanceResponse(
                 balances={
@@ -480,66 +503,6 @@ class KuruHandler:
                 error_message=f"Failed to get balance: {str(ex)}"
             )
 
-    async def margin(self, path, params, received_at_ms) -> Tuple[int, Union[MarginDataResponse, OrderErrorResponse]]:
-        """Get margin account data"""
-        try:
-            # Get margin balances for all common tokens
-            balances = {}
-            total_collateral = Decimal("0")
-            
-            for token_name, token_config in self._common_tokens.items():
-                token_address = token_config["address"]
-                token_decimals = token_config["decimals"]
-                
-                balance_wei = await self._margin_account.get_balance(str(self._margin_account.wallet_address), token_address)
-                
-                # Convert balance using proper decimals
-                if token_decimals == 18:
-                    balance_decimal = Decimal(str(from_wei(balance_wei, 'ether')))
-                else:
-                    balance_decimal = Decimal(balance_wei) / Decimal(10 ** token_decimals)
-                
-                balances[token_name] = balance_decimal
-                self._logger.info(f"Margin account balance: {balance_decimal} for token {token_name}")
-                
-                # For total collateral calculation, we'll use USDC as base and add native token
-                # In a real scenario, you'd apply proper conversion rates
-                if token_name == 'USDC':
-                    total_collateral += balance_decimal
-                elif token_name == 'NATIVE':
-                    # For demo, assume 1 MON = 1 USD (in reality you'd use price oracle)
-                    total_collateral += balance_decimal
-            
-            # Create unified margin with actual collateral data
-            unified_margin = UnifiedMargin(
-                total_collateral=total_collateral,
-                maintenance_ratio=Decimal("0"),  # Kuru doesn't provide this data
-                available_margin=total_collateral,  # All collateral is available for now
-                maintenance_margin=Decimal("0"),  # Kuru doesn't provide this data
-                total_equity=total_collateral,
-                upnl=Decimal("0"),  # Kuru doesn't provide unrealized PnL
-                rpnl=Decimal("0")   # Kuru doesn't provide realized PnL
-            )
-            
-            # Kuru doesn't provide position data via current SDK
-            positions = []
-            
-            # Add individual token balances to the response
-            margin_response = MarginDataResponse(
-                unified_margin=unified_margin,
-                positions=positions
-            )
-            
-            # Add token balances as additional metadata (if the schema supports it)
-            # For now, we'll include it in the unified_margin total_collateral
-            return 200, margin_response
-            
-        except Exception as ex:
-            self._logger.error(f"Failed to get margin data: {ex}", exc_info=ex)
-            return 400, OrderErrorResponse(
-                error_code=kuru_error_code_to_common(ErrorCode.EXCHANGE_REJECTION),
-                error_message=f"Failed to get margin data: {str(ex)}"
-            )
 
     async def deposit(self, path, params, received_at_ms) -> Tuple[int, Union[dict, OrderErrorResponse]]:
         """Deposit funds to margin account"""
