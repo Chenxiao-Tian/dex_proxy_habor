@@ -28,12 +28,9 @@ async def main():
     
     if response.status_code == 200:
         result = response.json()
-        if result.get("status") == "confirmed":
-            print(f"Successfully deposited {result.get('amount')} {result.get('currency')} to margin account")
-            print(f"Transaction hash: {result.get('tx_hash')}")
-            print(f"Block number: {result.get('block_number')}")
-        else:
-            print("Deposit failed")
+        print(f"Successfully deposited {result.get('amount')} {result.get('currency')} to margin account")
+        print(f"Transaction hash: {result.get('tx_hash')}")
+        print(f"Block number: {result.get('block_number')}")
     else:
         print("Failed to deposit")
 

@@ -26,7 +26,7 @@
   "RabbitMQ": {
     "url": "amqp://dev-sng-rmq.kdev"
   },
-  "key_store_file_path": "./test-local-wallet.json",
+  "key_store_file_path": "./any-evm-wallet.json.secret",
   "dex": {
     "name": "kuru",
     "url": "https://attentive-wider-arm.monad-testnet.quiknode.pro/178478d0eca04658f5155ae519d4b4a465482e47/",
