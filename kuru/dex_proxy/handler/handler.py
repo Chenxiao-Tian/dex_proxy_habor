@@ -174,8 +174,8 @@ class KuruHandler:
                 error_message=f"Input params are invalid: {', '.join(e.args[0])}"
             )
 
-        web3 = await self._create_web3()
-        client = await self._create_client_order_executor(order_request.market_address, web3)
+        async_web3 = await self._create_web3()
+        client = await self._create_client_order_executor(order_request.market_address, async_web3)
         
         start_time = time.time()
         self._logger.info(f"Placing limit buy order, order_request: {order_request}")
@@ -256,8 +256,8 @@ class KuruHandler:
         client_order_id, order_id, order = validated_data
 
         market_address = order.symbol
-        web3 = await self._create_web3()
-        client = await self._create_client_order_executor(market_address, web3)
+        async_web3 = await self._create_web3()
+        client = await self._create_client_order_executor(market_address, async_web3)
         
         # 6. Cancel the order
         try:
@@ -308,11 +308,11 @@ class KuruHandler:
         
         orders_by_market = self._group_orders_by_market()
         
-        web3 = await self._create_web3()
+        async_web3 = await self._create_web3()
         
         for market_address, order_list in orders_by_market.items():
             try:
-                client = await self._create_client_order_executor(market_address, web3)
+                client = await self._create_client_order_executor(market_address, async_web3)
                 order_ids = [order_id for _, order_id in order_list]
                 
                 nonce = await self.nonce_manager.get_nonce()
@@ -416,10 +416,15 @@ class KuruHandler:
         return None, None, (client_order_id, order_id, order)
 
 
-    async def _create_client_order_executor(self, market_address: str, web3: Web3) -> ClientOrderExecutor:
+    async def _create_client_order_executor(self, market_address: str, async_web3: AsyncWeb3) -> ClientOrderExecutor:
         if market_address not in self._clients:
+            # Create sync Web3 for ClientOrderExecutor if it requires it
+            sync_web3 = Web3(HTTPProvider(
+                endpoint_uri=self._config["url"],
+                request_kwargs={'timeout': 10}
+            ))
             client = ClientOrderExecutor(
-                web3=web3,
+                web3=sync_web3,
                 contract_address=market_address,
                 private_key=self._private_key,
             )
@@ -428,13 +433,13 @@ class KuruHandler:
             await WsOrderManager.ensure_instance(market_address, self._config["ws_url"], self._private_key, client.orderbook.market_params)
         return self._clients[market_address]
 
-    async def _create_web3(self) -> Web3:
-        web3 = Web3(HTTPProvider(
+    async def _create_web3(self) -> AsyncWeb3:
+        # Use AsyncWeb3 for all operations
+        async_web3 = AsyncWeb3(AsyncHTTPProvider(
             endpoint_uri=self._config["url"],
-            #cacheable_requests={"eth_chainId"},
-            #cache_allowed_requests=True
+            request_kwargs={'timeout': 10}  # Add timeout to prevent hanging
         ))
-        return web3
+        return async_web3
     
     async def _init_nonce_manager(self) -> Web3RequestManager:
         if self.nonce_manager is None:
@@ -452,7 +457,11 @@ class KuruHandler:
     async def _init_margin_account(self) -> MarginAccount:
         if self._margin_account is None:
             self._logger.info(f"Initializing margin account for contract {self._margin_contract_addr}")
-            web3 = Web3(HTTPProvider(self._config["url"]))
+            # Create sync Web3 only for MarginAccount SDK if it requires it
+            web3 = Web3(HTTPProvider(
+                endpoint_uri=self._config["url"],
+                request_kwargs={'timeout': 10}
+            ))
             self._margin_account = MarginAccount(
                 web3=web3, 
                 contract_address=self._margin_contract_addr, 
@@ -463,9 +472,9 @@ class KuruHandler:
         return self._margin_account
 
     async def _get_wallet_balance(self, token_configs: Dict[str, dict]) -> Dict[str, Decimal]:
-        """Get wallet balance for specified tokens"""
-        web3 = Web3(HTTPProvider(self._config["url"]))
-        account = web3.eth.account.from_key(self._private_key)
+        """Get wallet balance for specified tokens using async web3"""
+        async_web3 = AsyncWeb3(AsyncHTTPProvider(self._config["url"]))
+        account = Account.from_key(self._private_key)
         wallet_address = account.address
         
         balances = {}
@@ -476,14 +485,14 @@ class KuruHandler:
             
             if token_address.lower() == "0x0000000000000000000000000000000000000000":
                 # Native token
-                balance_wei = web3.eth.get_balance(wallet_address)
+                balance_wei = await async_web3.eth.get_balance(wallet_address)
                 balance = Decimal(str(from_wei(balance_wei, 'ether')))
                 balances[token_name] = balance
             else:
                 # ERC20 token
                 try:
-                    contract = web3.eth.contract(address=Web3.to_checksum_address(token_address), abi=self._erc20_abi)
-                    balance_raw = contract.functions.balanceOf(wallet_address).call()
+                    contract = async_web3.eth.contract(address=async_web3.to_checksum_address(token_address), abi=self._erc20_abi)
+                    balance_raw = await contract.functions.balanceOf(wallet_address).call()
                     balance = Decimal(balance_raw) / Decimal(10 ** token_decimals)
                     balances[token_name] = balance
                 except Exception as e:
@@ -609,18 +618,14 @@ class KuruHandler:
             assert margin_deposit_tx_hash is not None
             assert len(margin_deposit_tx_hash) > 0
             
-            # Wait for confirmation
-            web3 = Web3(HTTPProvider(self._config["url"]))
-            tx_receipt = web3.eth.wait_for_transaction_receipt(HexStr(margin_deposit_tx_hash))
-            assert tx_receipt["status"] == 1, "Deposit transaction failed"
-            self._logger.info(f"Deposit transaction confirmed, block_number: {tx_receipt['blockNumber']}")
+            # Return immediately without blocking - let transaction confirm in background
+            self._logger.info(f"Deposit transaction submitted: {margin_deposit_tx_hash}")
             
             return 200, {
                 "tx_hash": margin_deposit_tx_hash,
                 "amount": amount_decimal,
                 "currency": token,
-                "block_number": tx_receipt['blockNumber'],
-                "status": "confirmed"
+                "status": "submitted"
             }
             
         except Exception as ex:
@@ -670,29 +675,14 @@ class KuruHandler:
                 assert tx_hash is not None
                 assert len(tx_hash) > 0
                 
-                # Wait for confirmation
-                web3 = Web3(HTTPProvider(self._config["url"]))
-                receipt = web3.eth.wait_for_transaction_receipt(HexStr(tx_hash))
-                assert receipt["status"] == 1, f"Withdraw transaction failed {receipt}"
-                
-                # Verify balance is cleared
-                new_balance = await self._margin_account.get_balance(str(self._margin_account.wallet_address), token_address)
-                
-                # Convert new balance using proper decimals
-                if token_decimals == 18:
-                    new_balance_decimal = from_wei(new_balance, 'ether')
-                else:
-                    new_balance_decimal = new_balance / (10 ** token_decimals)
-                
-                self._logger.info(f"New margin account balance: {new_balance_decimal} {currency}")
-                assert new_balance == 0
+                # Return immediately without blocking - transaction will confirm in background
+                self._logger.info(f"Withdraw transaction submitted: {tx_hash}")
                 
                 return 200, {
                     "tx_hash": tx_hash,
                     "withdrawn_amount": balance_decimal,
                     "currency": currency,
-                    "block_number": receipt['blockNumber'],
-                    "status": "withdrawn"
+                    "status": "submitted"
                 }
             else:
                 return 200, {
