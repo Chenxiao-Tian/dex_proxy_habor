@@ -32,13 +32,16 @@
     "url": "https://attentive-wider-arm.monad-testnet.quiknode.pro/178478d0eca04658f5155ae519d4b4a465482e47/",
     "ws_url": "wss://ws.testnet.kuru.io",
     "env": "local",
-    "public_key": "0x95add7345dfdc0669edb413b7afa9ac76311d819",
+    "public_key": "01412AFdcD9658409e98682EA77c9584b77aF05a",
     "request_cache": {
       "finalised_requests_cleanup_after_s": 600,
       "store_in_redis": false
     },
     "transactions_status_poller": {
       "poll_interval_s": 15
-    }
+    },
+    "order_monitor_interval_s": 5,
+    "max_age_without_order_id_s": 120,
+    "open_order_check_interval_s": 30
   }
 }

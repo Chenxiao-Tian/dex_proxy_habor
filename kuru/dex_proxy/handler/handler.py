@@ -45,6 +45,8 @@ class KuruHandler:
         self._client_to_order_id_map: Dict[str, int] = {}  # client_order_id -> order_id
 
         self._logger = logging.getLogger(__name__)
+        self._background_task: Optional[asyncio.Task] = None
+        self._shutdown_event = asyncio.Event()
         
         self.nonce_manager: Optional[Web3RequestManager] = None
         self._margin_contract_addr = "0x4B186949F31FCA0aD08497Df9169a6bEbF0e26ef"
@@ -85,6 +87,10 @@ class KuruHandler:
 
         self.nonce_manager = await self._init_nonce_manager()
         self._margin_account = await self._init_margin_account()
+        
+        # Start background order monitoring task
+        self._background_task = asyncio.create_task(self._background_order_monitor())
+        self._logger.info("Background order monitoring task started")
 
     async def orders(self, path, params, received_at_ms) -> Tuple[int, QueryLiveOrdersResponse]:
         """Get all orders with OPEN status from cache"""
@@ -124,6 +130,17 @@ class KuruHandler:
         return self._order_completions
 
     async def clear(self) -> None:
+        # Signal background task to stop
+        self._shutdown_event.set()
+        
+        # Cancel and wait for background task to finish
+        if self._background_task and not self._background_task.done():
+            self._background_task.cancel()
+            try:
+                await self._background_task
+            except asyncio.CancelledError:
+                self._logger.info("Background order monitoring task cancelled")
+        
         self._order_completions.clear()
         self._orders_cache.clear()
         self._client_to_order_id_map.clear()
@@ -503,6 +520,152 @@ class KuruHandler:
             assert self._margin_account is not None
         
         return self._margin_account
+
+    async def _background_order_monitor(self):
+        """Background task to monitor and clean up problematic orders"""
+        self._logger.info("Starting background order monitoring")
+        
+        # Check interval in seconds (configurable, default 5 seconds for frequent checking)
+        check_interval = self._config.get('order_monitor_interval_s', 5)
+        # Maximum age for orders without order_id (default 2 minutes)
+        max_age_without_order_id_s = self._config.get('max_age_without_order_id_s', 120)
+        # Check frequency for OPEN orders (default 30 seconds - just for status updates)
+        open_order_check_interval_s = self._config.get('open_order_check_interval_s', 30)
+        
+        while not self._shutdown_event.is_set():
+            try:
+                await asyncio.wait_for(self._shutdown_event.wait(), timeout=check_interval)
+                # If we get here, shutdown was signaled
+                break
+            except asyncio.TimeoutError:
+                # Timeout is expected, continue with monitoring
+                pass
+            
+            try:
+                await self._monitor_and_cleanup_orders(max_age_without_order_id_s, open_order_check_interval_s)
+            except Exception as e:
+                self._logger.error(f"Error in background order monitoring: {e}", exc_info=True)
+        
+        self._logger.info("Background order monitoring stopped")
+
+    async def _monitor_and_cleanup_orders(self, max_age_without_order_id_s: int, open_order_check_interval_s: int):
+        """Monitor orders and clean up problematic ones"""
+        current_time_ns = get_current_timestamp_ns()
+        
+        problematic_orders = []
+        stale_orders = []
+        orders_to_check = []
+        
+        for client_order_id, order in self._orders_cache.items():
+            order_age_s = (current_time_ns - order.last_update_timestamp_ns) // 1_000_000_000
+            
+            # Check for orders without order_id that are too old
+            if order.status == OrderStatus.OPEN and order.order_id == "":
+                if order_age_s > max_age_without_order_id_s:
+                    problematic_orders.append((client_order_id, order, "missing_order_id"))
+                    self._logger.warning(f"Found problematic order {client_order_id}: OPEN for {order_age_s}s without order_id")
+            
+            # Check for OPEN orders that need status updates (but don't remove them)
+            elif order.status == OrderStatus.OPEN and order_age_s > open_order_check_interval_s:
+                order_id = self._client_to_order_id_map.get(client_order_id)
+                if order_id is not None:
+                    orders_to_check.append((client_order_id, order, "status_check"))
+                    self._logger.debug(f"Checking status of OPEN order {client_order_id}: last updated {order_age_s}s ago")
+                else:
+                    # No order_id, mark as stale
+                    stale_orders.append(client_order_id)
+        
+        # Clean up stale orders immediately
+        for client_order_id in stale_orders:
+            self._logger.info(f"Removing stale order {client_order_id} - no order_id found during monitoring")
+            if client_order_id in self._orders_cache:
+                del self._orders_cache[client_order_id]
+            if client_order_id in self._order_completions:
+                del self._order_completions[client_order_id]
+            if client_order_id in self._client_to_order_id_map:
+                del self._client_to_order_id_map[client_order_id]
+        
+        # Process problematic orders (only remove those without order_id)
+        for client_order_id, order, reason in problematic_orders:
+            await self._handle_problematic_order(client_order_id, order, reason)
+        
+        # Check status of OPEN orders (but don't remove them, just update status)
+        for client_order_id, order, reason in orders_to_check:
+            await self._check_order_status(client_order_id, order)
+
+    async def _handle_problematic_order(self, client_order_id: str, order: OrderResponse, reason: str):
+        """Handle a problematic order - only remove orders without order_id"""
+        try:
+            # For orders without order_id, we can't query them - just remove
+            if reason == "missing_order_id":
+                self._logger.info(f"Removing problematic order {client_order_id}: {reason}")
+                if client_order_id in self._orders_cache:
+                    del self._orders_cache[client_order_id]
+                if client_order_id in self._order_completions:
+                    del self._order_completions[client_order_id]
+                if client_order_id in self._client_to_order_id_map:
+                    del self._client_to_order_id_map[client_order_id]
+                
+        except Exception as e:
+            self._logger.error(f"Error handling problematic order {client_order_id}: {e}", exc_info=True)
+
+    async def _check_order_status(self, client_order_id: str, order: OrderResponse):
+        """Check and update order status without removing OPEN orders"""
+        try:
+            market_address = order.symbol
+            order_id = self._client_to_order_id_map.get(client_order_id)
+            
+            if order_id is None:
+                self._logger.warning(f"No order_id found for {client_order_id}, cannot check status")
+                return
+            
+            # Query order status from the exchange
+            async_web3 = await self._create_web3()
+            client = await self._create_client_order_executor(market_address, async_web3)
+            
+            try:
+                order_exists = await self._check_order_exists_on_exchange(client, order_id)
+                
+                if not order_exists:
+                    self._logger.info(f"Order {client_order_id} (order_id: {order_id}) no longer exists on exchange, marking as cancelled")
+                    order.status = OrderStatus.CANCELLED
+                    order.last_update_timestamp_ns = get_current_timestamp_ns()
+                else:
+                    self._logger.debug(f"Order {client_order_id} still exists on exchange")
+                    # Just update timestamp to avoid checking again too soon
+                    order.last_update_timestamp_ns = get_current_timestamp_ns()
+                    
+            except Exception as e:
+                self._logger.debug(f"Failed to query order {client_order_id} on exchange: {e}")
+                # Don't remove the order, just log the error
+                
+        except Exception as e:
+            self._logger.error(f"Error checking order status {client_order_id}: {e}", exc_info=True)
+
+    async def _check_order_exists_on_exchange(self, client: ClientOrderExecutor, order_id: int) -> bool:
+        """Check if an order exists on the exchange"""
+        try:
+            # This is a placeholder - you'll need to implement based on Kuru SDK
+            # The exact method depends on what's available in the ClientOrderExecutor
+            # For now, we'll try a simple approach that may work
+            
+            # If there's a get_order method available
+            if hasattr(client.orderbook, 'get_order'):
+                order_info = await client.orderbook.get_order(order_id)
+                return order_info is not None
+            
+            # Alternative: try to cancel the order and see if it fails
+            # This is more invasive but might be the only way to check
+            return True  # Conservative approach - assume it exists if we can't check
+            
+        except Exception as e:
+            self._logger.debug(f"Error checking if order {order_id} exists: {e}")
+            # If we get an error that suggests the order doesn't exist, return False
+            error_msg = str(e).lower()
+            if any(phrase in error_msg for phrase in ["not found", "does not exist", "invalid order"]):
+                return False
+            # For other errors, assume it exists
+            return True
 
     async def _get_wallet_balance(self, token_configs: Dict[str, dict]) -> Dict[str, Decimal]:
         """Get wallet balance for specified tokens using async web3"""

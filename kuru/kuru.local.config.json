@@ -39,6 +39,9 @@
     },
     "transactions_status_poller": {
       "poll_interval_s": 15
-    }
+    },
+    "order_monitor_interval_s": 5,
+    "max_age_without_order_id_s": 120,
+    "open_order_check_interval_s": 30
   }
 }
