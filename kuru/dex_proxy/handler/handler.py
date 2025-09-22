@@ -332,8 +332,27 @@ class KuruHandler:
                 self._logger.info(f"Cancelled {len(order_ids)} orders for market {market_address}, tx_hash: {tx_hash}")
                 
             except Exception as ex:
-                self._logger.error(f"Failed to cancel orders for market {market_address}", exc_info=ex)
-                errors.append(f"Market {market_address}: {str(ex)}")
+                error_message = str(ex).lower()
+                
+                # Check if orders are already filled or cancelled
+                if "already filled" in error_message or "already cancelled" in error_message or "order already filled" in error_message:
+                    self._logger.info(f"Orders in market {market_address} are already filled/cancelled, removing from cache")
+                    
+                    # Remove these orders from our cache since they're no longer active
+                    for client_order_id, order_id in order_list:
+                        if client_order_id in self._orders_cache:
+                            # Update status to reflect reality
+                            if "filled" in error_message:
+                                self._orders_cache[client_order_id].status = OrderStatus.FILLED
+                            else:
+                                self._orders_cache[client_order_id].status = OrderStatus.CANCELLED
+                            self._orders_cache[client_order_id].last_update_timestamp_ns = get_current_timestamp_ns()
+                            cancelled_orders_ids.append(client_order_id)
+                            self._logger.info(f"Marked order {client_order_id} as already processed")
+                else:
+                    # Only treat as error if it's not about already filled/cancelled orders
+                    self._logger.error(f"Failed to cancel orders for market {market_address}", exc_info=ex)
+                    errors.append(f"Market {market_address}: {str(ex)}")
         
         if errors:
             return 400, CancelAllOrdersErrorResponse(
@@ -350,6 +369,8 @@ class KuruHandler:
     def _group_orders_by_market(self):
         orders_by_market: Dict[str, List[Tuple[str, int]]] = {}  # market -> [(client_order_id, order_id)]
         
+        # Clean up orders that don't have valid order_ids first
+        stale_orders = []
         for client_order_id, order in self._orders_cache.items():
             if order.status == OrderStatus.OPEN:
                 order_id = self._client_to_order_id_map.get(client_order_id)
@@ -358,6 +379,18 @@ class KuruHandler:
                     if market not in orders_by_market:
                         orders_by_market[market] = []
                     orders_by_market[market].append((client_order_id, order_id))
+                else:
+                    # Mark orders without order_id as stale
+                    stale_orders.append(client_order_id)
+        
+        # Remove stale orders from cache
+        for client_order_id in stale_orders:
+            self._logger.info(f"Removing stale order {client_order_id} - no order_id found")
+            if client_order_id in self._orders_cache:
+                del self._orders_cache[client_order_id]
+            if client_order_id in self._order_completions:
+                del self._order_completions[client_order_id]
+                
         return orders_by_market
 
 

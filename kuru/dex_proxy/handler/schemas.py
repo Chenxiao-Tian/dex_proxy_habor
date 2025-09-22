@@ -22,6 +22,7 @@ class KuruOrderStatus(str, Enum):
     # TODO: This status should be deleted in favour of CANCELLED
     CANCELLED_PENDING = "CANCELLED_PENDING"
     REJECTED = "REJECTED"
+    FILLED = "FILLED"
 
 # Legacy aliases for backward compatibility
 ErrorCode = KuruErrorCode
