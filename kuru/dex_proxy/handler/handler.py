@@ -61,6 +61,11 @@ class KuruHandler:
                 "address": "0xf817257fed379853cDe0fa4F97AB987181B1E5Ea",  # USDC token
                 "decimals": 6,
                 "symbol": "USDC"
+            },
+            "CHOG": {
+                "address": "0xE0590015A873bF326bd645c3E1266d4db41C4E6B",  # CHOG token
+                "decimals": 18,
+                "symbol": "CHOG"
             }
         }
         
@@ -273,6 +278,23 @@ class KuruHandler:
             
         except Exception as ex:
             self._logger.error(f"Failed to cancel order {client_order_id}", exc_info=ex)
+            
+            # If the order doesn't exist on the exchange, remove it from our cache
+            error_message = str(ex).lower()
+            if "not found" in error_message or "does not exist" in error_message:
+                self._logger.info(f"Order {client_order_id} not found on exchange, removing from local cache")
+                if client_order_id in self._orders_cache:
+                    del self._orders_cache[client_order_id]
+                if client_order_id in self._client_to_order_id_map:
+                    del self._client_to_order_id_map[client_order_id]
+                if client_order_id in self._order_completions:
+                    del self._order_completions[client_order_id]
+                    
+                return 404, OrderErrorResponse(
+                    error_code=ErrorCode.ORDER_NOT_FOUND,
+                    error_message=f"Order {client_order_id} not found on exchange and removed from cache"
+                )
+            
             return 400, OrderErrorResponse(
                 error_code=ErrorCode.EXCHANGE_REJECTION,
                 error_message=f"Failed to cancel order {client_order_id}. Reason: {ex}"
@@ -352,6 +374,12 @@ class KuruHandler:
             ), None
 
         if client_order_id not in self._orders_cache:
+            self._logger.info(f"Order {client_order_id} not found in cache, removing from tracking if exists")
+            # Clean up any stale references
+            if client_order_id in self._client_to_order_id_map:
+                del self._client_to_order_id_map[client_order_id]
+            if client_order_id in self._order_completions:
+                del self._order_completions[client_order_id]
             return 404, OrderErrorResponse(
                 error_code=ErrorCode.ORDER_NOT_FOUND,
                 error_message=f"Order with client_order_id {client_order_id} not found"
@@ -359,6 +387,12 @@ class KuruHandler:
 
         order_id = self._client_to_order_id_map.get(client_order_id)
         if order_id is None:
+            self._logger.info(f"Order ID not found for {client_order_id}, removing from cache")
+            # Remove the order from cache since it doesn't have a valid order_id
+            if client_order_id in self._orders_cache:
+                del self._orders_cache[client_order_id]
+            if client_order_id in self._order_completions:
+                del self._order_completions[client_order_id]
             return 404, OrderErrorResponse(
                 error_code=ErrorCode.ORDER_NOT_FOUND,
                 error_message=f"Order ID not found for client_order_id {client_order_id}"
@@ -366,6 +400,14 @@ class KuruHandler:
 
         order = self._orders_cache[client_order_id]
         if order.status != OrderStatus.OPEN:
+            self._logger.info(f"Order {client_order_id} is not open (status: {order.status}), removing from cache")
+            # Remove non-open orders from cache as they can't be cancelled
+            if client_order_id in self._orders_cache:
+                del self._orders_cache[client_order_id]
+            if client_order_id in self._client_to_order_id_map:
+                del self._client_to_order_id_map[client_order_id]
+            if client_order_id in self._order_completions:
+                del self._order_completions[client_order_id]
             return 400, OrderErrorResponse(
                 error_code=ErrorCode.INVALID_PARAMETER,
                 error_message=f"Order with client_order_id {client_order_id} is not open (status: {order.status})"

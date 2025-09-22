@@ -25,7 +25,7 @@ async def main():
     print()
 
     # Step 2: Deposit funds
-    print("2. Depositing funds...")
+    input("2. Deposit funds?")
     deposit_data = {
         "amount": "50.0",  # 50 MON
         "currency": "MON"  # Required field
@@ -39,7 +39,7 @@ async def main():
     await asyncio.sleep(5)
 
     # Step 3: Check balances after deposit
-    print("3. Checking balances after deposit...")
+    input("3. Checking balances after deposit?")
     balance_response_after = requests.get(f"{base_url}/public/balance")
     print(f"Status: {balance_response_after.status_code}")
     if balance_response_after.status_code == 200:
@@ -49,9 +49,9 @@ async def main():
             print(f"Exchange wallet balance: {item['balance']} {item['symbol']}")
     pprint.pprint(balance_response_after.json())
     print()
-    return
+
     # Step 4: Withdraw funds
-    print("4. Withdrawing funds...")
+    input("4. Withdraw funds?")
     withdraw_data = {
         "currency": "MON"  # Required field
     }
