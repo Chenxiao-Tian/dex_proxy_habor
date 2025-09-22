@@ -7,7 +7,7 @@ from dex_proxy_common_setup import setup
 
 setup(
     [
-        "pyutils[web3] @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.11",
+        "pyutils[web3] @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.12",
         "websockets==10.4"
     ]
 )
