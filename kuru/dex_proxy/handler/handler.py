@@ -201,7 +201,7 @@ class KuruHandler:
             
             tx_hash = kuru_cloid.split("_")[0]
         except Exception as ex:
-            self._logger.error("Failed to insert order", ex)
+            self._logger.error("Failed to insert order", exc_info=ex)
             self.cleanup_order_completion(client_order_id)
             return 400, OrderErrorResponse(
                 error_code=ErrorCode.EXCHANGE_REJECTION,
