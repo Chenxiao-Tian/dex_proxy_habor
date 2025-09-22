@@ -6,7 +6,7 @@ from py_dex_common.schemas import TradeDetail
 
 
 class OrderResponse(BaseModel):
-    client_order_id: str = Field(..., example="123")
+    client_order_id: int = Field(..., example=123)
     order_id: str = Field(..., example="456")
     price: Decimal = Field(..., example="50000.0")
     quantity: Decimal = Field(..., example="0.1")
@@ -23,7 +23,7 @@ class OrderResponse(BaseModel):
     model_config = {
         "json_schema_extra": {
             "example": {
-                "client_order_id": "123",
+                "client_order_id": 123,
                 "order_id": "456",
                 "price": "50000.0",
                 "quantity": "0.1",
@@ -51,7 +51,7 @@ class QueryLiveOrdersResponse(BaseModel):
                 "send_timestamp_ns": 1620000001000000000,
                 "orders": [
                     {
-                        "client_order_id": "123",
+                        "client_order_id": 123,
                         "order_id": "456",
                         "price": "50000.0",
                         "quantity": "0.1",
