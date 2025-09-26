@@ -4,6 +4,3 @@ from .initialize_user import (
 from .margin_trading import (
     UpdateMarginTradingResponse
 )
-from .order_trade import (
-    QueryLiveOrdersResponse
-)
