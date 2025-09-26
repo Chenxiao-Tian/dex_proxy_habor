@@ -10,10 +10,10 @@ class UpdateMarginTradingResponse(BaseModel):
         description="Main account identifier",
         example="alice"
     )
-    subaccount: str = Field(
+    subaccount: int = Field(
         ...,
         description="Subaccount identifier",
-        example="main"
+        example=0
     )
     enabled: bool = Field(
         ...,
@@ -36,19 +36,19 @@ class UpdateMarginTradingResponse(BaseModel):
             "examples": {
                 "enable_success": {
                     "account": "alice",
-                    "subaccount": "main",
+                    "subaccount": 0,
                     "enabled": True,
                     "tx_sig": "0xabc123"
                 },
                 "disable_success": {
                     "account": "alice",
-                    "subaccount": "main",
+                    "subaccount": 0,
                     "enabled": False,
                     "tx_sig": "0xdef456"
                 },
                 "error": {
                     "account": "alice",
-                    "subaccount": "main",
+                    "subaccount": 0,
                     "failure": "Insufficient margin"
                 }
             }

@@ -73,11 +73,10 @@ from .tts import (
 )
 from .order_trade import (
     CreateOrderRequest,
-    TradeDetail,
-    CreateOrderResponse,
+    OrderResponse,
+    QueryLiveOrdersResponse,
     CreateOrderErrorResponse,
     QueryOrderParams,
-    QueryOrderResponse,
 )
 from .error_response import (
     ErrorResponse

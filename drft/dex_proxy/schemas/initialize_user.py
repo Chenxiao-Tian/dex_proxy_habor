@@ -11,10 +11,10 @@ class InitializeUserResponse(BaseModel):
         description="The main account identifier",
         example="alice"
     )
-    subaccount: str = Field(
+    subaccount: int = Field(
         ...,
         description="The subaccount identifier",
-        example="main"
+        example=0
     )
     tx_sig: Optional[str] = Field(
         None,
@@ -32,19 +32,18 @@ class InitializeUserResponse(BaseModel):
             "examples": {
                 "success": {
                     "account": "alice",
-                    "subaccount": "main",
+                    "subaccount": 0,
                     "tx_sig": "0xabc123"
                 },
                 "already_initialized": {
                     "account": "alice",
-                    "subaccount": "main"
+                    "subaccount": 0
                 },
                 "error": {
                     "account": "alice",
-                    "subaccount": "main",
+                    "subaccount": 0,
                     "failure": "some unexpected error"
                 }
             }
         }
     }
-

@@ -82,9 +82,8 @@
   "dex": {
     "name": "drft",
     "mode": "READWRITE",
-    "comment1": "The RPC server is the default one on drift website. Others may has larger latency or not compatible with drift's SDK",
     "url": "https://abigail-3etg2x-fast-mainnet.helius-rpc.com",
-    "_private_key": "nhUoPPyXEDhReAPzMxu85Sf4zNaJSrPz8vYRTwzng7tdz7q1M5sB4SjmmFxnzDRpB5Hv6gMam2SchidALVu8wQr",
+    "_url": "http://prod-amo-solana0.kprod:8899",
     "comment2": "drift has a broken devnet implementation, so we have to use mainet.",
     "env": "mainnet",
     "account": "drift_test_0",
@@ -98,7 +97,7 @@
       "store_in_redis": false
     },
     "clients_pool": {
-      "public_key": "76qh9UEKv8We4Um5bznSPvn2jkNrckq2hKeNQt8JNNKQ",
+      "public_key": "5BGjbSVSt8RmBWNNt9FQqg5sCB6LWsQPuEaMsgdnHBSs",
       "comment3": "subaccount 0 is the main account",
       "subaccount": 0,
       "skip_solana_preflight_checks": false,
@@ -108,18 +107,20 @@
       "urls": {
         "helius_0": "https://abigail-3etg2x-fast-mainnet.helius-rpc.com"
       },
+      "_urls": {
+        "internal_solana_0": "http://prod-amo-solana0.kprod:8899"
+      },
       "refresh_leading_client_interval_s": 10
     },
     "event_subscribers": {
       "enabled": true,
       "type": "polling",
+      "_type": "websocket",
       "urls": {
         "helius_1": "https://abigail-3etg2x-fast-mainnet.helius-rpc.com"
       },
-      "_type": "websocket",
       "_urls": {
-        "helius_1": "wss://abigail-3etg2x-fast-mainnet.helius-rpc.com",
-        "solana_1": "ws://prod-amo-solana1.kprod:8900"
+        "internal_solana_0": "http://prod-amo-solana0.kprod:8899"
       }
     },
     "rest_order_poller": {
