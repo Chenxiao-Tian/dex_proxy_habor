@@ -44,8 +44,6 @@ from py_dex_common.dexes.dex_common import (
     DexCommon,
 )
 from py_dex_common.web_server import WebServer
-import py_dex_common.schemas as schemas
-from . import schemas as local_schemas
 
 from solana.rpc.api import Client
 from solders.message import Message
@@ -129,21 +127,15 @@ class Drift(DexCommon):
             "GET",
             "/public/order",
             self._query_order,
-            request_model=schemas.QueryOrderParams,
-            response_model=schemas.OrderResponse,
-            response_errors={404: {"model": schemas.CancelOrderErrorResponse}},
             summary="Get a single order",
             tags=["public"],
-            oapi_in=[name],
         )
         server.register(
             "GET",
             "/public/orders",
             self._query_live_orders,
-            response_model=schemas.QueryLiveOrdersResponse,
             summary="List all live orders",
             tags=["public"],
-            oapi_in=[name],
         )
 
         server.register("GET", "/public/portfolio", self._query_portfolio)
@@ -163,10 +155,8 @@ class Drift(DexCommon):
                 "POST",
                 "/initialize-user",
                 self._initialize_user,
-                response_model=local_schemas.InitializeUserResponse,
                 summary="Initialize user",
                 tags=[name],
-                oapi_in=[name],
             )
 
             # https://drift-labs.github.io/v2-teacher/#manager-commands
@@ -176,55 +166,38 @@ class Drift(DexCommon):
                 "POST",
                 "/enable-margin-trading",
                 self._enable_margin_trading,
-                response_model=local_schemas.UpdateMarginTradingResponse,
                 summary="Enable margin trading",
                 tags=[name],
-                oapi_in=[name],
             )
             server.register(
                 "POST",
                 "/disable-margin-trading",
                 self._disable_margin_trading,
-                response_model=local_schemas.UpdateMarginTradingResponse,
                 summary="Disable margin trading",
                 tags=[name],
-                oapi_in=[name],
             )
 
             server.register(
                 "POST",
                 "/private/create-order",
                 self._create_order,
-                request_model=schemas.CreateOrderRequest,
-                response_model=schemas.OrderResponse,
-                response_errors={400: {"model": schemas.CreateOrderErrorResponse}},
                 summary="Create a new order",
                 tags=["private"],
-                oapi_in=[name],
             )
 
             server.register(
                 "DELETE",
                 "/private/cancel-order",
                 self._cancel_order,
-                request_model=schemas.CancelOrderParams,
-                response_model=schemas.OrderResponse,
-                response_errors={
-                    400: {"model": schemas.CancelOrderErrorResponse},
-                    404: {"model": schemas.CancelOrderErrorResponse},
-                },
                 summary="Cancel a single order",
                 tags=["private"],
-                oapi_in=[name],
             )
             server.register(
                 "DELETE",
                 "/private/cancel-all-orders",
                 self._cancel_all_orders,
-                response_model=schemas.CancelAllOrdersResponse,
                 summary="Cancel all orders",
                 tags=["private"],
-                oapi_in=[name],
             )
             server.register("POST", "/private/deposit-token", self._deposit)
             server.register("POST", "/private/withdraw-token", self._withdraw)
