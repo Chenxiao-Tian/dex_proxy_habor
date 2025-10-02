@@ -169,6 +169,28 @@
                     "2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5": "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
                     "3ATp7waptopFefKsqbgmF7omXt2BN5oUofpcPUJVsXCn": "0x8AEd108899153f73a19605d80041ef300B75b27A"
                 }
+            },
+            {
+                "symbol": "UDZ",
+                "_details": "curl -X GET https://api.hyperunit.xyz/gen/hyperliquid/solana/2z/2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5",
+                "address": "0x7650808198966e4285687d3deb556ccc",
+                "valid_withdrawal_addresses": [
+                    "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
+                    "0x8AEd108899153f73a19605d80041ef300B75b27A",
+                    "0x198350063dDcA3b0cADE88ae7398E7bb51ad09CB",
+                    "0xb0CC5084A339877b0a151Be28DA0D6C6718cAD49",
+                    "0x8a3457ff1C565e5A290aE1Ec09DAAddEBd57D00a",
+                    "0x99b134C6B3367D9db724CBd5A7c715e21c43cAE8",
+                    "0xf702A74648FA8f1A1c6240c5fF993DA8C8116EE9"
+                ],
+                "unit_withdrawal_address_mappings": {
+                    "2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5": "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
+                    "3ATp7waptopFefKsqbgmF7omXt2BN5oUofpcPUJVsXCn": "0x8AEd108899153f73a19605d80041ef300B75b27A",
+                    "BRmGR1P7SBpN1qf9AGAi8gVf2zKpC8HUJvV624RksqHD": "0x198350063dDcA3b0cADE88ae7398E7bb51ad09CB",
+                    "5resAYKS1SV9GBxhXBpCeAUVWNMTWW7c5F7kDSZK5rFg": "0xb0CC5084A339877b0a151Be28DA0D6C6718cAD49",
+                    "47BQHRAZhV9SG94sU1VzqKk4kTSBvtg2E8QuQZokRnzw": "0x8a3457ff1C565e5A290aE1Ec09DAAddEBd57D00a",
+                    "3G7baZkGVvyyh9tfn1E78NXEmdeVDjT5N4uSDGpq56Yx": "0x99b134C6B3367D9db724CBd5A7c715e21c43cAE8"
+                }
             }
         ]
     }
