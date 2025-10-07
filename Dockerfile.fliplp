@@ -1,5 +1,5 @@
-# SHASUM pin of chainfliplabs/chainflip-lp-api:berghain:1.9.2
-FROM chainfliplabs/chainflip-lp-api@sha256:4d19e70ebfd56adbe40d0152421ff035f13284a2cc56bc88321ccd5cce8e8286 as flip
+# SHASUM pin of chainfliplabs/chainflip-lp-api:berghain-1.11.10
+FROM chainfliplabs/chainflip-lp-api@sha256:1bc91666f7ee24fe095c1afe0eedf960c00768ead4d6a7db32ba40a7fb87a7eb as flip
 
 ARG SSH_PRIVATE_KEY_BASE64
 
