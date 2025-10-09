@@ -99,7 +99,7 @@
     "clients_pool": {
       "public_key": "5BGjbSVSt8RmBWNNt9FQqg5sCB6LWsQPuEaMsgdnHBSs",
       "comment3": "subaccount 0 is the main account",
-      "subaccount": 0,
+      "sub_account_ids": [0, 1, 2],
       "skip_solana_preflight_checks": false,
       "blockhash_refresh_interval_secs": 1,
       "compute_unit_limit": 600000,
@@ -107,7 +107,7 @@
       "urls": {
         "helius_0": "https://abigail-3etg2x-fast-mainnet.helius-rpc.com"
       },
-      "_urls": {
+      "__urls": {
         "internal_solana_0": "http://prod-amo-solana0.kprod:8899"
       },
       "refresh_leading_client_interval_s": 10
