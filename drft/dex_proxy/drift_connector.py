@@ -29,7 +29,7 @@ class DriftConfiguration:
     env: DriftEnv
     url: str
     public_key: str = None
-    subaccount: int = 0
+    sub_account_ids: list | None = None
     skip_preflight: bool = False
     blockhash_refresh_interval_secs: int = 1
     compute_unit_limit: int = None
@@ -83,7 +83,7 @@ class DriftConnection:
             authority=authority,
             tx_params=tx_params,
             tx_sender=tx_sender,
-            active_sub_account_id=config.subaccount,
+            sub_account_ids=config.sub_account_ids
         )
         self.pantheon = None
 

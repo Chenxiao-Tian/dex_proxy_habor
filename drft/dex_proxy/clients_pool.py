@@ -15,6 +15,7 @@ from driftpy.drift_client import DriftClient
 
 # A pool of DriftClient => each will be using a different RPC node
 
+DEFAULT_SUB_ACCOUNT_ID = 0
 
 class ClientsPool:
 
@@ -40,7 +41,7 @@ class ClientsPool:
                 env=self.__env,
                 url=url,
                 public_key=self.__config["public_key"],
-                subaccount=self.__config.get("subaccount", 0),
+                sub_account_ids=self.__config.get("sub_account_ids", [DEFAULT_SUB_ACCOUNT_ID]),
                 skip_preflight=self.__config.get("skip_solana_preflight_checks", False),
                 blockhash_refresh_interval_secs=self.__config.get(
                     "blockhash_refresh_interval_secs", 1

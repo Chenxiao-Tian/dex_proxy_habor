@@ -23,7 +23,7 @@ from .drift_api import (
     decode_name,
     equal_drift_enum,
 )
-from .clients_pool import ClientsPool
+from .clients_pool import ClientsPool, DEFAULT_SUB_ACCOUNT_ID
 from .event_subscribers import EventSubscribers
 from .order_cache import OrderCache
 from .rest_order_status_syncer import RestOrderStatusSyncer
@@ -60,6 +60,7 @@ from driftpy.constants.numeric_constants import (
     QUOTE_PRECISION,
 )
 from driftpy.drift_client import DriftClient
+from driftpy.drift_user import DriftUser
 from driftpy.math.amm import calculate_bid_ask_price
 from driftpy.math.conversion import convert_to_number
 from driftpy.math.margin import MarginCategory
@@ -140,6 +141,7 @@ class Drift(DexCommon):
 
         server.register("GET", "/public/portfolio", self._query_portfolio)
         server.register("GET", "/public/balance", self._get_balance)
+        server.register("GET", "/public/user-info", self._get_user_info)
         server.register("GET", "/public/contract-data", self._get_contract_data)
         server.register("GET", "/public/margin-data", self._get_margin_data)
         server.register("GET", "/public/markets", self._fetch_markets)
@@ -728,32 +730,33 @@ class Drift(DexCommon):
         self, path: str, params: dict, received_at_ms: int
     ) -> Tuple[int, dict]:
         response = {}
+        try:
+            drift_client, drift_user = self.__get_drift_client_user_from_params(params)
+        except Exception as e:
+            return 400, {"error": str(e)}
         response["send_timestamp_ns"] = TimestampNs.now().get_ns_since_epoch()
-        response["spot_positions"] = self.__get_spot_positions()
-        response["perp_positions"] = self.__get_perp_positions()
+        response["spot_positions"] = self.__get_spot_positions(drift_client, drift_user)
+        response["perp_positions"] = self.__get_perp_positions(drift_client, drift_user)
         return 200, response
 
-    def __get_spot_positions(self) -> Dict[str, float]:
-        drift_client = self._clients_pool.get_client()
-        drift_user = drift_client.get_user()
+    def __get_spot_positions(self, drift_client, drift_user) -> Dict[str, float]:
         user_account = drift_user.get_user_account()
         positions = {}
         for position in user_account.spot_positions:
-            if position.market_index == 0 and position.scaled_balance == 0:
-                break
+            if position.scaled_balance == 0:
+                continue
             spot = drift_client.get_spot_market_account(position.market_index)
             name = decode_name(spot.name)
             balance = convert_to_number(drift_user.get_token_amount(spot.market_index), pow(10, spot.decimals))
             positions[name] = balance
         return positions
 
-    def __get_perp_positions(self) -> Dict[str, float]:
-        drift_client = self._clients_pool.get_client()
-        user_account = drift_client.get_user().get_user_account()
+    def __get_perp_positions(self, drift_client, drift_user) -> Dict[str, float]:
+        user_account = drift_user.get_user_account()
         positions = {}
         for position in user_account.perp_positions:
             if position.base_asset_amount == 0:
-                break
+                continue
             perp = drift_client.get_perp_market_account(position.market_index)
             name = decode_name(perp.name)
             position = convert_to_number(position.base_asset_amount, BASE_PRECISION)
@@ -823,6 +826,41 @@ class Drift(DexCommon):
     async def _cancel_all(self, path: str, params: dict, received_at_ms: int):
         pass
 
+    def __parse_subaccount_id(self, params: dict) -> int:
+        subaccount_param = params.get('subaccount_id') if params else None
+        if subaccount_param is None:
+            return DEFAULT_SUB_ACCOUNT_ID
+        return int(subaccount_param)
+
+    def __get_drift_client_user_from_params(self, params: dict) -> tuple[DriftClient, DriftUser]:
+        drift_client = self._clients_pool.get_client()
+        # Parse and validate subaccount id
+        try:
+            subaccount_param = params.get('subaccount_id') if params else None
+            subaccount_id = int(subaccount_param) if subaccount_param is not None else DEFAULT_SUB_ACCOUNT_ID
+        except Exception:
+            raise ValueError(f"INVALID_SUBACCOUNT_ID: must be an integer; got={params.get('subaccount_id')}")
+
+        # Membership validation against configured sub accounts
+        configured = getattr(drift_client, 'sub_account_ids', None)
+        if configured is not None and subaccount_id not in configured:
+            raise ValueError(
+                f"SUBACCOUNT_NOT_SUBSCRIBED: subaccount_id={subaccount_id} not in configured={configured}"
+            )
+
+        # Resolve user, map common driftpy errors to clearer codes
+        try:
+            user = drift_client.get_user(subaccount_id)
+        except Exception as ex:
+            msg = str(ex)
+            if "No sub account id" in msg or "No subaccount" in msg or "not found" in msg:
+                raise ValueError(
+                    f"SUBACCOUNT_NOT_INITIALIZED: subaccount_id={subaccount_id} not initialized on-chain"
+                )
+            raise ValueError(f"USER_RESOLVE_FAILED: {msg}")
+
+        return drift_client, user
+
     def __fetch_market_index_from_token_name(self, token_name: str, drift_client: DriftClient):
         map_token_name_to_marker_index = {
             decode_name(market.name): market.market_index
@@ -885,8 +923,10 @@ class Drift(DexCommon):
         return 200, {"tx_sig": str(tx_sig.tx_sig)}
 
     async def _get_balance(self, path: str, params: dict, received_at_ms: int):
-        drift_client = self._clients_pool.get_client()
-        drift_user = drift_client.get_user()
+        try:
+            drift_client, drift_user = self.__get_drift_client_user_from_params(params)
+        except Exception as e:
+            return 400, {"error": str(e)}
         spot_market_accounts = await drift_client.program.account["SpotMarket"].all()
         result = []
         perp_pnl = drift_user.get_unrealized_pnl(with_funding=False)
@@ -903,6 +943,38 @@ class Drift(DexCommon):
             result.append(resp)
 
         return 200, {"success": True, "perp_pnl": perp_pnl, "balances": result}
+
+    async def _get_user_info(self, path: str, params: dict, received_at_ms: int):
+        try:
+            drift_client, drift_user = self.__get_drift_client_user_from_params(params)
+        except Exception as e:
+            return 400, {"error": str(e)}
+
+        subaccount_id = self.__parse_subaccount_id(params)
+        info = {
+            "wallet_public_key": str(drift_client.wallet.public_key),
+            "user_public_key": str(drift_user.user_public_key),
+            "subaccount_id": subaccount_id,
+            "associated_token_accounts": [],
+        }
+
+        try:
+            spot_market_accounts = await drift_client.program.account["SpotMarket"].all()
+            for market_account in spot_market_accounts:
+                market = market_account.account
+                try:
+                    ata = str(drift_client.get_associated_token_account_public_key(market.market_index))
+                except Exception:
+                    ata = None
+                info["associated_token_accounts"].append({
+                    "symbol": bytes(market.name).decode("utf-8").strip(),
+                    "market_index": market.market_index,
+                    "ata": ata,
+                })
+        except Exception as e:
+            self._logger.warning("Failed to enumerate ATAs: %s", e)
+
+        return 200, info
 
     async def __get_drift_contracts(self) -> Optional[dict]:
         try:
@@ -925,8 +997,10 @@ class Drift(DexCommon):
             return 500, {"error": "Failed to retrieve contract data"}
 
         markets = []
-        drift_client = self._clients_pool.get_client()
-        drift_user = drift_client.get_user()
+        try:
+            drift_client, drift_user = self.__get_drift_client_user_from_params(params)
+        except Exception as e:
+            return 400, {"error": str(e)}
         for contract in contract_data_response.get("contracts", []):
             amm = None
             mark_price = None
@@ -962,8 +1036,10 @@ class Drift(DexCommon):
         return 200, contract_data
 
     async def _get_margin_data(self, path: str, params: dict, received_at_ms: int):
-        drift_client = self._clients_pool.get_client()
-        drift_user = drift_client.get_user()
+        try:
+            drift_client, drift_user = self.__get_drift_client_user_from_params(params)
+        except Exception as e:
+            return 400, {"error": str(e)}
         user_account = drift_user.get_user_account()
 
         total_collateral = drift_user.get_total_collateral(
@@ -1063,9 +1139,14 @@ class Drift(DexCommon):
     ):
         next_page = params.get("next_page")
         try:
+            _, drift_user = self.__get_drift_client_user_from_params(params)
+            user_public_key = str(drift_user.user_public_key)
+        except Exception as e:
+            return 400, {"error": str(e)}
+        try:
             timeout = aiohttp.ClientTimeout(total=10)
             url = (
-                f"https://data.api.drift.trade/user/{self.user_public_key}/deposits"
+                f"https://data.api.drift.trade/user/{user_public_key}/deposits"
                 + (f"?page={next_page}" if next_page else "")
             )
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -1080,7 +1161,11 @@ class Drift(DexCommon):
     async def _fetch_funding_records(
         self, path: str, params: dict, received_at_ms: int
     ):
-        drift_client = self._clients_pool.get_client()
+        try:
+            drift_client, drift_user = self.__get_drift_client_user_from_params(params)
+            user_public_key = str(drift_user.user_public_key)
+        except Exception as e:
+            return 400, {"error": str(e)}
         next_page = params.get("next_page")
         map_market_index_to_name = {
             market.market_index: decode_name(market.name)
@@ -1090,7 +1175,7 @@ class Drift(DexCommon):
         try:
             timeout = aiohttp.ClientTimeout(total=10)
             url = (
-                f"https://data.api.drift.trade/user/{self.user_public_key}/fundingPayments"
+                f"https://data.api.drift.trade/user/{user_public_key}/fundingPayments"
                 + (f"?page={next_page}" if next_page else "")
             )
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -1109,9 +1194,14 @@ class Drift(DexCommon):
     async def _fetch_trades(self, path: str, params: dict, received_at_ms: int):
         next_page = params.get("next_page")
         try:
+            _, drift_user = self.__get_drift_client_user_from_params(params)
+            user_public_key = str(drift_user.user_public_key)
+        except Exception as e:
+            return 400, {"error": str(e)}
+        try:
             timeout = aiohttp.ClientTimeout(total=10)
             url = (
-                f"https://data.api.drift.trade/user/{self.user_public_key}/trades"
+                f"https://data.api.drift.trade/user/{user_public_key}/trades"
                 + (f"?page={next_page}" if next_page else "")
             )
             async with aiohttp.ClientSession(timeout=timeout) as session:
