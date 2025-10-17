@@ -137,6 +137,11 @@
       "url": "https://dlob.drift.trade/l3",
       "request_timeout_s": 5,
       "max_number_of_makers": 1
+    },
+    "api": {
+      "base_url": "https://18j4mizwxe.execute-api.eu-west-1.amazonaws.com/live/",
+      "api_key": "hkugmRbuKV6fa6TO4jErl9LmYdLwOBJSyv3HgtO7",
+      "timeout_s": 10
     }
   }
 }

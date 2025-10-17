@@ -3,8 +3,8 @@ import logging
 from decimal import Decimal
 from typing import Dict
 
-from .drift_api import MarketType
-from .clients_pool import ClientsPool
+from drift_api import MarketType
+from clients_pool import ClientsPool
 
 from solders.pubkey import Pubkey
 from solana.rpc.commitment import Confirmed
