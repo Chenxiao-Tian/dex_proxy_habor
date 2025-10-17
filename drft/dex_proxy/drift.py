@@ -17,18 +17,18 @@ from pantheon.instruments_source import (
 from pantheon.pantheon_types import OrderType, Side
 from pantheon.timestamp_ns import TimestampNs
 
-from .drift_api import (
+from drift_api import (
     Order,
     OrderStatus,
     decode_name,
     equal_drift_enum,
 )
-from .clients_pool import ClientsPool, DEFAULT_SUB_ACCOUNT_ID
-from .event_subscribers import EventSubscribers
-from .order_cache import OrderCache
-from .rest_order_status_syncer import RestOrderStatusSyncer
-from .makers import Makers
-from .utils import (
+from clients_pool import ClientsPool, DEFAULT_SUB_ACCOUNT_ID
+from event_subscribers import EventSubscribers
+from order_cache import OrderCache
+from rest_order_status_syncer import RestOrderStatusSyncer
+from makers import Makers
+from utils import (
     AccessMode,
     classify_cancel_error,
     classify_insert_error,
@@ -119,6 +119,12 @@ class Drift(DexCommon):
 
         self._order_cache = OrderCache(pantheon=pantheon, config=config["order_cache"])
         self._makers = Makers(config["makers"]) if "makers" in config else None
+
+        # Initialize API configuration once
+        api_config = config.get("api", {})
+        self._api_base_url = api_config.get("base_url", "https://18j4mizwxe.execute-api.eu-west-1.amazonaws.com/live/")
+        self._api_key = api_config.get("api_key", "hkugmRbuKV6fa6TO4jErl9LmYdLwOBJSyv3HgtO7")
+        self._api_timeout_s = api_config.get("timeout_s", 10)
 
         self.instruments: Optional[InstrumentsLiveSource] = None
 
@@ -976,6 +982,42 @@ class Drift(DexCommon):
 
         return 200, info
 
+    async def _make_api_request(self, path: str, params: dict = None) -> Optional[dict]:
+        """
+        Make a reusable API request to the configured Drift API endpoint.
+
+        Args:
+            path: API endpoint path (e.g., "/contracts", "/user/{user_id}/trades")
+            params: Optional query parameters as a dictionary
+
+        Returns:
+            JSON response data or None if request fails
+        """
+        try:
+            # Build the full URL
+            url = f"{self._api_base_url}{path}"
+
+            # Add query parameters if provided
+            if params:
+                query_string = "&".join([f"{k}={v}" for k, v in params.items() if v is not None])
+                if query_string:
+                    url += f"?{query_string}"
+
+            # Prepare headers
+            headers = {}
+            if self._api_key:
+                headers["X-API-Key"] = self._api_key
+
+            timeout = aiohttp.ClientTimeout(total=self._api_timeout_s)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url, headers=headers) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    return data
+        except Exception as e:
+            self._logger.error(f"[ERROR] API request failed for path '{path}': {e}")
+            return None
+
     async def __get_drift_contracts(self) -> Optional[dict]:
         try:
             timeout = aiohttp.ClientTimeout(total=10)
@@ -1143,20 +1185,14 @@ class Drift(DexCommon):
             user_public_key = str(drift_user.user_public_key)
         except Exception as e:
             return 400, {"error": str(e)}
-        try:
-            timeout = aiohttp.ClientTimeout(total=10)
-            url = (
-                f"https://data.api.drift.trade/user/{user_public_key}/deposits"
-                + (f"?page={next_page}" if next_page else "")
-            )
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    return 200, data
-        except Exception as e:
-            self._logger.error(f"[ERROR] Exception occurred: {e}")
+
+        api_params = {"page": next_page} if next_page else None
+        data = await self._make_api_request(f"/user/{user_public_key}/deposits", api_params)
+
+        if data is None:
             return 500, {"error": "Failed to retrieve transfers"}
+
+        return 200, data
 
     async def _fetch_funding_records(
         self, path: str, params: dict, received_at_ms: int
@@ -1172,24 +1208,17 @@ class Drift(DexCommon):
             for market in drift_client.get_perp_market_accounts()
         }
 
-        try:
-            timeout = aiohttp.ClientTimeout(total=10)
-            url = (
-                f"https://data.api.drift.trade/user/{user_public_key}/fundingPayments"
-                + (f"?page={next_page}" if next_page else "")
-            )
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    for datum in data["records"]:
-                        datum["nativeCode"] = map_market_index_to_name[
-                            datum["marketIndex"]
-                        ]
-                    return 200, data
-        except Exception as e:
-            self._logger.error(f"[ERROR] Exception occurred: {e}")
-            return 500, {"error": "Failed to funding records"}
+        api_params = {"page": next_page} if next_page else None
+        data = await self._make_api_request(f"/user/{user_public_key}/fundingPayments", api_params)
+
+        if data is None:
+            return 500, {"error": "Failed to retrieve funding records"}
+
+        # Process the data to add native codes
+        for datum in data["records"]:
+            datum["nativeCode"] = map_market_index_to_name[datum["marketIndex"]]
+
+        return 200, data
 
     async def _fetch_trades(self, path: str, params: dict, received_at_ms: int):
         next_page = params.get("next_page")
@@ -1198,20 +1227,14 @@ class Drift(DexCommon):
             user_public_key = str(drift_user.user_public_key)
         except Exception as e:
             return 400, {"error": str(e)}
-        try:
-            timeout = aiohttp.ClientTimeout(total=10)
-            url = (
-                f"https://data.api.drift.trade/user/{user_public_key}/trades"
-                + (f"?page={next_page}" if next_page else "")
-            )
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    return 200, data
-        except Exception as e:
-            self._logger.error(f"[ERROR] Exception occurred: {e}")
+
+        api_params = {"page": next_page} if next_page else None
+        data = await self._make_api_request(f"/user/{user_public_key}/trades", api_params)
+
+        if data is None:
             return 500, {"error": "Failed to retrieve trades"}
+
+        return 200, data
 
     async def _transfer(self, request, gas_price_wei: int, nonce: int = None):
         try:
