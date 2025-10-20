@@ -3,7 +3,7 @@ import logging
 from typing import Dict, Optional
 
 from pantheon import Pantheon
-from drift_connector import (
+from .drift_connector import (
     DriftConfiguration,
     DriftConnector,
 )
