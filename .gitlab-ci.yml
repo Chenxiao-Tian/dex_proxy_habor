@@ -1,4 +1,5 @@
 stages:
+  - test
   - build
   - authorise
 
@@ -447,3 +448,54 @@ authorise enclaves (other):
       optional: true
       parallel:
         matrix: *other-enclaves
+
+.drft test files to monitor for changes: &drft-test-files-to-monitor-for-changes
+  - .gitlab-ci.yml
+  - drft/**/*
+  - py_dex_common/**/*
+  - py_dex_web3/**/*
+  - DockerfileTests.dockerfile
+  - .dockerignore-tests
+
+
+.run drft tests:
+  rules:
+    - if: '$CI_COMMIT_MESSAGE =~ /\[skip-func-tests-drft\]/'
+      when: never
+    - if: '$SKIP_FUNC_TESTS == "all"'
+      when: never
+    - if: '$SKIP_FUNC_TESTS =~ /(^|,)drft(,|$)/'
+      when: never
+    - if: $FORCE_BUILD == "true"
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        paths: *drft-test-files-to-monitor-for-changes
+
+test drft:
+  stage: test
+  extends:
+    - .run drft tests
+  needs: []
+  variables:
+    DOCKER_BUILDKIT: "1"
+  before_script:
+    - yum install -y make
+  script:
+    - echo ${SSH_PRIVATE_KEY_BASE64} | base64 -d -w 0 > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - eval $(ssh-agent -s)
+    - ssh-add ~/.ssh/id_rsa
+    - ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
+    - cd drft && make docker-build-tests
+    - mkdir -p test_reports
+    - echo "Running functional test suite inside container (with host network)"
+    - make docker-make-test-functional-ci
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - drft/test_reports/report.xml
+      - drft/test_reports/pytest.log
+      - drft/test_reports/.pytest_cache/d/.xprocess/dex_proxy_process/xprocess.log
+    reports:
+      junit: drft/test_reports/report.xml

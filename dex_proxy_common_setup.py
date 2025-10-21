@@ -1,7 +1,7 @@
 import os
 import setuptools
 import subprocess
-from typing import List
+from typing import List, Optional, Dict
 
 
 def _run(*cmd):
@@ -10,7 +10,7 @@ def _run(*cmd):
     return p.stdout.read().decode().rstrip()
 
 
-def setup(install_requires: List[str], name: str = "dex_proxy"):
+def setup(install_requires: List[str], name: str = "dex_proxy", extras_require: Optional[Dict[str, List[str]]] = None):
     version = _run("git", "rev-parse", "--short=7", "HEAD")
 
     if name != "py_dex_common":
@@ -22,4 +22,5 @@ def setup(install_requires: List[str], name: str = "dex_proxy"):
         version=f"0.0.0+{version}",
         packages=setuptools.find_packages(),
         install_requires=install_requires,
+        extras_require=extras_require,
     )

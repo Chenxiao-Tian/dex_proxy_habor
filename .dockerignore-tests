@@ -1,0 +1,31 @@
+# .dockerignore for tests Docker build
+# This file controls what files are included in the Docker build context for tests
+
+# Ignore configuration files that shouldn't be in the test image
+config
+
+# Ignore test cache files
+.pytest_cache/
+__pycache__/
+
+# Ignore virtual environments
+.venv/
+venv/
+env/
+
+# Ignore log files
+*.log
+
+# Ignore IDE files
+.vscode/
+.idea/
+
+# Ignore documentation files (unless needed for tests)
+documentation/
+
+DockerfileProd.dockerfile
+DockerfileTests.dockerfile
+
+.dockerignore-tests
+.dockerignore
+.dockerignore.bak

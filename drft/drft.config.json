@@ -82,7 +82,7 @@
   "dex": {
     "name": "drft",
     "mode": "READWRITE",
-    "url": "https://abigail-3etg2x-fast-mainnet.helius-rpc.com",
+    "url": "https://kora-8cwrc2-fast-mainnet.helius-rpc.com/",
     "_url": "http://prod-amo-solana0.kprod:8899",
     "comment2": "drift has a broken devnet implementation, so we have to use mainet.",
     "env": "mainnet",
@@ -105,7 +105,7 @@
       "compute_unit_limit": 600000,
       "compute_unit_price": 0,
       "urls": {
-        "helius_0": "https://abigail-3etg2x-fast-mainnet.helius-rpc.com"
+        "helius_0": "https://kora-8cwrc2-fast-mainnet.helius-rpc.com"
       },
       "__urls": {
         "internal_solana_0": "http://prod-amo-solana0.kprod:8899"
@@ -117,9 +117,10 @@
       "type": "polling",
       "_type": "websocket",
       "urls": {
-        "helius_1": "https://abigail-3etg2x-fast-mainnet.helius-rpc.com"
+        "helius_1": "https://kora-8cwrc2-fast-mainnet.helius-rpc.com/"
       },
       "_urls": {
+        "helius_1": "wss://kora-8cwrc2-fast-mainnet.helius-rpc.com/",
         "internal_solana_0": "http://prod-amo-solana0.kprod:8899"
       }
     },
