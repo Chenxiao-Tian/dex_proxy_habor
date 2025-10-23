@@ -330,6 +330,7 @@ build enclaves (python):
   extends:
     - .build enclaves
     - .build on changes (python)
+  needs: []
   parallel:
     matrix: *python-enclaves
 
@@ -338,6 +339,7 @@ build enclaves (ts):
   extends:
     - .build enclaves
     - .build on changes (ts)
+  needs: []
   parallel:
     matrix: *ts-enclaves
 
@@ -346,6 +348,7 @@ build enclaves (other):
   extends:
     - .build enclaves
     - .build on changes (other)
+  needs: []
   parallel:
     matrix: *other-enclaves
 
@@ -361,6 +364,7 @@ build containers (ts):
   extends:
     - .build containers
     - .build on changes (ts)
+  needs: []
   parallel:
     matrix: *ts-containers
 
