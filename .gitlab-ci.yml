@@ -181,6 +181,9 @@ variables:
   # Set to `true` in order to force all pipeline jobs to execute.
   # You do not need to change it here: you can set it in the UI when you press "New pipeline".
   FORCE_BUILD: "false"
+  # https://kenetic.atlassian.net/wiki/x/BYCX0w
+  KUBERNETES_CPU_LIMIT: 12
+  KUBERNETES_MEMORY_LIMIT: 12Gi
 
 
 default:
@@ -191,6 +194,9 @@ default:
     # library/docker:24-dind
     - name: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker@sha256:962ad28b5cddb82c7cadbf222a71c403bd97ef1814005624bd8a3697cbb58bba
       alias: docker
+      variables:
+        # required for dind k8s executor:
+        HEALTHCHECK_TCP_PORT: 2375
   before_script:
     - docker login -u $CI_DEPENDENCY_PROXY_USER -p $CI_DEPENDENCY_PROXY_PASSWORD $CI_DEPENDENCY_PROXY_SERVER
     - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
