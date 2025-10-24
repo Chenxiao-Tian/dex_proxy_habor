@@ -137,6 +137,7 @@ class DexProxyApiTestHelper:
 
         cancel_endpoint = "/private/cancel-order"
         cancel_data = {
+            "account": data["account"],
             "client_order_id": data["client_order_id"],
         }
         log.info(f"Cancelling order via DELETE {cancel_endpoint}")

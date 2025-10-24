@@ -18,6 +18,7 @@ from dex_proxy.drift_utils import (
     should_get_order_record,
     should_get_order_action_records,
     should_check_place_transaction,
+    make_api_request,
 )
 
 from solana.rpc.async_api import AsyncClient, Signature
@@ -26,11 +27,10 @@ from solana.rpc.commitment import Confirmed
 
 class RestOrderStatusSyncer:
 
-    def __init__(self, pantheon: Pantheon, config: dict, user_public_key: str, order_cache: OrderCache, dex):
+    def __init__(self, pantheon: Pantheon, config: dict, order_cache: OrderCache, dex):
         self.__logger = logging.getLogger("REST_ORDER_POLLER")
         self.__pantheon = pantheon
         self.__order_cache = order_cache
-        self.__user_public_key = user_public_key
         self.__dex = dex
         self.__url = config["url"]
         self.__api_key = config.get("api_key")
@@ -59,20 +59,22 @@ class RestOrderStatusSyncer:
     async def __poll_for_order_records(self):
         while True:
             try:
-                symbol_market_to_min_slot: Dict[Tuple[str, str], int] = {}
+                symbol_market_to_min_slot_and_public_key: Dict[Tuple[str, str], Tuple[int, str]] = {}
                 for order in self.__order_cache.get_all_open_orders():
                     if should_get_order_record(order, self.__start_polling_after_insert_s):
                         maybe_add_symbol_for_getting_order_record(
-                            symbol_market_to_min_slot=symbol_market_to_min_slot,
+                            symbol_market_to_min_slot_and_public_key=symbol_market_to_min_slot_and_public_key,
                             symbol=order.symbol,
                             market=order.drift_market_type,
                             slot=order.slot,
+                            user_public_key=order.sub_account_public_key,
                         )
 
                 tasks = []
-                for symbol_market, min_slot in symbol_market_to_min_slot.items():
+                for symbol_market, min_slot_public_key in symbol_market_to_min_slot_and_public_key.items():
                     symbol, market = symbol_market
-                    tasks.append(self.__get_order_records(symbol=symbol, market=market, fetch_till_slot=min_slot))
+                    min_slot, user_public_key = min_slot_public_key
+                    tasks.append(self.__get_order_records(user_public_key=user_public_key, symbol=symbol, market=market, fetch_till_slot=min_slot))
 
                 await asyncio.gather(*tasks)
             except Exception as ex:
@@ -88,7 +90,7 @@ class RestOrderStatusSyncer:
                     if should_get_order_action_records(
                         order, self.__start_polling_after_insert_s, self.__refetch_order_action_records_after_s
                     ):
-                        tasks.append(self.__get_order_action_records(drift_order_id=order.drift_order_id))
+                        tasks.append(self.__get_order_action_records(user_public_key=str(order.sub_account_public_key), drift_order_id=order.drift_order_id))
 
                 await asyncio.gather(*tasks)
             except Exception as ex:
@@ -118,6 +120,7 @@ class RestOrderStatusSyncer:
 
     async def __get_order_records_next_page(
         self,
+        user_public_key: str,
         symbol: str,
         market: MarketType,
         fetch_till_slot: int,
@@ -128,101 +131,98 @@ class RestOrderStatusSyncer:
         # sleep to avoid spamming
         await self.__pantheon.sleep(self.__order_records_poll_interval_ms / 1000)
         await self.__get_order_records(
+            user_public_key=user_public_key,
             symbol=symbol,
             market=market,
             fetch_till_slot=fetch_till_slot,
-            params=f"?page={next_page}",
+            params={"page": next_page},
             min_seen_slot=min_seen_slot,
             max_seen_slot=max_seen_slot,
         )
 
     async def __get_order_records(
         self,
+        user_public_key: str,
         symbol: str,
         market: MarketType,
         fetch_till_slot: int,
-        params: str = "",
+        params: dict = {},
         min_seen_slot: int | None = None,
         max_seen_slot: int | None = None,
     ):
         try:
-            url = f"{self.__url}/{self.__user_public_key}/orders/{market}/{symbol}{params}"
-            timeout = aiohttp.ClientTimeout(total=self.__request_timeout_s)
-            headers = None
-            if self.__api_key:
-                headers = {"X-API-Key": self.__api_key}
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url, headers=headers) as response:
-                    data = await response.json()
-                    status = response.status
-                    self.__logger.debug(f"Got order records for symbol={symbol} market={market}: status={status}, data={data}")
-                    if status == 200:
-                        assert data["success"] == True, "Invalid order records"
-                        for record in data["records"]:
-                            slot = await self.__handle_order_record(record)
-                            min_seen_slot = min_without_none(min_seen_slot, slot)
-                            max_seen_slot = max_without_none(max_seen_slot, slot)
+            data, status = await make_api_request(
+                url=f"{self.__url}/{user_public_key}/orders/{market}/{symbol}",
+                api_timeout_s=self.__request_timeout_s,
+                api_key=self.__api_key,
+                params=params,
+            )
+            self.__logger.debug(f"Got order records for symbol={symbol} market={market}: status={status}, data={data}")
+            if status == 200:
+                assert data["success"] == True, "Invalid order records"
+                for record in data["records"]:
+                    slot = await self.__handle_order_record(record)
+                    min_seen_slot = min_without_none(min_seen_slot, slot)
+                    max_seen_slot = max_without_none(max_seen_slot, slot)
 
-                        # fetch next page if required
-                        if min_seen_slot and min_seen_slot >= fetch_till_slot:
-                            next_page = data["meta"]["nextPage"]
-                            self.__logger.debug(f"Scheduling fetching next page of order records for symbol={symbol} market={market}")
-                            task = asyncio.create_task(
-                                self.__get_order_records_next_page(
-                                    symbol=symbol,
-                                    market=market,
-                                    fetch_till_slot=fetch_till_slot,
-                                    next_page=next_page,
-                                    min_seen_slot=min_seen_slot,
-                                    max_seen_slot=max_seen_slot,
-                                )
-                            )
-                            self.__pending_tasks.add(task)
-                            task.add_done_callback(self.__pending_tasks.discard)
-
-                        self.__finalise_failed_to_insert_orders(
-                            symbol=symbol, market=market, min_slot=min_seen_slot, max_slot=max_seen_slot
+                # fetch next page if required
+                if min_seen_slot and min_seen_slot >= fetch_till_slot:
+                    next_page = data["meta"]["nextPage"]
+                    self.__logger.debug(f"Scheduling fetching next page of order records for symbol={symbol} market={market}")
+                    task = asyncio.create_task(
+                        self.__get_order_records_next_page(
+                            user_public_key=user_public_key,
+                            symbol=symbol,
+                            market=market,
+                            fetch_till_slot=fetch_till_slot,
+                            next_page=next_page,
+                            min_seen_slot=min_seen_slot,
+                            max_seen_slot=max_seen_slot,
                         )
+                    )
+                    self.__pending_tasks.add(task)
+                    task.add_done_callback(self.__pending_tasks.discard)
+
+                self.__finalise_failed_to_insert_orders(
+                    symbol=symbol, market=market, min_slot=min_seen_slot, max_slot=max_seen_slot
+                )
 
         except Exception as ex:
             self.__logger.exception(f"Error while requesting order records for symbol={symbol} market={market}. %r", ex)
 
-    async def __get_order_action_records_next_page(self, drift_order_id: int, next_page: str):
+    async def __get_order_action_records_next_page(self, user_public_key: str, drift_order_id: int, next_page: str):
         # sleep to avoid spamming
         await self.__pantheon.sleep(self.__order_action_records_poll_interval_ms / 1000)
-        await self.__get_order_action_records(drift_order_id=drift_order_id, params=f"?page={next_page}")
+        await self.__get_order_action_records(user_public_key=user_public_key, drift_order_id=drift_order_id, params={"page": next_page})
 
-    async def __get_order_action_records(self, drift_order_id: int, params: str = ""):
+    async def __get_order_action_records(self, user_public_key: str, drift_order_id: int, params: dict = {}):
         try:
-            url = f"{self.__url}/{self.__user_public_key}/orders/{drift_order_id}/actions{params}"
-            timeout = aiohttp.ClientTimeout(total=self.__request_timeout_s)
-            headers = None
-            if self.__api_key:
-                headers = {"X-API-Key": self.__api_key}
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url, headers=headers) as response:
-                    data = await response.json()
-                    status = response.status
-                    self.__logger.debug(f"Got order action records for drift_order_id={drift_order_id}: status={status}, data={data}")
-                    if status == 200:
-                        assert data["success"] == True, "Invalid order action records"
-                        for record in data["records"]:
-                            await self.__handle_order_action_record(record)
+            data, status = await make_api_request(
+                url=f"{self.__url}/{user_public_key}/orders/{drift_order_id}/actions",
+                api_timeout_s=self.__request_timeout_s,
+                api_key=self.__api_key,
+                params=params,
+            )
+            self.__logger.debug(f"Got order action records for drift_order_id={drift_order_id}: status={status}, data={data}")
+            if status == 200:
+                assert data["success"] == True, "Invalid order action records"
+                for record in data["records"]:
+                    await self.__handle_order_action_record(user_public_key=user_public_key, record=record)
 
-                        order = self.__order_cache.get_order_from_drift_order_id(drift_order_id)
-                        if order:
-                            order.last_order_action_record_poll_success_at = TimestampNs.now()
+                order = self.__order_cache.get_order_from_drift_order_id(drift_order_id)
+                if order:
+                    order.last_order_action_record_poll_success_at = TimestampNs.now()
 
-                            next_page = data["meta"]["nextPage"]
-                            if next_page:
-                                self.__logger.debug(
-                                    f"Scheduling fetching next page of order action records for drift_order_id={drift_order_id}"
-                                )
-                                task = asyncio.create_task(
-                                    self.__get_order_action_records_next_page(drift_order_id=drift_order_id, next_page=next_page)
-                                )
-                                self.__pending_tasks.add(task)
-                                task.add_done_callback(self.__pending_tasks.discard)
+                    next_page = data["meta"]["nextPage"]
+                    if next_page:
+                        self.__logger.debug(
+                            f"Scheduling fetching next page of order action records for drift_order_id={drift_order_id}"
+                        )
+                        task = asyncio.create_task(
+                            self.__get_order_action_records_next_page(user_public_key=user_public_key, drift_order_id=drift_order_id, next_page=next_page)
+                        )
+                        self.__pending_tasks.add(task)
+                        task.add_done_callback(self.__pending_tasks.discard)
 
         except Exception as ex:
             self.__logger.exception(f"Error while requesting order action records for drift_order_id={drift_order_id}. %r", ex)
@@ -335,14 +335,14 @@ class RestOrderStatusSyncer:
 
         return None
 
-    async def __handle_order_action_record(self, record: dict):
+    async def __handle_order_action_record(self, user_public_key: str, record: dict):
         try:
             if record["action"] == "place":
                 pass
             elif record["action"] == "fill":
-                await self.__handle_order_filled_event(record)
+                await self.__handle_order_filled_event(user_public_key=user_public_key, record=record)
             elif record["action"] == "cancel":
-                await self.__handle_order_cancelled_event(record)
+                await self.__handle_order_cancelled_event(user_public_key=user_public_key, record=record)
             elif record["action"] == "trigger":
                 pass
             else:
@@ -350,9 +350,9 @@ class RestOrderStatusSyncer:
         except Exception as ex:
             self.__logger.exception(f"Error while processing handling order action record {record}. %r", ex)
 
-    async def __handle_order_filled_event(self, record: dict):
-        is_maker = record["maker"] == self.__user_public_key
-        is_taker = record["taker"] == self.__user_public_key
+    async def __handle_order_filled_event(self, user_public_key: str, record: dict):
+        is_maker = record["maker"] == user_public_key
+        is_taker = record["taker"] == user_public_key
 
         # this happens sometimes
         # TODO: need to check why?
@@ -408,11 +408,11 @@ class RestOrderStatusSyncer:
 
         await self.__dex._send_order_update(order.auros_order_id)
 
-    async def __handle_order_cancelled_event(self, record: dict):
+    async def __handle_order_cancelled_event(self, user_public_key: str, record: dict):
         # doesn't make much sense for cancels but data will be either in maker
         # sub-section or in taker sub-section
-        in_maker = record["maker"] == self.__user_public_key
-        in_taker = record["taker"] == self.__user_public_key
+        in_maker = record["maker"] == user_public_key
+        in_taker = record["taker"] == user_public_key
 
         # this happens for some orders
         # TODO: need to check why?

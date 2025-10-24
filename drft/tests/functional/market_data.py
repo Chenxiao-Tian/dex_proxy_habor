@@ -7,6 +7,8 @@ from order_generator import OrderGenerator
 
 
 class MarketData:
+    DRIFT_TEST_ACCOUNT: str = "drift_test_0"
+
     def __init__(self, order_generator: OrderGenerator):
         self.order_generator = order_generator
 
@@ -49,13 +51,13 @@ class MarketData:
             return ioc_price
 
     async def get_ioc_order_data(self, client_order_id: Optional[str] = None, symbol: Optional[str] = "SOL-PERP",
-                                 side: Optional[str] = "SELL"):
+                                 side: Optional[str] = "SELL", account: Optional[str] = DRIFT_TEST_ACCOUNT):
         ioc_price = await self.get_price_for_ioc_order(symbol, side)
 
-        return self.order_generator.generate_ioc_order_data(client_order_id, ioc_price, symbol, side)
+        return self.order_generator.generate_ioc_order_data(account, client_order_id, ioc_price, symbol, side)
 
     async def get_gtc_order_data(self, client_order_id: Optional[str] = None, symbol: Optional[str] = "SOL-PERP",
-                                 side: Optional[str] = "SELL"):
+                                 side: Optional[str] = "SELL", account: Optional[str] = DRIFT_TEST_ACCOUNT):
         high_price = await self.get_price_for_gtc_order(symbol, side)
 
-        return self.order_generator.generate_gtc_order_data(client_order_id, high_price, symbol, side)
+        return self.order_generator.generate_gtc_order_data(account, client_order_id, high_price, symbol, side)

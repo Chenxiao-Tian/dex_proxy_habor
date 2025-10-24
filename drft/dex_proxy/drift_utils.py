@@ -1,3 +1,4 @@
+import aiohttp
 from enum import Enum
 from typing import Dict, Tuple
 
@@ -35,6 +36,8 @@ def full_order_to_dict(order: Order) -> dict:
         "auros_order_id": order.auros_order_id,
         "drift_user_order_id": order.drift_user_order_id,
         "drift_order_id": str(order.drift_order_id) if order.drift_order_id else "",
+        "sub_account_id": order.sub_account_id,
+        "sub_account_public_key": order.sub_account_public_key,
         "price": str(order.price),
         "qty": str(order.qty),
         "side": str(order.side.name),
@@ -128,10 +131,20 @@ def has_insert_failed(
 
 
 def maybe_add_symbol_for_getting_order_record(
-    symbol_market_to_min_slot: Dict[Tuple[str, str], int], symbol: str, market: MarketType, slot: int
+    symbol_market_to_min_slot_and_public_key: Dict[Tuple[str, str], Tuple[int, str]],
+    symbol: str,
+    market: MarketType,
+    slot: int,
+    user_public_key: str,
 ):
-    if (symbol, market) not in symbol_market_to_min_slot or symbol_market_to_min_slot[(symbol, market)] > slot:
-        symbol_market_to_min_slot[(symbol, market)] = slot
+    if (
+        (symbol, market) not in symbol_market_to_min_slot_and_public_key
+        or symbol_market_to_min_slot_and_public_key[(symbol, market)][0] > slot
+    ):
+        symbol_market_to_min_slot_and_public_key[(symbol, market)] = (
+            slot,
+            user_public_key,
+        )
 
 
 def min_without_none(slot_1: int | None, slot_2: int | None) -> int | None:
@@ -170,3 +183,28 @@ def should_check_place_transaction(order: Order) -> bool:
         order.place_tx_confirmed = True
 
     return not order.place_tx_confirmed and len(order.place_tx_sig) > 0
+
+
+async def make_api_request(
+    url: str, api_timeout_s: int, api_key: str = None, params: dict = None
+) -> Tuple[dict, int]:
+
+    # Prepare headers
+    headers = {}
+    if api_key:
+        headers["X-API-Key"] = api_key
+
+    # Add query parameters if provided
+    if params:
+        query_string = "&".join(
+            [f"{k}={v}" for k, v in params.items() if v is not None]
+        )
+        if query_string:
+            url += f"?{query_string}"
+
+    timeout = aiohttp.ClientTimeout(total=api_timeout_s)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(url, headers=headers) as response:
+            response.raise_for_status()
+            data = await response.json()
+            return data, response.status
