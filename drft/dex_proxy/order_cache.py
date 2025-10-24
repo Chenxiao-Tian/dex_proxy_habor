@@ -3,7 +3,7 @@ from typing import Dict
 
 from pantheon import Pantheon
 from pantheon.timestamp_ns import TimestampNs
-from .drift_api import Order
+from dex_proxy.drift_api import Order
 
 
 class OrderCache:

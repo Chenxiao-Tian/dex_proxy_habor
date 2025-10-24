@@ -5,13 +5,13 @@ from logging import Logger
 from typing import List
 
 from pantheon import Pantheon, TimestampNs
-from .drift_connector import (
+from dex_proxy.drift_connector import (
     DriftConfiguration,
     DriftSubscriber,
 )
-from .drift_api import OrderStatus, OrderTrade
-from .order_cache import OrderCache
-from .utils import AccessMode
+from dex_proxy.drift_api import OrderStatus, OrderTrade
+from dex_proxy.order_cache import OrderCache
+from dex_proxy.drift_utils import AccessMode
 
 from solana.rpc.commitment import Confirmed
 from solders.pubkey import Pubkey

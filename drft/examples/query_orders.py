@@ -1,7 +1,7 @@
 import asyncio
 
 from .make_drift_client import *
-from dex_proxy.utils import full_order_to_dict
+from dex_proxy.drift_utils import full_order_to_dict
 
 
 async def main():

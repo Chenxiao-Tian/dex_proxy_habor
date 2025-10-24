@@ -5,7 +5,7 @@ from enum import auto
 from typing import Dict, List, Optional, Literal, Any, AsyncGenerator
 from datetime import datetime
 
-from .drift_connector import DriftConnection
+from dex_proxy.drift_connector import DriftConnection
 
 from pantheon.movements import Trade
 from pantheon.pantheon_types import OrderType, Side, TradeLiquidity, EEID, OpenClose

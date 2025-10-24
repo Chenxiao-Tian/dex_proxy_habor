@@ -17,18 +17,18 @@ from pantheon.instruments_source import (
 from pantheon.pantheon_types import OrderType, Side
 from pantheon.timestamp_ns import TimestampNs
 
-from .drift_api import (
+from dex_proxy.drift_api import (
     Order,
     OrderStatus,
     decode_name,
     equal_drift_enum,
 )
-from .clients_pool import ClientsPool, DEFAULT_SUB_ACCOUNT_ID
-from .event_subscribers import EventSubscribers
-from .order_cache import OrderCache
-from .rest_order_status_syncer import RestOrderStatusSyncer
-from .makers import Makers
-from .utils import (
+from dex_proxy.clients_pool import ClientsPool, DEFAULT_SUB_ACCOUNT_ID
+from dex_proxy.event_subscribers import EventSubscribers
+from dex_proxy.order_cache import OrderCache
+from dex_proxy.rest_order_status_syncer import RestOrderStatusSyncer
+from dex_proxy.makers import Makers
+from dex_proxy.drift_utils import (
     AccessMode,
     classify_cancel_error,
     classify_insert_error,
@@ -55,7 +55,6 @@ from spl.token.instructions import TransferParams, transfer
 
 from driftpy.constants.numeric_constants import (
     BASE_PRECISION,
-    MARGIN_PRECISION,
     PRICE_PRECISION,
     QUOTE_PRECISION,
 )
