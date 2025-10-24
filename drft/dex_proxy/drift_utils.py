@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Dict, Tuple
 
 from pantheon.timestamp_ns import TimestampNs
-from .drift_api import MarketType, Order, OrderTrade
+from dex_proxy.drift_api import MarketType, Order, OrderTrade
 
 from driftpy.types import MarketType as DriftMarketType
 

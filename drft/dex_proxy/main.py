@@ -2,7 +2,7 @@ from pantheon import Pantheon, StandardArgParser
 from py_dex_common.dex_proxy import DexProxy
 from py_dex_common.web_server import WebServer
 
-from .drift import Drift
+from dex_proxy.drift import Drift
 
 
 class Main(DexProxy):
