@@ -31,7 +31,7 @@ class ClientsPool:
         self.__latest_seen_slot: int = 0
         self.__refresh_leading_client_interval_s = self.__config["refresh_leading_client_interval_s"]
 
-    async def start(self, secret: list):
+    async def start(self, secret: list, sub_account_ids: list):
         assert (
             len(self.__config["urls"]) > 0
         ), "No solana RPC url provided in clients_pool"
@@ -41,7 +41,7 @@ class ClientsPool:
                 env=self.__env,
                 url=url,
                 public_key=self.__config["public_key"],
-                sub_account_ids=self.__config.get("sub_account_ids", [DEFAULT_SUB_ACCOUNT_ID]),
+                sub_account_ids=sub_account_ids,
                 skip_preflight=self.__config.get("skip_solana_preflight_checks", False),
                 blockhash_refresh_interval_secs=self.__config.get(
                     "blockhash_refresh_interval_secs", 1

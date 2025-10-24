@@ -69,6 +69,7 @@ class DexProxy:
         await self.__exchange.on_new_connection(ws)
 
     async def on_message(self, ws, msg: dict):
+        request_id = None
         try:
             request_id = msg['id']
             method = msg['method']

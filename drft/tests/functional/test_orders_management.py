@@ -97,6 +97,7 @@ class TestOrdersManagement:
                 raise ValueError(f"Invalid order_type: {order_type}")
         else:
             data = {
+                "account": MarketData.DRIFT_TEST_ACCOUNT,
                 "price": "50000" if price is None else price,
                 "quantity": "0.00001" if quantity is None else quantity,
                 "client_order_id": client_order_id or rand_id(),
@@ -221,6 +222,7 @@ class TestOrdersManagement:
             log.info("Created order for cancellation test: %s", data)
 
         cancel_data = {
+            "account": MarketData.DRIFT_TEST_ACCOUNT,
             "client_order_id": client_order_id
         }
 
@@ -306,4 +308,3 @@ class TestOrdersManagement:
 
             for client_order_id in client_order_ids:
                 await self.check_order_cancelled(api_helper, client_order_id, 200)
-

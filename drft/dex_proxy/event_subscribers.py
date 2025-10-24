@@ -2,7 +2,8 @@ import asyncio
 import logging
 from decimal import Decimal, InvalidOperation
 from logging import Logger
-from typing import List
+from typing import Dict, List
+import weakref
 
 from pantheon import Pantheon, TimestampNs
 from dex_proxy.drift_connector import (
@@ -31,7 +32,8 @@ class EventSubscribers:
         pantheon: Pantheon,
         config: dict,
         env: DriftEnv,
-        user_public_key: Pubkey,
+        user_public_keys: Dict[str, Pubkey],
+        subaccount_ids: Dict[str, int],
         order_cache: OrderCache,
         dex,
     ):
@@ -39,10 +41,11 @@ class EventSubscribers:
         self.__pantheon = pantheon
         self.__event_subscribers: List[DriftSubscriber] = []
         self.__dex = dex
-        self.__user_public_key = user_public_key
         self.__send_order_updates_for = asyncio.Queue()
 
         self.__trades_queue = asyncio.Queue()
+        # user_public_key (str) -> WeakSet[ws]
+        self.__user_ws_map: Dict[str, weakref.WeakSet] = {}
 
         if self.__dex.dex_access_mode == AccessMode.READONLY:
             self.subscribed_events = ("OrderActionRecord",)
@@ -50,31 +53,29 @@ class EventSubscribers:
             self.subscribed_events = ("OrderRecord", "OrderActionRecord")
 
         for name, url in config["urls"].items():
-            event_handler = EventHandler(
-                logger=self.__logger,
-                name=name,
-                user_public_key=self.__user_public_key,
-                order_cache=order_cache,
-                dex=self.__dex,
-                updates_queue=self.__send_order_updates_for,
-                trades_queue=self.__trades_queue,
-            )
-            configuration = DriftConfiguration(url=url, env=env)
-
-            subscriber_type = config["type"]
-            assert subscriber_type == "polling" or subscriber_type == "websocket", "Invalid event_subscriber type"
-            event_subscriber = DriftSubscriber(
-                config=configuration, type=subscriber_type
-            )
-
-            event_subscriber.add_callback(event_handler.handle_event)
-
-            self.__event_subscribers.append(event_subscriber)
+            for user, user_public_key in user_public_keys.items():
+                event_handler = EventHandler(
+                    logger=self.__logger,
+                    name=f"{name}|{user}",
+                    user_public_key=user_public_key,
+                    order_cache=order_cache,
+                    dex=self.__dex,
+                    updates_queue=self.__send_order_updates_for,
+                    trades_queue=self.__trades_queue,
+                )
+                configuration = DriftConfiguration(url=url, env=env, public_key=str(user_public_key),
+                                                   sub_account_ids=[subaccount_ids.get(user)])
+                subscriber_type = config["type"]
+                assert subscriber_type == "polling" or subscriber_type == "websocket", "Invalid event_subscriber type"
+                event_subscriber = DriftSubscriber(
+                    config=configuration, type=subscriber_type
+                )
+                event_subscriber.add_callback(event_handler.handle_event)
+                self.__event_subscribers.append(event_subscriber)
 
     async def start(self):
         for subscriber in self.__event_subscribers:
             await subscriber.start(
-                address=self.__user_public_key,
                 event_types=self.subscribed_events,
                 commitment=Confirmed,
             )
@@ -86,6 +87,17 @@ class EventSubscribers:
         if self.__dex.dex_access_mode == AccessMode.READONLY:
             self.__logger.info("Spawning receive trades utility")
             self.__pantheon.spawn(self.__receive_trades())
+
+    def register_ws_for_user_pubkey(self, user_public_key: str, ws):
+        try:
+            if user_public_key not in self.__user_ws_map:
+                self.__user_ws_map[user_public_key] = weakref.WeakSet()
+            self.__user_ws_map[user_public_key].add(ws)
+            self.__logger.info(
+                f"Registered WS connection_id={id(ws)} for user_public_key={user_public_key}"
+            )
+        except Exception as ex:
+            self.__logger.exception("Failed to register ws for user %s: %r", user_public_key, ex)
 
     async def __send_order_updates(self):
         while True:
@@ -101,12 +113,26 @@ class EventSubscribers:
                 trade = await self.__trades_queue.get()
                 self.__logger.info(f"Received trade : {trade}")
 
+                user_pk = trade.get("exchange_account")
                 event = {
                     "jsonrpc": "2.0",
                     "method": "subscription",
                     "params": {"channel": "TRADE", "data": trade},
                 }
-                await self.__dex._event_sink.on_event("TRADE", event)
+
+                # If we have registered WS for this user, send only to those
+                ws_targets_by_user_pk = self.__user_ws_map.get(user_pk)
+                if ws_targets_by_user_pk and len(list(ws_targets_by_user_pk)) > 0:
+                    for ws in list(ws_targets_by_user_pk):
+                        try:
+                            await self.__dex._server.send_json(ws, event)
+                        except Exception as ex:
+                            self.__logger.exception(
+                                "Error sending trade event to ws %s: %r", id(ws), ex
+                            )
+                else:
+                    # Fallback to broadcast over the generic channel
+                    await self.__dex._event_sink.on_event("TRADE", event)
             except BaseException as ex:
                 self.__logger.exception("Error sending trade updates %r", ex)
 

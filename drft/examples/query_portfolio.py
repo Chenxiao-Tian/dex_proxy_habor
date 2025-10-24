@@ -1,17 +1,10 @@
-import asyncio
+import pprint
+import requests
 
-from .make_drift_client import *
+host = "http://localhost"
+port = "1958"
+endpoint = "/public/portfolio"
 
-
-async def main():
-    api = await make_drift_client()
-
-    for position in api.get_spot_positions().items():
-        print(position)
-    for position in api.get_perp_positions().items():
-        print(position)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
-    print("done")
+response = requests.get(url=host + ":" + port + endpoint)
+print(response.status_code)
+pprint.pprint(response.json())

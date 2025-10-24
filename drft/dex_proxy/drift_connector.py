@@ -118,6 +118,7 @@ class DriftSubscriber:
         self.program = (
             program or DriftClient(self.connection, Wallet.dummy(), config.env).program
         )
+        self.address = Pubkey.from_string(config.public_key)
 
         if type == "polling":
             self.log_provider_config = PollingLogProviderConfig()
@@ -133,12 +134,11 @@ class DriftSubscriber:
 
     async def start(
         self,
-        address: Pubkey = DRIFT_PROGRAM_ID,
         event_types: tuple[EventType] = DEFAULT_EVENT_TYPES,
         commitment: Commitment = Confirmed,
     ):
         options = EventSubscriptionOptions(
-            address=address,
+            address=self.address,
             event_types=event_types,
             max_tx=4096,
             max_events_per_type=4096,
@@ -162,19 +162,3 @@ class DriftConnector:
         conn = DriftConnection(config=self.config, secret=secret)
         await conn.start()
         return conn
-
-    async def get_subscriber(
-        self,
-        address: Pubkey = DRIFT_PROGRAM_ID,
-        event_types: tuple[EventType] = DEFAULT_EVENT_TYPES,
-        commitment: Commitment = Confirmed,
-        connection: AsyncClient = None,
-        program: Program = None,
-    ) -> DriftSubscriber:
-        subscriber = DriftSubscriber(
-            config=self.config, connection=connection, program=program
-        )
-        await subscriber.start(
-            address=address, event_types=event_types, commitment=commitment
-        )
-        return subscriber

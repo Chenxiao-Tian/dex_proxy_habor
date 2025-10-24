@@ -9,7 +9,7 @@ import aiofiles
 from anchorpy import Wallet
 from solders.keypair import Keypair
 
-from dex_proxy.drift_connector import DriftConnector, DriftConfiguration, DriftConnection
+from dex_proxy.drift_connector import DriftConnector, DriftConfiguration
 
 from driftpy.drift_client import DriftClient
 
@@ -93,11 +93,15 @@ class ExchangeHelper:
     @staticmethod
     async def _init_client(config_data, config_path: Path) -> DriftClient:
         dex_config = config_data["dex"]
+        subaccounts = dex_config["clients_pool"]["subaccounts"]
+        sub_account_ids = []
+        for account, account_data in subaccounts.items():
+            sub_account_ids.append(int(account_data["sub_account_id"]))
         drift_config = DriftConfiguration(
             url=dex_config["url"],
             public_key=dex_config["clients_pool"]["public_key"],
             env=dex_config["env"],
-            sub_account_ids=dex_config["clients_pool"]["sub_account_ids"],
+            sub_account_ids=sub_account_ids,
         )
 
         # Load secret

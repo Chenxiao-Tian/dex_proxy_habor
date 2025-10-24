@@ -36,6 +36,7 @@ from dex_proxy.drift_utils import (
     get_drift_market_type,
     order_to_dict,
     should_send_cancel_order_error,
+    make_api_request,
 )
 from py_dex_common.dexes.dex_common import (
     ApiResult,
@@ -98,13 +99,16 @@ class Drift(DexCommon):
         self.solana_client = Client(config["url"])
 
         self.wallet_public_key: Pubkey = None
-        self.user_public_key: Pubkey = None
         self._markets_refresh_interval_s = config["markets_refresh_interval_s"]
 
         self._spot_id2name = {}
         self._spot_name2id = {}
         self._perp_id2name = {}
         self._perp_name2id = {}
+
+        self._sub_account_ids: Dict[str, int] = {}
+        self._sub_account_public_keys: Dict[str, Pubkey] = {}
+        self.__parse_sub_accounts(config)
 
         self.perp_pnl_settlement_frequency = config.get(
             "perp_pnl_settlement_frequency", 120
@@ -121,8 +125,8 @@ class Drift(DexCommon):
 
         # Initialize API configuration once
         api_config = config.get("api", {})
-        self._api_base_url = api_config.get("base_url", "https://18j4mizwxe.execute-api.eu-west-1.amazonaws.com/live/")
-        self._api_key = api_config.get("api_key", "hkugmRbuKV6fa6TO4jErl9LmYdLwOBJSyv3HgtO7")
+        self._api_base_url = api_config.get("base_url", "")
+        self._api_key = api_config.get("api_key", None)
         self._api_timeout_s = api_config.get("timeout_s", 10)
 
         self.instruments: Optional[InstrumentsLiveSource] = None
@@ -216,6 +220,20 @@ class Drift(DexCommon):
             self._server.deregister("DELETE", "/private/cancel-request")
             self._server.deregister("DELETE", "/private/cancel-all")
 
+    def __parse_sub_accounts(self, config: dict):
+        ids = set()
+        subaccounts = config["clients_pool"]["subaccounts"]
+        for account, account_data in subaccounts.items():
+            sub_account_id = int(account_data["sub_account_id"])
+            assert -1 < sub_account_id and sub_account_id < 8
+            assert sub_account_id not in ids
+            ids.add(sub_account_id)
+
+            sub_account_public_key = Pubkey.from_string(account_data["public_key"])
+
+            self._sub_account_ids[account] = sub_account_id
+            self._sub_account_public_keys[account] = sub_account_public_key
+
     def __load_whitelist(self):
         file_prefix = os.path.dirname(os.path.realpath(__file__))
         self._withdrawal_address_whitelists = {}
@@ -261,18 +279,17 @@ class Drift(DexCommon):
             config=self._config["clients_pool"],
             env=self._config["env"]
             )
-        await self._clients_pool.start(secret=secret)
+        await self._clients_pool.start(
+            secret=secret, sub_account_ids=list(self._sub_account_ids.values())
+        )
 
         await self._init_current_slot()
 
         drift_client = self._clients_pool.get_client()
         self.wallet_public_key = drift_client.wallet.public_key
-        self.user_public_key = drift_client.get_user().user_public_key
 
         if self.dex_access_mode == AccessMode.READWRITE:
             self.keypair = drift_client.wallet.payer
-
-        self._logger.info(f"User public key is : {str(self.user_public_key)}")
 
         self._order_cache.start()
 
@@ -284,7 +301,8 @@ class Drift(DexCommon):
                 pantheon=self.pantheon,
                 config=self._config["event_subscribers"],
                 env=self._config["env"],
-                user_public_key=self.user_public_key,
+                user_public_keys=self._sub_account_public_keys,
+                subaccount_ids=self._sub_account_ids,
                 order_cache=self._order_cache,
                 dex=self,
             )
@@ -294,7 +312,6 @@ class Drift(DexCommon):
             self._rest_order_poller = RestOrderStatusSyncer(
                 pantheon=self.pantheon,
                 config=self._config["rest_order_poller"],
-                user_public_key=str(self.user_public_key),
                 order_cache=self._order_cache,
                 dex=self,
             )
@@ -339,8 +356,16 @@ class Drift(DexCommon):
                 self._logger.exception(f"settle pnl failed: %r", e)
 
     async def _settle_pnl(self):
-        drift_client = self._clients_pool.get_client()
-        drift_user = drift_client.get_user()
+        tasks = []
+        for _, sub_account_id in self._sub_account_ids:
+            task = asyncio.create_task(self._settle_pnl(sub_account_id))
+            tasks.append(task)
+        asyncio.gather(*tasks)
+
+    async def _settle_pnl(self, sub_account_id: int):
+        drift_client, drift_user = self.__get_drift_client_user_from_params(
+            {"sub_account_id": {sub_account_id}}
+        )
         tasks = []
         map_market_index_to_name = {
             market.market_index: decode_name(market.name)
@@ -356,7 +381,7 @@ class Drift(DexCommon):
             )
             if unrealized_pnl:
                 task = drift_client.settle_pnl(
-                    self.user_public_key,
+                    drift_user.user_public_key,
                     drift_user.get_user_account(),
                     perp.market_index,
                 )
@@ -465,14 +490,28 @@ class Drift(DexCommon):
         self, path: str, params: dict, received_at_ms: int
     ) -> Tuple[int, dict]:
         drift_client = self._clients_pool.get_client()
+
+        response = {"account": self._account}
+
+        try:
+            account = params["account"]
+            sub_account_id = self._sub_account_ids[account]
+        except Exception as e:
+            failure = f"couldn't get sub_account_id: {str(e)}"
+            response["failure"] = failure
+            self._logger.error(failure)
+            return 400, response
+
         response = {
             "account": self._account,
-            "subaccount": drift_client.active_sub_account_id,
+            "sub_account": account,
+            "sub_account_id": sub_account_id,
         }
+
         try:
             tx_sig = await drift_client.initialize_user(
                 name=self._account,
-                sub_account_id=drift_client.active_sub_account_id,
+                sub_account_id=sub_account_id,
             )
             response["tx_sig"] = str(tx_sig)
             self._logger.info(f"initialized {response}")
@@ -486,16 +525,32 @@ class Drift(DexCommon):
                 self._logger.error(f"failed to initialize {response}")
                 return 400, response
 
-    async def _update_margin_trading(self, enabled: bool) -> Tuple[int, dict]:
+    async def _update_margin_trading(
+        self, params: dict, enabled: bool
+    ) -> Tuple[int, dict]:
         drift_client = self._clients_pool.get_client()
+
+        response = {"account": self._account}
+
+        try:
+            account = params["account"]
+            sub_account_id = self._sub_account_ids[account]
+        except Exception as e:
+            failure = f"couldn't get sub_account_id: {str(e)}"
+            response["failure"] = failure
+            self._logger.error(failure)
+            return 400, response
+
         response = {
             "account": self._account,
-            "subaccount": drift_client.active_sub_account_id,
+            "sub_account": account,
+            "sub_account_id": sub_account_id,
         }
+
         try:
             tx_sig = await drift_client.update_user_margin_trading_enabled(
                 margin_trading_enabled=enabled,
-                sub_account_id=drift_client.active_sub_account_id,
+                sub_account_id=sub_account_id,
             )
             response["enabled"] = enabled
             response["tx_sig"] = str(tx_sig)
@@ -509,12 +564,12 @@ class Drift(DexCommon):
     async def _enable_margin_trading(
         self, path: str, params: dict, received_at_ms: int
     ) -> Tuple[int, dict]:
-        return await self._update_margin_trading(True)
+        return await self._update_margin_trading(params, True)
 
     async def _disable_margin_trading(
         self, path: str, params: dict, received_at_ms: int
     ) -> Tuple[int, dict]:
-        return await self._update_margin_trading(False)
+        return await self._update_margin_trading(params, False)
 
     async def _place_order(self, order: Order):
         order_params = self._get_drift_order_params(order)
@@ -543,11 +598,14 @@ class Drift(DexCommon):
 
         if order_params.market_type == DriftMarketType.Perp():
             if makers is None:
-                tx_sig = await drift_client.place_perp_order(order_params)
+                tx_sig = await drift_client.place_perp_order(
+                    order_params, sub_account_id=order.sub_account_id
+                )
             else:
                 tx_sig = await drift_client.place_and_take_perp_order(
                     order_params=order_params,
-                    maker_info=makers
+                    maker_info=makers,
+                    sub_account_id=order.sub_account_id,
                 )
 
             self.__update_and_get_current_slot(
@@ -558,11 +616,15 @@ class Drift(DexCommon):
 
         elif order_params.market_type == DriftMarketType.Spot():
             if makers is None:
-                tx_sig = await drift_client.place_spot_order(order_params)
+                tx_sig = await drift_client.place_spot_order(
+                    order_params,
+                    sub_account_id=order.sub_account_id,
+                )
             else:
                 tx_sig = await drift_client.place_and_take_spot_order(
                     order_params=order_params,
-                    maker_info=makers
+                    maker_info=makers,
+                    sub_account_id=order.sub_account_id,
                 )
 
             self.__update_and_get_current_slot(
@@ -586,6 +648,27 @@ class Drift(DexCommon):
             return 400, {
                 "error_code": "TRADING_RULES_BREACH",
                 "error_message": f"maximum of {MAX_DRIFT_USER_ORDER_ID} active orders reached",
+            }
+
+        try:
+            account = params["account"]
+            sub_account_id = self._sub_account_ids[account]
+        except Exception as e:
+            failure = f"couldn't get sub_account_id for create order request: {str(e)}"
+            self._logger.error(failure)
+            return 400, {
+                "error_code": "TRADING_RULES_BREACH",
+                "error_message": failure,
+            }
+
+        try:
+            sub_account_public_key = self._sub_account_public_keys[account]
+        except Exception as e:
+            failure = f"couldn't get sub_account_public_key for create order request: {str(e)}"
+            self._logger.error(failure)
+            return 400, {
+                "error_code": "TRADING_RULES_BREACH",
+                "error_message": failure,
             }
 
         try:
@@ -622,6 +705,8 @@ class Drift(DexCommon):
             auros_order_id=client_order_id,
             drift_user_order_id=drift_user_order_id,
             drift_order_id=None,
+            sub_account_id=sub_account_id,
+            sub_account_public_key=str(sub_account_public_key),
             price=price,
             qty=qty,
             side=Side[params["side"]],
@@ -675,12 +760,24 @@ class Drift(DexCommon):
             response["send_timestamp_ns"] = TimestampNs.now().get_ns_since_epoch()
             return 200, response
 
+        try:
+            account = params["account"]
+            sub_account_id = self._sub_account_ids[account]
+            assert sub_account_id == order.sub_account_id
+        except Exception as e:
+            failure = f"couldn't get sub_account_id for cancel order request: {str(e)}"
+            self._logger.error(failure)
+            return 400, {
+                "error_code": "TRADING_RULES_BREACH",
+                "error_message": failure,
+            }
+
         tx_sig = None
 
         try:
             drift_client = self._clients_pool.get_client()
             tx_sig = await drift_client.cancel_order_by_user_id(
-                order.drift_user_order_id
+                order.drift_user_order_id, sub_account_id=sub_account_id
             )
         except Exception as ex:
             error_msg = str(ex)
@@ -768,23 +865,32 @@ class Drift(DexCommon):
             positions[name] = position
         return positions
 
+    async def _cancel_all_orders_for_sub_account(
+        self, account: str, sub_account_id: int
+    ):
+        try:
+            drift_client = self._clients_pool.get_client()
+            tx_sig = await drift_client.cancel_orders(sub_account_id=sub_account_id)
+            self._logger.info(
+                f"cancel all orders for sub account {account} tx_sig: {tx_sig}"
+            )
+        except Exception as e:
+            self._logger.exception(
+                f"canceling all orders for sub account {account} failed: %r", e
+            )
+
     async def _cancel_all_orders(
         self, path: str, params: dict, received_at_ms: int
     ) -> Tuple[int, dict]:
-        tx_sig = None
-        try:
-            drift_client = self._clients_pool.get_client()
-            tx_sig = await drift_client.cancel_orders()
-            self._logger.info(f"cancel all orders tx_sig: {tx_sig}")
-        except Exception as e:
-            self._logger.exception(f"canceling all orders failed: %r", e)
 
-        cancelled = []
+        cancelled = [
+            order.auros_order_id for order in self._order_cache.get_all_open_orders()
+        ]
 
-        for order in self._order_cache.get_all_open_orders():
-            if order.order_type != OrderType.IOC:
-                cancelled.append(order.auros_order_id)
-                order.last_update = TimestampNs.now()
+        cancel_all_tasks = []
+        for account, sub_account_id in self._sub_account_ids.items():
+            # maybe run these in parallel ?
+            await self._cancel_all_orders_for_sub_account(account, sub_account_id)
 
         return 200, {
             "cancelled": cancelled,
@@ -795,7 +901,31 @@ class Drift(DexCommon):
         self._logger.info(f"new connection {ws}")
 
     async def process_request(self, ws, request_id, method, params: dict):
-        pass
+        # Handle setting subaccount for targeted trade streaming
+        if method == "set_subaccount":
+            try:
+                if not params or "subaccount_id" not in params:
+                    self._logger.warning("set_subaccount called without subaccount_id; ignoring")
+                else:
+                    drift_client, drift_user = self.__get_drift_client_user_from_params(params)
+                    user_pk = str(drift_user.user_public_key)
+
+                    # Register this websocket for targeted trade delivery
+                    if self._event_subscribers:
+                        self._event_subscribers.register_ws_for_user_pubkey(user_pk, ws)
+
+                    reply = {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "result": {"subaccount_id": params["subaccount_id"], "user_public_key": user_pk},
+                    }
+                    await self._server.send_json(ws, reply)
+            except Exception as e:
+                self._logger.exception("Failed to set subaccount: %r", e)
+                reply = {"jsonrpc": "2.0", "id": request_id, "error": {"message": str(e)}}
+                await self._server.send_json(ws, reply)
+
+        return True
 
     async def _approve(self, request, gas_price_wei, nonce=None):
         pass
@@ -996,37 +1126,23 @@ class Drift(DexCommon):
             # Build the full URL
             url = f"{self._api_base_url}{path}"
 
-            # Add query parameters if provided
-            if params:
-                query_string = "&".join([f"{k}={v}" for k, v in params.items() if v is not None])
-                if query_string:
-                    url += f"?{query_string}"
+            data, status = await make_api_request(
+                url=url,
+                api_timeout_s=self._api_timeout_s,
+                api_key=self._api_key,
+                params=params,
+            )
 
-            # Prepare headers
-            headers = {}
-            if self._api_key:
-                headers["X-API-Key"] = self._api_key
+            return data
 
-            timeout = aiohttp.ClientTimeout(total=self._api_timeout_s)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url, headers=headers) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    return data
         except Exception as e:
             self._logger.error(f"[ERROR] API request failed for path '{path}': {e}")
             return None
 
     async def __get_drift_contracts(self) -> Optional[dict]:
         try:
-            timeout = aiohttp.ClientTimeout(total=10)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(
-                    "https://data.api.drift.trade/contracts"
-                ) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    return data
+            data, status = await make_api_request(url="https://data.api.drift.trade/contracts", api_timeout_s=10)
+            return data
         except Exception as e:
             self._logger.error(f"[ERROR] Exception occurred: {e}")
             return None

@@ -81,7 +81,7 @@
   "solana_secret_file_path": "./secret.txt",
   "dex": {
     "name": "drft",
-    "mode": "READWRITE",
+    "mode": "READONLY",
     "url": "https://mainnet.helius-rpc.com/?api-key=6bcf566b-7f8e-489c-938f-761bdf71106a",
     "_url": "http://prod-amo-solana0.kprod:8899",
     "env": "mainnet",
