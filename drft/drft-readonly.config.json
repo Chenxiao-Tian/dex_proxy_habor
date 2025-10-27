@@ -82,8 +82,7 @@
   "dex": {
     "name": "drft",
     "mode": "READONLY",
-    "url": "https://mainnet.helius-rpc.com/?api-key=6bcf566b-7f8e-489c-938f-761bdf71106a",
-    "_url": "http://prod-amo-solana0.kprod:8899",
+    "url": "https://kora-8cwrc2-fast-mainnet.helius-rpc.com",
     "env": "mainnet",
     "account": "drift_test_0",
     "markets_refresh_interval_s": 900,
@@ -116,28 +115,19 @@
       "compute_unit_limit": 600000,
       "compute_unit_price": 0,
       "urls": {
-        "helius_prod": "https://mainnet.helius-rpc.com/?api-key=6bcf566b-7f8e-489c-938f-761bdf71106a"
-      },
-      "_urls": {
-        "solana_prod": "http://prod-amo-solana0.kprod:8899"
+        "helius": "https://kora-8cwrc2-fast-mainnet.helius-rpc.com"
       },
       "refresh_leading_client_interval_s": 10
     },
     "event_subscribers": {
       "enabled": true,
       "type": "polling",
-      "_urls": {
-        "helius_prod": "https://mainnet.helius-rpc.com"
-      },
       "urls": {
-        "solana_prod": "http://prod-amo-solana0.kprod:8899"
+        "helius": "https://kora-8cwrc2-fast-mainnet.helius-rpc.com"
       },
       "_type": "websocket",
-      "__urls": {
-        "helius_prod": "wss://mainnet.helius-rpc.com"
-      },
-      "___urls": {
-        "solana_prod": "ws://prod-amo-solana0.kprod:8900"
+      "_urls": {
+        "helius": "wss://kora-8cwrc2-fast-mainnet.helius-rpc.com"
       }
     },
     "rest_order_poller": {
