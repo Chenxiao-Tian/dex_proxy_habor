@@ -212,6 +212,7 @@ class Drift(DexCommon):
             )
             server.register("POST", "/private/deposit-token", self._deposit)
             server.register("POST", "/private/withdraw-token", self._withdraw)
+            server.register("POST", "/private/transfer-token", self._transfer_deposit)
 
         if self.dex_access_mode == AccessMode.READONLY:
             self._server.deregister("POST", "/private/approve-token")
@@ -1003,9 +1004,34 @@ class Drift(DexCommon):
         }
         return map_token_name_to_marker_index.get(token_name)
 
+    async def _transfer_deposit(self, path: str, params: dict, received_at_ms: int):
+        token = params["token"]
+        amount = float(params["amount"])
+        from_subaccount_id = params.get("from_subaccount_id")
+        to_subaccount_id = params.get("to_subaccount_id")
+
+        assert to_subaccount_id is not None and from_subaccount_id is not None
+
+        drift_client = self._clients_pool.get_client()
+        spot_market_index = self.__fetch_market_index_from_token_name(token_name=token, drift_client=drift_client)
+
+        if spot_market_index is None:
+            return 400, {"error": "Invalid token"}
+
+        amount = drift_client.convert_to_spot_precision(amount, spot_market_index)
+        tx_sig = await drift_client.transfer_deposit(
+            amount, spot_market_index, from_subaccount_id, to_subaccount_id
+        )
+        self._logger.debug(f"[transfer_deposit] tx_sig: {tx_sig}")
+
+        if tx_sig is None:
+            return 500, {"status": "Transaction failed"}
+        return 200, {"tx_sig": str(tx_sig)}
+
     async def _deposit(self, path: str, params: dict, received_at_ms: int):
         token = params["token"]
         amount = float(params["amount"])
+        subaccount_id = params.get("subaccount_id", 0)
 
         drift_client = self._clients_pool.get_client()
         spot_market_index = self.__fetch_market_index_from_token_name(token_name=token, drift_client=drift_client)
@@ -1022,7 +1048,7 @@ class Drift(DexCommon):
             tx_sig = await drift_client.deposit(amount, spot_market_index, self.wallet_public_key)
         else:
             tx_sig = await drift_client.deposit(
-                amount, spot_market_index, user_token_account
+                amount, spot_market_index, user_token_account, subaccount_id
             )
         self._logger.debug(f"[deposit] tx_sig: {tx_sig.tx_sig}")
 
@@ -1033,6 +1059,7 @@ class Drift(DexCommon):
     async def _withdraw(self, path: str, params: dict, received_at_ms: int):
         token = params["token"]
         amount = float(params["amount"])
+        subaccount_id = params.get("subaccount_id", 0)
         drift_client = self._clients_pool.get_client()
         spot_market_index = self.__fetch_market_index_from_token_name(token_name=token, drift_client=drift_client)
         if spot_market_index is None:
@@ -1051,7 +1078,7 @@ class Drift(DexCommon):
             )
 
             tx_sig = await drift_client.withdraw(
-                amount, spot_market_index, user_token_account
+                amount, spot_market_index, user_token_account, False, subaccount_id
             )
 
         self._logger.debug(f"[withdraw] tx_sig: {tx_sig.tx_sig}")
