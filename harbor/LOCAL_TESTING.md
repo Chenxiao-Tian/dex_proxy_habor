@@ -23,6 +23,10 @@ repository root and have Python 3.11+ available.
    > so that editable installs work on machines without access to the private
    > Bitbucket/GitLab packages. Installing the two editable packages above is
    > sufficient for local smoke tests.
+   >
+   > On Windows `cmd.exe`/PowerShell the same commands work; ensure you run
+   > them from the repository root so the helper can resolve the local
+   > dependencies. No manual `PYTHONPATH` adjustments are required.
 
 2. Export the Harbor API key that was issued for the staging environment:
 
@@ -47,6 +51,8 @@ Useful flags:
 - `-n harbor` advertises the service name to Pantheon.
 
 The process only needs the keystore listed in the config (`kuru/test-local-wallet.json`), which is
+already part of the repository for local testing. Press `Ctrl+C` (or close the
+PowerShell window) to terminate the service when you are done testing.
 already part of the repository for local testing.
 
 ## 3. HTTP smoke tests
