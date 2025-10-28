@@ -1,0 +1,34 @@
+{
+  "logging": {
+    "level": "info",
+    "overrides": [
+      { "logger_name": "aiohttp.access", "level": "warning" },
+      { "logger_name": "pantheon.app_health", "level": "info" }
+    ]
+  },
+  "server": {
+    "port": 1958
+  },
+  "RabbitMQ": {
+    "url": "amqp://localhost"
+  },
+  "key_store_file_path": "kuru/test-local-wallet.json",
+  "dex": {
+    "name": "harbor",
+    "rest": {
+      "base_url": "https://api.harbor-dev.xyz/api/v1",
+      "api_key_env": "HARBOR_API_KEY",
+      "default_time_in_force": "gtc"
+    },
+    "ws": {
+      "url": "wss://api.harbor-dev.xyz/ws/v1"
+    },
+    "request_cache": {
+      "finalised_requests_cleanup_after_s": 600,
+      "store_in_redis": false
+    },
+    "transactions_status_poller": {
+      "poll_interval_s": 30
+    }
+  }
+}
