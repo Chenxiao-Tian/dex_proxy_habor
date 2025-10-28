@@ -140,6 +140,10 @@ def test_path_to_file_uri_handles_spaces(tmp_path):
 
     assert uri.startswith("file://")
     assert " " not in uri
+    # ``Path.as_uri`` percent-encodes spaces as ``%20`` which should appear here
+    assert "%20" in uri
+
+
     # ``pathname2url`` percent-encodes spaces as ``%20`` which should appear here
     assert "%20" in uri
 

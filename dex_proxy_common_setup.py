@@ -29,6 +29,8 @@ import setuptools
 import setuptools
 
 
+import setuptools
+
 _DEFAULT_VERSION = "0.0.dev0"
 
 
@@ -88,6 +90,7 @@ def _compute_version() -> str:
 def _path_to_file_uri(path: Path) -> str:
     """Return a ``file://`` URI for *path* with proper escaping."""
 
+    return path.resolve().as_uri()
     resolved = path.resolve()
     return urlunparse(("file", "", pathname2url(str(resolved)), "", "", ""))
 
