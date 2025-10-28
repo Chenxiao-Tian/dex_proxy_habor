@@ -7,6 +7,7 @@ repository root and have Python 3.11+ available.
 ## 1. Environment preparation
 
 1. Create a virtual environment and install the shared stubs + Harbor package in editable mode:
+1. Create a virtual environment and install the Harbor package in editable mode:
 
    ```bash
    python -m venv .venv
@@ -52,6 +53,7 @@ Useful flags:
 The process only needs the keystore listed in the config (`kuru/test-local-wallet.json`), which is
 already part of the repository for local testing. Press `Ctrl+C` (or close the
 PowerShell window) to terminate the service when you are done testing.
+already part of the repository for local testing.
 
 ## 3. HTTP smoke tests
 
