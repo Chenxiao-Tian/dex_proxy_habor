@@ -34,6 +34,11 @@ import setuptools
 
 _DEFAULT_VERSION = "0.0.dev0"
 
+import setuptools
+
+
+_DEFAULT_VERSION = "0.0.dev0"
+
 
 def _run_command(*cmd: str) -> str:
     """Execute *cmd* in the repository root and return stdout.
@@ -56,6 +61,29 @@ def _run_command(*cmd: str) -> str:
         raise RuntimeError(f"command {cmd!r} exited with {completed.returncode}: {completed.stderr}")
     return (completed.stdout or "").strip()
 
+def _run_command(*cmd: str) -> str:
+    """Execute *cmd* in the repository root and return stdout.
+
+    ``pip`` invokes ``setup.py`` from temporary build directories, therefore we
+    need to ensure the command runs relative to this file.  Any failure simply
+    propagates to the caller so the version helper can fall back gracefully.
+    """
+
+    repo_root = os.path.dirname(os.path.abspath(__file__))
+    completed = subprocess.run(
+        cmd,
+        cwd=repo_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        text=True,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(f"command {cmd!r} exited with {completed.returncode}: {completed.stderr}")
+    return (completed.stdout or "").strip()
+
+def _normalise_version(raw: str | None) -> str:
+    """Convert a raw git hash into a PEP-440 compliant version string."""
 
 _DEFAULT_VERSION = "0.0.dev0"
 
