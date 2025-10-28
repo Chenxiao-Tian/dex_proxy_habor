@@ -9,8 +9,9 @@ setup(
     [
         "msgpack==1.0.8",
         "orjson==3.10.18",
-        "pyutils @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.4",
         "fastopenapi",
+        "pydantic>=2.0",
+        "eth-account>=0.9",
     ],
     name="py_dex_common",
 )

@@ -31,6 +31,7 @@ from .status import (
 )
 
 from .balance import (
+    BalanceItem,
     BalanceResponse
 )
 
