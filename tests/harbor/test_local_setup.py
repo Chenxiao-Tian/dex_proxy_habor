@@ -144,6 +144,15 @@ def test_path_to_file_uri_handles_spaces(tmp_path):
     assert "%20" in uri
 
 
+def test_path_to_file_uri_encodes_parentheses(tmp_path):
+    nested = tmp_path / "dir (with) parens" / "py_dex_common"
+    nested.mkdir(parents=True)
+
+    uri = _path_to_file_uri(nested)
+
+    assert "%28" in uri
+    assert "%29" in uri
+    assert "(" not in uri and ")" not in uri
     # ``pathname2url`` percent-encodes spaces as ``%20`` which should appear here
     assert "%20" in uri
 
