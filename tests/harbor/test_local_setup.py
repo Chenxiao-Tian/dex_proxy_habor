@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from dex_proxy_common_setup import _compute_version, _normalise_version, setup
 from dex_proxy_common_setup import _compute_version, _normalise_version
 
 _DEX_PROXY_PATH = Path(__file__).resolve().parents[2] / "py_dex_common" / "py_dex_common" / "dex_proxy.py"
@@ -106,6 +107,23 @@ def test_compute_version_handles_git_errors(monkeypatch):
 
     monkeypatch.setattr(setup_module, "_run_command", lambda *a, **k: "deadbeef")
     assert _compute_version() == "0.0.dev0+gdeadbeef"
+
+
+def test_setup_appends_local_py_dex_common(monkeypatch):
+    captured = {}
+
+    def fake_setup(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr("dex_proxy_common_setup.setuptools.setup", fake_setup)
+
+    setup(["aiohttp"], name="harbor")
+
+    assert captured["name"] == "harbor"
+    assert "aiohttp" in captured["install_requires"]
+
+    expected_uri = (Path(__file__).resolve().parents[2] / "py_dex_common").resolve().as_uri()
+    assert any(req.startswith("py_dex_common @") and expected_uri in req for req in captured["install_requires"])
 
 
 def test_run_falls_back_to_signal_signal():
