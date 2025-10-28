@@ -12,6 +12,8 @@ from dex_proxy_common_setup import (
     _path_to_file_uri,
     setup,
 )
+from dex_proxy_common_setup import _compute_version, _normalise_version, setup
+from dex_proxy_common_setup import _compute_version, _normalise_version
 
 _DEX_PROXY_PATH = Path(__file__).resolve().parents[2] / "py_dex_common" / "py_dex_common" / "dex_proxy.py"
 _DEX_PROXY_SPEC = importlib.util.spec_from_file_location("tests.harbor._dex_proxy", _DEX_PROXY_PATH)
@@ -151,6 +153,12 @@ def test_path_to_file_uri_encodes_parentheses(tmp_path):
     assert "%28" in uri
     assert "%29" in uri
     assert "(" not in uri and ")" not in uri
+    # ``pathname2url`` percent-encodes spaces as ``%20`` which should appear here
+    assert "%20" in uri
+
+
+    expected_uri = (Path(__file__).resolve().parents[2] / "py_dex_common").resolve().as_uri()
+    assert any(req.startswith("py_dex_common @") and expected_uri in req for req in captured["install_requires"])
 
 
 def test_run_falls_back_to_signal_signal():
