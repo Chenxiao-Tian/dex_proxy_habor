@@ -81,7 +81,6 @@ This configuration:
 
 To use: Open a test file, set breakpoints, and run the debug configuration from VSCode's Run and Debug panel. This configuration will also be automatically used when debugging tests from VSCode's Testing panel because `"purpose": ["debug-test"]` is set.
 
-
 ## Optional Flags
 - `--dex-proxy-config=<file>`: Override default config. Path is resolved relative to the dex_dir/ dex root (working dir when using Make targets).
 - `--internal-proxy=True`: Switch to internal mode (see above).
@@ -106,4 +105,31 @@ pytest -s -p no:logging tests/functional --internal-proxy=True
 
 # Use outside proxy (already running at localhost:1958)
 pytest -s -p no:logging tests/functional --outside-proxy-host=localhost --outside-proxy-port=1958
+```
+
+## Skipping Tests in CI/CD
+
+Functional tests run in the `test` stage of the GitLab CI/CD pipeline. **Important: Test jobs do not block build jobs** - they run in parallel, so builds proceed regardless of test results (see [`.gitlab-ci.yml`](.gitlab-ci.yml) stages configuration).
+
+However, you can skip running functional tests entirely using one of the following methods:
+
+### Method 1: Pipeline Parameter
+
+When manually triggering a pipeline, set the `SKIP_FUNC_TESTS` variable:
+
+- **Skip all tests**: Set `SKIP_FUNC_TESTS` to `all`
+- **Skip specific DEX tests**: Set `SKIP_FUNC_TESTS` to the DEX name(s), e.g.:
+    - `drft` - skips only drft tests
+    - `drft,ethereal` - skips multiple DEX tests (comma-separated)
+
+### Method 2: Commit Message Marker
+
+Include a skip marker in your commit message:
+
+- **Skip drft tests**: Include `[skip-func-tests-drft]` in the commit message
+- **Skip ethereal tests**: Include `[skip-func-tests-ethereal]` in the commit message
+
+Example:
+```bash
+git commit -m "feat: update config [skip-func-tests-drft]"
 ```
