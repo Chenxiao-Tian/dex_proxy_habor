@@ -358,12 +358,12 @@ class Drift(DexCommon):
 
     async def _settle_pnl(self):
         tasks = []
-        for _, sub_account_id in self._sub_account_ids:
-            task = asyncio.create_task(self._settle_pnl(sub_account_id))
+        for _, sub_account_id in self._sub_account_ids.items():
+            task = asyncio.create_task(self._settle_pnl_for_sub(sub_account_id))
             tasks.append(task)
         asyncio.gather(*tasks)
 
-    async def _settle_pnl(self, sub_account_id: int):
+    async def _settle_pnl_for_sub(self, sub_account_id: int):
         drift_client, drift_user = self.__get_drift_client_user_from_params(
             {"sub_account_id": {sub_account_id}}
         )
