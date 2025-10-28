@@ -84,6 +84,8 @@ def setup(install_requires: List[str], name: str = "dex_proxy") -> None:
     if name != "py_dex_common":
         py_dex_common_path = Path(__file__).resolve().parent / "py_dex_common"
         install_requires = list(install_requires) + [f"py_dex_common @ {py_dex_common_path.as_uri()}"]
+        py_dex_common_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "py_dex_common"))
+        install_requires = list(install_requires) + [f"py_dex_common @ file://{py_dex_common_path}"]
 
     setuptools.setup(
         name=name,

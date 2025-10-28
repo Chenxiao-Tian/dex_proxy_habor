@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from dex_proxy_common_setup import _compute_version, _normalise_version, setup
+from dex_proxy_common_setup import _compute_version, _normalise_version
 
 _DEX_PROXY_PATH = Path(__file__).resolve().parents[2] / "py_dex_common" / "py_dex_common" / "dex_proxy.py"
 _DEX_PROXY_SPEC = importlib.util.spec_from_file_location("tests.harbor._dex_proxy", _DEX_PROXY_PATH)
