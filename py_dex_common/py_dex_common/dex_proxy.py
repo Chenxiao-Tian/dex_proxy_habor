@@ -124,9 +124,14 @@ class DexProxy:
         self.__running = False
 
     async def run(self):
-        self.pantheon.loop.add_signal_handler(
-            signal.SIGTERM, functools.partial(
-                self.stop, signal.SIGTERM))
+        try:
+            self.pantheon.loop.add_signal_handler(
+                signal.SIGTERM, functools.partial(self.stop, signal.SIGTERM))
+        except (AttributeError, NotImplementedError):
+            # Windows event loops do not implement ``add_signal_handler``.  Fall
+            # back to the synchronous signal API so the service can still shut
+            # down gracefully when ``timeout`` or CTRL+C delivers SIGTERM.
+            signal.signal(signal.SIGTERM, lambda sig, frame: self.stop(sig))
 
         app_health = await self.pantheon.get_app_health(app_type='service')
 
