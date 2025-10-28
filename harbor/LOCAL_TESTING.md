@@ -7,6 +7,7 @@ repository root and have Python 3.11+ available.
 ## 1. Environment preparation
 
 1. Create a virtual environment and install the shared stubs + Harbor package in editable mode:
+1. Create a virtual environment and install the Harbor package in editable mode:
 
    ```bash
    python -m venv .venv
