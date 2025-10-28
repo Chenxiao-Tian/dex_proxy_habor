@@ -6,6 +6,12 @@ from pathlib import Path
 
 import pytest
 
+from dex_proxy_common_setup import (
+    _compute_version,
+    _normalise_version,
+    _path_to_file_uri,
+    setup,
+)
 from dex_proxy_common_setup import _compute_version, _normalise_version, setup
 from dex_proxy_common_setup import _compute_version, _normalise_version
 
@@ -121,6 +127,22 @@ def test_setup_appends_local_py_dex_common(monkeypatch):
 
     assert captured["name"] == "harbor"
     assert "aiohttp" in captured["install_requires"]
+
+    expected_uri = _path_to_file_uri(Path(__file__).resolve().parents[2] / "py_dex_common")
+    assert any(req.startswith("py_dex_common @") and expected_uri in req for req in captured["install_requires"])
+
+
+def test_path_to_file_uri_handles_spaces(tmp_path):
+    nested = tmp_path / "dir with space" / "py_dex_common"
+    nested.mkdir(parents=True)
+
+    uri = _path_to_file_uri(nested)
+
+    assert uri.startswith("file://")
+    assert " " not in uri
+    # ``pathname2url`` percent-encodes spaces as ``%20`` which should appear here
+    assert "%20" in uri
+
 
     expected_uri = (Path(__file__).resolve().parents[2] / "py_dex_common").resolve().as_uri()
     assert any(req.startswith("py_dex_common @") and expected_uri in req for req in captured["install_requires"])
