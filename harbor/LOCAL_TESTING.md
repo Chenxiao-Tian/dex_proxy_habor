@@ -6,6 +6,7 @@ repository root and have Python 3.11+ available.
 
 ## 1. Environment preparation
 
+1. Create a virtual environment and install the shared stubs + Harbor package in editable mode:
 1. Create a virtual environment and install the Harbor package in editable mode:
 
    ```bash
@@ -14,6 +15,14 @@ repository root and have Python 3.11+ available.
    pip install -e py_dex_common
    pip install -e harbor
    ```
+
+   > **Note**
+   >
+   > The repository now bundles light-weight replacements for the internal
+   > `pantheon`, `pyutils`, `fastopenapi`, `aiohttp`, and related dependencies
+   > so that editable installs work on machines without access to the private
+   > Bitbucket/GitLab packages. Installing the two editable packages above is
+   > sufficient for local smoke tests.
 
 2. Export the Harbor API key that was issued for the staging environment:
 
