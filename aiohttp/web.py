@@ -19,6 +19,11 @@ import json
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional
 from urllib.parse import parse_qs
+"""Stub aiohttp.web module for local testing without network dependencies."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Awaitable, Callable, Iterable, List, Optional
 
 
 class _Route:
@@ -145,6 +150,12 @@ class AppRunner:
         for callback in self.app.on_shutdown:
             await callback(self.app)
 
+    async def setup(self) -> None:  # pragma: no cover - stub
+        return None
+
+    async def cleanup(self) -> None:  # pragma: no cover - stub
+        return None
+
 
 class TCPSite:
     def __init__(self, runner: AppRunner, host: str = "127.0.0.1", port: int = 0) -> None:
@@ -169,6 +180,13 @@ class TCPSite:
 
 class WebSocketResponse:
     async def prepare(self, request) -> None:  # pragma: no cover - not used in tests
+
+    async def start(self) -> None:  # pragma: no cover - stub
+        return None
+
+
+class WebSocketResponse:
+    async def prepare(self, request) -> None:  # pragma: no cover - stub
         return None
 
     async def close(self, *, message: Optional[str] = None) -> None:  # pragma: no cover - stub
@@ -219,3 +237,10 @@ _STATUS_REASONS = {
 
 def _status_reason(status: int) -> str:
     return _STATUS_REASONS.get(status, "OK")
+
+    async def text(self) -> str:
+        return ""
+
+
+def json_response(data: Any, status: int = 200, dumps: Callable[[Any], str] | None = None):  # pragma: no cover - stub
+    return {"status": status, "data": data}

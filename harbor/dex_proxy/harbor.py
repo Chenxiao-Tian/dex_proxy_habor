@@ -74,6 +74,8 @@ class Harbor(DexCommon):
         )
 
         balance_kwargs = dict(
+            "/public/balance",
+            self.get_balance,
             response_model=BalanceResponse,
             summary="Get account balances from Harbor",
             tags=["public", "balance"],
@@ -83,6 +85,11 @@ class Harbor(DexCommon):
             server.register("GET", path, self.get_balance, **balance_kwargs)
 
         create_order_kwargs = dict(
+
+        server.register(
+            "POST",
+            "/private/create-order",
+            self.create_order,
             request_model=CreateOrderRequest,
             response_model=OrderResponse,
             response_errors={400: {"model": OrderErrorResponse}},
@@ -94,6 +101,11 @@ class Harbor(DexCommon):
             server.register("POST", path, self.create_order, **create_order_kwargs)
 
         cancel_order_kwargs = dict(
+
+        server.register(
+            "DELETE",
+            "/private/cancel-order",
+            self.cancel_order,
             request_model=CancelOrderParams,
             response_model=OrderResponse,
             response_errors={400: {"model": OrderErrorResponse}},
@@ -117,6 +129,22 @@ class Harbor(DexCommon):
         server.register("GET", "/private/harbor/list_open_orders", self.list_open_orders, **list_orders_kwargs)
 
         depth_kwargs = dict(
+
+        server.register(
+            "GET",
+            "/public/orders",
+            self.list_open_orders,
+            response_model=QueryLiveOrdersResponse,
+            response_errors={400: {"model": OrderErrorResponse}},
+            summary="List open Harbor orders",
+            tags=["public", "orders"],
+            oapi_in=["harbor"],
+        )
+
+        server.register(
+            "GET",
+            "/public/depth",
+            self.get_depth_snapshot,
             summary="Get depth snapshot for a Harbor symbol",
             tags=["public", "market-data"],
             oapi_in=["harbor"],

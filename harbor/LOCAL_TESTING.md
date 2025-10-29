@@ -7,6 +7,7 @@ repository root and have Python 3.11+ available.
 ## 1. Environment preparation
 
 1. Create a virtual environment and install the shared stubs + Harbor package in editable mode:
+1. Create a virtual environment and install the Harbor package in editable mode:
 
    ```bash
    python -m venv .venv
@@ -52,6 +53,7 @@ Useful flags:
 The process only needs the keystore listed in the config (`kuru/test-local-wallet.json`), which is
 already part of the repository for local testing. Press `Ctrl+C` (or close the
 PowerShell window) to terminate the service when you are done testing.
+already part of the repository for local testing.
 
 ## 3. HTTP smoke tests
 
@@ -64,6 +66,9 @@ curl "http://localhost:1958/ping"
 curl "http://localhost:1958/public/harbor/get_balance"
 
 curl -X POST "http://localhost:1958/private/harbor/create_order" \
+curl "http://localhost:1958/public/balance"
+
+curl -X POST "http://localhost:1958/private/create-order" \
   -H 'Content-Type: application/json' \
   -d '{
         "client_order_id": "demo-1",
@@ -82,6 +87,7 @@ To cancel an order, issue:
 
 ```bash
 curl -X POST "http://localhost:1958/private/harbor/cancel_order" \
+curl -X DELETE "http://localhost:1958/private/cancel-order" \
   -H 'Content-Type: application/json' \
   -d '{"client_order_id": "demo-1"}'
 ```
@@ -90,6 +96,7 @@ Retrieve live orders:
 
 ```bash
 curl "http://localhost:1958/private/harbor/list_open_orders"
+curl "http://localhost:1958/public/orders"
 ```
 
 Fetch a depth snapshot:
@@ -101,6 +108,9 @@ curl "http://localhost:1958/public/harbor/get_depth_snapshot?symbol=btc.btc-eth.
 > **Compatibility note:** Legacy paths such as `/public/balance` and
 > `/public/depth` remain available, but new development should target the
 > `/harbor/` namespaced endpoints demonstrated above.
+
+curl "http://localhost:1958/public/depth?symbol=btc.btc-eth.usdt"
+```
 
 ## 4. Demo script (place + cancel)
 

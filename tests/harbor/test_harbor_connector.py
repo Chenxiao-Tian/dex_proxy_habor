@@ -161,6 +161,11 @@ def test_route_registration(harbor_connector):
 
 def test_create_order_tick_validation(harbor_connector):
     connector, stub, _ = harbor_connector
+    return connector, stub_client
+
+
+def test_create_order_tick_validation(harbor_connector):
+    connector, stub = harbor_connector
     params = {
         "client_order_id": "bad-tick",
         "symbol": "btc.btc-eth.usdt",
@@ -178,6 +183,7 @@ def test_create_order_tick_validation(harbor_connector):
 
 def test_create_order_success(harbor_connector):
     connector, stub, _ = harbor_connector
+    connector, stub = harbor_connector
     params = {
         "client_order_id": "demo-1",
         "symbol": "btc.btc-eth.usdt",
@@ -196,6 +202,7 @@ def test_create_order_success(harbor_connector):
 
 def test_cancel_order_fetches_latest_state(harbor_connector):
     connector, stub, _ = harbor_connector
+    connector, stub = harbor_connector
     connector._order_index["demo-1"] = None  # ensure mapping exists without symbol
     status, response = asyncio.run(connector.cancel_order("", {"client_order_id": "demo-1"}, 0))
     assert status == 200
@@ -206,6 +213,7 @@ def test_cancel_order_fetches_latest_state(harbor_connector):
 
 def test_list_open_orders_returns_snapshot(harbor_connector):
     connector, stub, _ = harbor_connector
+    connector, stub = harbor_connector
     status, response = asyncio.run(connector.list_open_orders("", {}, 0))
     assert status == 200
     assert isinstance(response, QueryLiveOrdersResponse)
@@ -215,6 +223,7 @@ def test_list_open_orders_returns_snapshot(harbor_connector):
 
 def test_get_balance_handles_various_keys(harbor_connector):
     connector, stub, _ = harbor_connector
+    connector, stub = harbor_connector
     stub.account_payload = {"balances": {"btc": {"asset": "BTC.BTC", "balance": "1.23"}}}
     status, response = asyncio.run(connector.get_balance("", {}, 0))
     assert status == 200
@@ -223,6 +232,7 @@ def test_get_balance_handles_various_keys(harbor_connector):
 
 def test_get_depth_requires_symbol(harbor_connector):
     connector, stub, _ = harbor_connector
+    connector, stub = harbor_connector
     status, response = asyncio.run(connector.get_depth_snapshot("", {}, 0))
     assert status == 400
     assert "symbol" in response["error"]["message"]
@@ -230,6 +240,7 @@ def test_get_depth_requires_symbol(harbor_connector):
 
 def test_error_bubbles_request_id(harbor_connector):
     connector, stub, _ = harbor_connector
+    connector, stub = harbor_connector
     stub.error = HarborAPIError(401, "unauthorized", request_id="abc-123")
     status, response = asyncio.run(connector.get_balance("", {}, 0))
     assert status == 401
