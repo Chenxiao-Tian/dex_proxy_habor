@@ -61,6 +61,11 @@ def _run_command(*cmd: str) -> str:
         raise RuntimeError(f"command {cmd!r} exited with {completed.returncode}: {completed.stderr}")
     return (completed.stdout or "").strip()
 
+
+def _normalise_version(raw: str | None) -> str:
+    """Convert a raw git hash into a PEP-440 compliant version string."""
+
+
 def _run_command(*cmd: str) -> str:
     """Execute *cmd* in the repository root and return stdout.
 

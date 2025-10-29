@@ -67,6 +67,13 @@ class Harbor(DexCommon):
     def _register_endpoints(self, server: WebServer) -> None:
         server.register(
             "GET",
+            "/ping",
+            self._ping,
+            summary="Simple Harbor adapter health-check",
+            tags=["public", "health"],
+        )
+
+        balance_kwargs = dict(
             "/public/balance",
             self.get_balance,
             response_model=BalanceResponse,
@@ -74,6 +81,10 @@ class Harbor(DexCommon):
             tags=["public", "balance"],
             oapi_in=["harbor"],
         )
+        for path in ("/public/balance", "/public/harbor/get_balance"):
+            server.register("GET", path, self.get_balance, **balance_kwargs)
+
+        create_order_kwargs = dict(
 
         server.register(
             "POST",
@@ -86,6 +97,10 @@ class Harbor(DexCommon):
             tags=["private", "orders"],
             oapi_in=["harbor"],
         )
+        for path in ("/private/create-order", "/private/harbor/create_order"):
+            server.register("POST", path, self.create_order, **create_order_kwargs)
+
+        cancel_order_kwargs = dict(
 
         server.register(
             "DELETE",
@@ -98,6 +113,22 @@ class Harbor(DexCommon):
             tags=["private", "orders"],
             oapi_in=["harbor"],
         )
+        # Support both DELETE and POST for compatibility with existing scripts.
+        server.register("DELETE", "/private/cancel-order", self.cancel_order, **cancel_order_kwargs)
+        for method, path in (("DELETE", "/private/harbor/cancel_order"), ("POST", "/private/harbor/cancel_order")):
+            server.register(method, path, self.cancel_order, **cancel_order_kwargs)
+
+        list_orders_kwargs = dict(
+            response_model=QueryLiveOrdersResponse,
+            response_errors={400: {"model": OrderErrorResponse}},
+            summary="List open Harbor orders",
+            tags=["private", "orders"],
+            oapi_in=["harbor"],
+        )
+        server.register("GET", "/public/orders", self.list_open_orders, **list_orders_kwargs)
+        server.register("GET", "/private/harbor/list_open_orders", self.list_open_orders, **list_orders_kwargs)
+
+        depth_kwargs = dict(
 
         server.register(
             "GET",
@@ -118,6 +149,11 @@ class Harbor(DexCommon):
             tags=["public", "market-data"],
             oapi_in=["harbor"],
         )
+        server.register("GET", "/public/depth", self.get_depth_snapshot, **depth_kwargs)
+        server.register("GET", "/public/harbor/get_depth_snapshot", self.get_depth_snapshot, **depth_kwargs)
+
+    async def _ping(self, path, params, received_at_ms):
+        return 200, {"ok": True, "name": self._config.get("name", "harbor")}
 
     async def start(self, private_key=None):  # pragma: no cover - exercised in integration
         self.started = True

@@ -142,6 +142,25 @@ def harbor_connector():
     stub_client = StubHarborClient()
     connector = Harbor(pantheon, config, server, event_sink, rest_client=stub_client)
     connector._rest_client = stub_client  # type: ignore[attr-defined]
+    return connector, stub_client, server
+
+
+def test_route_registration(harbor_connector):
+    connector, stub, server = harbor_connector
+    registered = {(args[0], args[1]) for args, _ in server.registered}
+    assert ("GET", "/ping") in registered
+    assert ("GET", "/public/harbor/get_balance") in registered
+    assert ("GET", "/public/balance") in registered
+    assert ("POST", "/private/harbor/create_order") in registered
+    assert ("POST", "/private/create-order") in registered
+    assert ("DELETE", "/private/harbor/cancel_order") in registered
+    assert ("POST", "/private/harbor/cancel_order") in registered
+    assert ("GET", "/private/harbor/list_open_orders") in registered
+    assert ("GET", "/public/harbor/get_depth_snapshot") in registered
+
+
+def test_create_order_tick_validation(harbor_connector):
+    connector, stub, _ = harbor_connector
     return connector, stub_client
 
 
@@ -163,6 +182,7 @@ def test_create_order_tick_validation(harbor_connector):
 
 
 def test_create_order_success(harbor_connector):
+    connector, stub, _ = harbor_connector
     connector, stub = harbor_connector
     params = {
         "client_order_id": "demo-1",
@@ -181,6 +201,7 @@ def test_create_order_success(harbor_connector):
 
 
 def test_cancel_order_fetches_latest_state(harbor_connector):
+    connector, stub, _ = harbor_connector
     connector, stub = harbor_connector
     connector._order_index["demo-1"] = None  # ensure mapping exists without symbol
     status, response = asyncio.run(connector.cancel_order("", {"client_order_id": "demo-1"}, 0))
@@ -191,6 +212,7 @@ def test_cancel_order_fetches_latest_state(harbor_connector):
 
 
 def test_list_open_orders_returns_snapshot(harbor_connector):
+    connector, stub, _ = harbor_connector
     connector, stub = harbor_connector
     status, response = asyncio.run(connector.list_open_orders("", {}, 0))
     assert status == 200
@@ -200,6 +222,7 @@ def test_list_open_orders_returns_snapshot(harbor_connector):
 
 
 def test_get_balance_handles_various_keys(harbor_connector):
+    connector, stub, _ = harbor_connector
     connector, stub = harbor_connector
     stub.account_payload = {"balances": {"btc": {"asset": "BTC.BTC", "balance": "1.23"}}}
     status, response = asyncio.run(connector.get_balance("", {}, 0))
@@ -208,6 +231,7 @@ def test_get_balance_handles_various_keys(harbor_connector):
 
 
 def test_get_depth_requires_symbol(harbor_connector):
+    connector, stub, _ = harbor_connector
     connector, stub = harbor_connector
     status, response = asyncio.run(connector.get_depth_snapshot("", {}, 0))
     assert status == 400
@@ -215,6 +239,7 @@ def test_get_depth_requires_symbol(harbor_connector):
 
 
 def test_error_bubbles_request_id(harbor_connector):
+    connector, stub, _ = harbor_connector
     connector, stub = harbor_connector
     stub.error = HarborAPIError(401, "unauthorized", request_id="abc-123")
     status, response = asyncio.run(connector.get_balance("", {}, 0))

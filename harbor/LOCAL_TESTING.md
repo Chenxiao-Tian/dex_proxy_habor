@@ -61,6 +61,11 @@ With the server running locally (default `http://localhost:1958`), you can perfo
 sanity checks using `curl`:
 
 ```bash
+curl "http://localhost:1958/ping"
+
+curl "http://localhost:1958/public/harbor/get_balance"
+
+curl -X POST "http://localhost:1958/private/harbor/create_order" \
 curl "http://localhost:1958/public/balance"
 
 curl -X POST "http://localhost:1958/private/create-order" \
@@ -81,6 +86,7 @@ message including the Harbor request id when available.
 To cancel an order, issue:
 
 ```bash
+curl -X POST "http://localhost:1958/private/harbor/cancel_order" \
 curl -X DELETE "http://localhost:1958/private/cancel-order" \
   -H 'Content-Type: application/json' \
   -d '{"client_order_id": "demo-1"}'
@@ -89,12 +95,20 @@ curl -X DELETE "http://localhost:1958/private/cancel-order" \
 Retrieve live orders:
 
 ```bash
+curl "http://localhost:1958/private/harbor/list_open_orders"
 curl "http://localhost:1958/public/orders"
 ```
 
 Fetch a depth snapshot:
 
 ```bash
+curl "http://localhost:1958/public/harbor/get_depth_snapshot?symbol=btc.btc-eth.usdt"
+```
+
+> **Compatibility note:** Legacy paths such as `/public/balance` and
+> `/public/depth` remain available, but new development should target the
+> `/harbor/` namespaced endpoints demonstrated above.
+
 curl "http://localhost:1958/public/depth?symbol=btc.btc-eth.usdt"
 ```
 
