@@ -13,7 +13,6 @@ from pantheon.utils import receive_json
 from pydantic import BaseModel
 
 from .utils import json_type_formatter
-
 from py_dex_common.web_server.dexproxy_aiohtttp_router import DexProxyAioHttpRouter
 from py_dex_common.web_server.error_handling import DexProxyGenericAPIError
 
@@ -21,7 +20,6 @@ _logger = logging.getLogger('WebServer')
 
 
 class WebServer:
-
     def __init__(self, config, proxy: 'DexProxy', name: str = "Undefined"):
         self.__config = config
         self.__proxy = proxy
@@ -34,15 +32,16 @@ class WebServer:
             version=f"1.0.6",
             description=f"OpenAPI documentation for '{name}'"
         )
+
         self.__app.on_shutdown.append(self.__on_shutdown)
-        self.__app.add_routes(
-            [web.get('/private/ws', self.__websocket_handler)])
+        self.__app.add_routes([web.get('/private/ws', self.__websocket_handler)])
 
         self.__runner = web.AppRunner(self.__app)
-
         self.__connections = weakref.WeakSet()
-
         self.__request_id: int = 0
+
+        # 防重注册（解决 aiohttp HEAD 冲突）
+        self.__registered_routes = set()
 
     def __get_next_request_id(self) -> int:
         self.__request_id += 1
@@ -53,23 +52,25 @@ class WebServer:
         return self.__app
 
     def register(
-            self,
-            method: str,
-            path: str,
-            handler: Callable[[str, Dict[str, Any], int], Awaitable[tuple[int, Dict[str, Any]]]],
-            *,
-            request_model: Optional[Type[BaseModel]] = None,
-            response_model: Optional[Type[BaseModel]] = None,
-            response_errors: Optional[Dict[int, Type[BaseModel]]] = None,
-            summary: Optional[str] = None,
-            tags: Optional[List[str]] = None,
-            oapi_in: Optional[List[str]] = None,
+        self,
+        method: str,
+        path: str,
+        handler: Callable[[str, Dict[str, Any], int], Awaitable[tuple[int, Dict[str, Any]]]],
+        *,
+        request_model: Optional[Type[BaseModel]] = None,
+        response_model: Optional[Type[BaseModel]] = None,
+        response_errors: Optional[Dict[int, Type[BaseModel]]] = None,
+        summary: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        oapi_in: Optional[List[str]] = None,
     ) -> None:
+        """Register HTTP route and handler"""
 
+        # ---- OpenAPI handler ----
         use_openapi = (
-                oapi_in is not None
-                and self.__name in oapi_in
-                and response_model is not None
+            oapi_in is not None
+            and self.__name in oapi_in
+            and response_model is not None
         )
 
         if use_openapi:
@@ -77,11 +78,7 @@ class WebServer:
                 try:
                     request_id = self.__get_next_request_id()
                     received_at_ms = int(time.time() * 1000)
-                    _logger.debug(
-                        f'oapi [{request_id}] received_at_ms={received_at_ms}, '
-                        f'path={path}, params={params}'
-                    )
-
+                    _logger.debug(f'oapi [{request_id}] received_at_ms={received_at_ms}, path={path}, params={params}')
                     status, data = await handler(path, params, received_at_ms)
                     _logger.debug(f'[{request_id}] status={status}, data={data}')
 
@@ -92,10 +89,8 @@ class WebServer:
                             try:
                                 ujson.dumps(data)
                                 safe = data
-                            except Exception as e:
-                                _logger.exception(f'[{request_id}] status={status}, data={str(data)}')
+                            except Exception:
                                 safe = {"message": str(data)}
-
                             raise DexProxyGenericAPIError(safe, status)
 
                     if isinstance(data, BaseModel):
@@ -103,11 +98,10 @@ class WebServer:
                     else:
                         model = response_model(**data)
 
-                    model_json = model.model_dump(mode="json")
+                    return model.model_dump(mode="json")
                 except Exception as e:
                     _logger.exception("Error occurred during request handling")
                     raise e
-                return model_json
 
             decorator_args: Dict[str, Any] = {
                 "request_body": request_model,
@@ -133,6 +127,7 @@ class WebServer:
             getattr(self.__router, method.lower())(path, **decorator_args)(endpoint)
             return
 
+        # ---- Regular handler ----
         def wrapper(wrapped):
             async def inner(request: web.Request):
                 received_at_ms = int(time.time() * 1000)
@@ -141,57 +136,61 @@ class WebServer:
                 try:
                     if request.method == 'POST':
                         raw_request = await request.text()
-                        # This was changed to json.loads so that an empty body is a valid empty dict for the pydantic validator
                         params = ujson.loads(raw_request) if raw_request else {}
                     else:
                         params = dict(request.query)
                     _logger.debug(
-                        f'[{request_id}] received_at_ms={received_at_ms}, remote={request.remote}, method={request.method}, path={request.path}, params={params}')
+                        f'[{request_id}] received_at_ms={received_at_ms}, '
+                        f'remote={request.remote}, method={request.method}, '
+                        f'path={request.path}, params={params}'
+                    )
                 except Exception as e:
                     _logger.error(
-                        f'[{request_id}] error=Malformed JSON, received_at_ms={received_at_ms}, remote={request.remote}, method={request.method}, path={request.path}, raw_request={raw_request}')
-                    return web.json_response(data={
-                        "error": f"Unable to parse request payload as JSON. payload={raw_request}, parsing_error={e}"},
-                                             status=400)
+                        f'[{request_id}] error=Malformed JSON, remote={request.remote}, path={request.path}, err={e}'
+                    )
+                    return web.json_response(
+                        data={"error": f"Unable to parse JSON: {e}"},
+                        status=400,
+                    )
 
                 try:
                     status, data = await wrapped(request.path, params, received_at_ms)
                 except Exception as e:
-                    return web.json_response(data={"error": {"message": str(e)}}, status=500)
+                    _logger.exception(f'[{request_id}] Handler exception: {e}')
+                    return web.json_response(
+                        data={"error": {"message": str(e)}}, status=500
+                    )
 
-                _logger.debug(f'[{request_id}] status={status}, data={data}')
-                return web.json_response(data=data, status=status,
-                                         dumps=lambda x: json.dumps(x, default=json_type_formatter))
+                return web.json_response(
+                    data=data,
+                    status=status,
+                    dumps=lambda x: json.dumps(x, default=json_type_formatter),
+                )
 
             return inner
 
-        for route in self.__app.router.routes():
-            assert not (
-                    route.method == method and str(route.resource) == path
-            ), f"[WebServer] duplicate route: {method} {path}"
-
-        # de-dupe & tolerate duplicate HEAD from GET
-        self.___routes_seen = getattr(self, "___routes_seen", set())
+        # ---- 去重注册 (HEAD / GET) ----
         key = (method.upper(), path)
-        if key in self.___routes_seen:
+        if key in self.__registered_routes:
+            _logger.debug(f"[WebServer] skip duplicate route {method} {path}")
             return
         try:
             self.__app.add_routes([web.route(method, path, wrapper(handler))])
-            self.___routes_seen.add(key)
+            self.__registered_routes.add(key)
         except RuntimeError as e:
             msg = str(e)
             if "HEAD is already registered" in msg or "will never be executed" in msg:
-                self.___routes_seen.add(key)
-                return
-            raise
+                _logger.warning(f"[WebServer] Ignoring duplicate HEAD/GET route {path}")
+                self.__registered_routes.add(key)
+            else:
+                raise
 
     async def start(self):
         _logger.info('Starting')
         await self.__runner.setup()
-
         self.__site = web.TCPSite(self.__runner, port=self.__config['port'])
         await self.__site.start()
-        _logger.info('Started')
+        _logger.info(f"Started WebServer on port {self.__config['port']}")
 
     async def stop(self):
         _logger.info('Stopping')
@@ -213,7 +212,7 @@ class WebServer:
         try:
             _logger.debug(f'Sending {msg}')
             await ws.send_json(msg)
-        except Exception as e:
+        except Exception:
             _logger.exception(f'Could not send {msg}')
             await ws.close()
 
@@ -222,26 +221,20 @@ class WebServer:
             await ws.close(code=WSCloseCode.GOING_AWAY, message='Server shutdown')
 
     async def __websocket_handler(self, request):
-
         ws = web.WebSocketResponse()
-        _logger.debug(
-            f'New client(connection_id={id(ws)}) from {request.remote}')
-
+        _logger.debug(f'New client(connection_id={id(ws)}) from {request.remote}')
         await ws.prepare(request)
-
         self.__connections.add(ws)
-
         await self.__proxy.on_new_connection(ws)
 
         while True:
             try:
                 msg = await receive_json(ws)
                 _logger.debug(f'Received {msg}')
-
                 await self.__proxy.on_message(ws, msg)
             except concurrent.futures.CancelledError:
-                pass  # quietly
-            except Exception as e:
+                pass
+            except Exception:
                 _logger.exception(f'Client(connection_id={id(ws)}) lost')
                 break
 

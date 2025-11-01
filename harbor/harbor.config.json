@@ -2,13 +2,19 @@
   "logging": {
     "level": "debug",
     "overrides": [
-      { "logger_name": "aiohttp.access", "level": "warning" },
-      { "logger_name": "pantheon.app_health", "level": "info" }
+      {
+        "logger_name": "aiohttp.access",
+        "level": "warning"
+      },
+      {
+        "logger_name": "pantheon.app_health",
+        "level": "info"
+      }
     ]
   },
   "server": {
     "host": "0.0.0.0",
-    "port": 1958
+    "port": 2958
   },
   "RabbitMQ": {
     "url": "amqp://localhost"
@@ -23,7 +29,10 @@
       "base_url": "https://api.harbor-dev.xyz/api/v1",
       "api_key_env": "HARBOR_API_KEY",
       "default_time_in_force": "gtc",
-      "timeout": 20
+      "timeout": 20,
+      "proxy": "http://127.0.0.1:7890",
+      "trust_env": false,
+      "verify_ssl": true
     },
     "ws": {
       "url": "wss://api.harbor-dev.xyz/api/v1/ws",

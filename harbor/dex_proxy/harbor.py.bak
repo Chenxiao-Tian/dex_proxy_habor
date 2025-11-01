@@ -14,6 +14,7 @@ from py_dex_common.schemas import (
     CreateOrderRequest,
     OrderErrorResponse,
     OrderResponse,
+    QueryLiveOrdersResponse,
 )
 from py_dex_common.web_server import WebServer
 from pyutils.exchange_apis.dex_common import RequestStatus
@@ -27,8 +28,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Request/response helpers
+# Request/response helpers for spec-aligned endpoints
 # ---------------------------------------------------------------------------
+
 
 class HarborRequestAck:
     def __init__(
@@ -159,8 +161,7 @@ class ApproveTokenBody:
     @classmethod
     def parse(cls, params: Dict[str, Any]) -> "ApproveTokenBody":
         client_request_id = str(_require(params, "client_request_id"))
-        token_symbol = params.get("token_symbol") or params.get("symbol")
-        token_symbol = str(_require({"token_symbol": token_symbol}, "token_symbol"))
+        token_symbol = str(_require(params, "token_symbol"))
         amount = _required_decimal(params, "amount")
         spender = params.get("spender_address")
         return cls(client_request_id, token_symbol, amount, spender)
@@ -176,8 +177,7 @@ class WithdrawBody:
     @classmethod
     def parse(cls, params: Dict[str, Any]) -> "WithdrawBody":
         client_request_id = str(_require(params, "client_request_id"))
-        token_symbol = params.get("token_symbol") or params.get("symbol")
-        token_symbol = str(_require({"token_symbol": token_symbol}, "token_symbol"))
+        token_symbol = str(_require(params, "token_symbol"))
         amount = _required_decimal(params, "amount")
         destination = str(_require(params, "destination"))
         return cls(client_request_id, token_symbol, amount, destination)
@@ -258,8 +258,7 @@ class CancelAllQuery:
 
     @classmethod
     def parse(cls, params: Dict[str, Any]) -> "CancelAllQuery":
-        raw = (params.get("request_type") or params.get("type") or "")
-        request_type = _normalize_type(str(raw))
+        request_type = _normalize_type(str(_require(params, "type")))
         instrument = params.get("instrument")
         return cls(request_type, instrument)
 
@@ -286,8 +285,7 @@ class GetAllOpenRequestsQuery:
 
     @classmethod
     def parse(cls, params: Dict[str, Any]) -> "GetAllOpenRequestsQuery":
-        raw = (params.get("request_type") or params.get("type") or "")
-        return cls(_normalize_type(str(raw)))
+        return cls(_normalize_type(str(_require(params, "type"))))
 
 
 @dataclass
@@ -302,6 +300,7 @@ class GetRequestStatusQuery:
 # ---------------------------------------------------------------------------
 # Legacy helper for order tracking
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class _OrderIndex:
@@ -352,71 +351,199 @@ class Harbor(DexCommon):
     # Route registration
     # ------------------------------------------------------------------
     def _register_endpoints(self, server: WebServer) -> None:
-        # Health / debug
+        self._register_spec_endpoints(server)
+
+        # Health legacy
         server.register("GET", "/ping", self._ping, summary="Health", tags=["public", "health"])
+
+        # Debug: list routes
         server.register("GET", "/debug/routes", self._debug_routes, summary="List registered routes", tags=["debug"])
 
         # Markets
         for path in ("/public/markets", "/public/harbor/get_markets"):
-            server.register("GET", path, self.get_markets, summary="List Harbor markets", tags=["public", "market-data"], oapi_in=["harbor"])
+            server.register(
+                "GET",
+                path,
+                self.get_markets,
+                summary="List Harbor markets",
+                tags=["public", "market-data"],
+                oapi_in=["harbor"],
+            )
 
-        # Account
-        server.register("GET", "/public/account", self.get_account_raw, summary="Raw Harbor account payload", tags=["public", "account"], oapi_in=["harbor"])
+        # Account raw
+        server.register(
+            "GET",
+            "/public/account",
+            self.get_account_raw,
+            summary="Raw Harbor account payload",
+            tags=["public", "account"],
+            oapi_in=["harbor"],
+        )
 
-        # Balances (never 404)
-        for path in ("/public/balance", "/public/harbor/get_balance", "/api/harbor/balance", "/private/balance", "/public/exchange_balance"):
-            server.register("GET", path, self.get_balance, summary="Get account balances", tags=["public", "balance"], oapi_in=["harbor"])
+        # Balance (normalize; NEVER 404 from adapter)
+        for path in (
+            "/public/balance",
+            "/public/harbor/get_balance",
+            "/api/harbor/balance",
+            "/private/balance",
+            "/public/exchange_balance",
+        ):
+            server.register(
+                "GET",
+                path,
+                self.get_balance,
+                summary="Get account balances",
+                tags=["public", "balance"],
+                oapi_in=["harbor"],
+            )
 
-        # Legacy orders —— 不加 response_model，避免框架干预
-        server.register("POST", "/private/create-order", self.create_order, summary="Create order (legacy)", tags=["private", "orders"], oapi_in=["harbor"])
-        server.register("POST", "/private/harbor/create_order", self.create_order, summary="Create order (legacy)", tags=["private", "orders"], oapi_in=["harbor"])
+        # Legacy create order
+        create_order_kwargs = dict(
+            request_model=CreateOrderRequest,
+            response_model=OrderResponse,
+            response_errors={400: {"model": OrderErrorResponse}},
+            summary="Create order (legacy)",
+            tags=["private", "orders"],
+            oapi_in=["harbor"],
+        )
+        for path in ("/private/create-order", "/private/harbor/create_order"):
+            server.register("POST", path, self.create_order, **create_order_kwargs)
 
-        for method, path in (("DELETE", "/private/cancel-order"), ("DELETE", "/private/harbor/cancel_order"), ("POST", "/private/harbor/cancel_order")):
-            server.register(method, path, self.cancel_order, summary="Cancel order (legacy)", tags=["private", "orders"], oapi_in=["harbor"])
+        # Legacy cancel order
+        cancel_order_kwargs = dict(
+            request_model=CancelOrderParams,
+            response_model=OrderResponse,
+            response_errors={400: {"model": OrderErrorResponse}},
+            summary="Cancel order (legacy)",
+            tags=["private", "orders"],
+            oapi_in=["harbor"],
+        )
+        for method, path in (
+            ("DELETE", "/private/cancel-order"),
+            ("DELETE", "/private/harbor/cancel_order"),
+            ("POST", "/private/harbor/cancel_order"),
+        ):
+            server.register(method, path, self.cancel_order, **cancel_order_kwargs)
 
-        # ✅ 关键：公开 open orders 路由（上游 404 → 200 空数组）
-        server.register("GET", "/public/orders", self.list_open_orders, summary="List open orders (legacy)", tags=["public", "orders"], oapi_in=["harbor"])
-        server.register("GET", "/private/harbor/list_open_orders", self.list_open_orders, summary="List open orders (legacy)", tags=["private", "orders"], oapi_in=["harbor"])
+        # Legacy list open orders
+        list_orders_kwargs = dict(
+            response_model=QueryLiveOrdersResponse,
+            response_errors={400: {"model": OrderErrorResponse}},
+            summary="List open orders (legacy)",
+            tags=["private", "orders"],
+            oapi_in=["harbor"],
+        )
+        for path in ("/public/orders", "/private/harbor/list_open_orders"):
+            server.register("GET", path, self.list_open_orders, **list_orders_kwargs)
 
         # Depth snapshot
         for path in ("/public/depth", "/public/harbor/get_depth_snapshot"):
-            server.register("GET", path, self.get_depth_snapshot, summary="Depth snapshot for a symbol", tags=["public", "market-data"], oapi_in=["harbor"])
-
-        # Spec endpoints
-        self._register_spec_endpoints(server)
+            server.register(
+                "GET",
+                path,
+                self.get_depth_snapshot,
+                summary="Depth snapshot for a symbol",
+                tags=["public", "market-data"],
+                oapi_in=["harbor"],
+            )
 
     def _register_spec_endpoints(self, server: WebServer) -> None:
+        self._deregister_default_routes(server)
+
         oapi = ["harbor"]
 
-        for path in ("/private/approve-token", "/private/harbor/approve-token"):
-            server.register("POST", path, self.approve_token, summary="Approve token allowance on Harbor", tags=["private", "requests"], oapi_in=oapi)
+        server.register(
+            "GET",
+            "/public/status",
+            self._status,
+            summary="Harbor adapter health",
+            tags=["public", "health"],
+            oapi_in=oapi,
+        )
 
-        for path in ("/private/withdraw", "/private/harbor/withdraw"):
-            server.register("POST", path, self.withdraw, summary="Withdraw funds from Harbor", tags=["private", "requests"], oapi_in=oapi)
+        server.register(
+            "POST",
+            "/private/approve-token",
+            self.approve_token,
+            summary="Approve token allowance on Harbor",
+            tags=["private", "requests"],
+            oapi_in=oapi,
+        )
 
-        for path in ("/private/wrap-unwrap-token", "/private/harbor/wrap-unwrap-token"):
-            server.register("POST", path, self.wrap_unwrap_token, summary="Wrap or unwrap native tokens", tags=["private", "requests"], oapi_in=oapi)
+        server.register(
+            "POST",
+            "/private/withdraw",
+            self.withdraw,
+            summary="Withdraw funds from Harbor",
+            tags=["private", "requests"],
+            oapi_in=oapi,
+        )
 
-        for path in ("/private/insert-order", "/private/harbor/insert-order"):
-            server.register("POST", path, self.insert_order, summary="Submit a spot order", tags=["private", "orders"], oapi_in=oapi)
+        server.register(
+            "POST",
+            "/private/insert-order",
+            self.insert_order,
+            summary="Submit a spot order",
+            tags=["private", "orders"],
+            oapi_in=oapi,
+        )
 
-        for path in ("/private/amend-request", "/private/harbor/amend-request"):
-            server.register("POST", path, self.amend_request, summary="Amend an existing Harbor request", tags=["private", "orders"], oapi_in=oapi)
+        server.register(
+            "POST",
+            "/private/amend-request",
+            self.amend_request,
+            summary="Amend an existing Harbor request",
+            tags=["private", "orders"],
+            oapi_in=oapi,
+        )
 
-        for path in ("/private/cancel-request", "/private/harbor/cancel-request"):
-            server.register("DELETE", path, self.cancel_request, summary="Cancel a request via client_request_id", tags=["private", "orders"], oapi_in=oapi)
+        server.register(
+            "DELETE",
+            "/private/cancel-request",
+            self.cancel_request,
+            summary="Cancel a request via client_request_id",
+            tags=["private", "orders"],
+            oapi_in=oapi,
+        )
 
-        for path in ("/private/cancel-all", "/private/harbor/cancel-all"):
-            server.register("DELETE", path, self.cancel_all, summary="Cancel all requests for a type", tags=["private", "orders"], oapi_in=oapi)
+        server.register(
+            "DELETE",
+            "/private/cancel-all",
+            self.cancel_all,
+            summary="Cancel all requests for a type",
+            tags=["private", "orders"],
+            oapi_in=oapi,
+        )
 
-        for path in ("/public/get-all-open-requests", "/public/harbor/get-all-open-requests"):
-            server.register("GET", path, self.get_all_open_requests, summary="List Harbor open requests", tags=["public", "requests"], oapi_in=oapi)
+        server.register(
+            "POST",
+            "/private/wrap-unwrap-token",
+            self.wrap_unwrap_token,
+            summary="Wrap or unwrap native tokens",
+            tags=["private", "requests"],
+            oapi_in=oapi,
+        )
 
-        for path in ("/public/get-request-status", "/public/harbor/get-request-status"):
-            server.register("GET", path, self.get_request_status, summary="Fetch Harbor request status", tags=["public", "requests"], oapi_in=oapi)
+        server.register(
+            "GET",
+            "/public/get-all-open-requests",
+            self.get_all_open_requests,
+            summary="List Harbor open requests",
+            tags=["public", "requests"],
+            oapi_in=oapi,
+        )
+
+        server.register(
+            "GET",
+            "/public/get-request-status",
+            self.get_request_status,
+            summary="Fetch Harbor request status",
+            tags=["public", "requests"],
+            oapi_in=oapi,
+        )
 
     # ------------------------------------------------------------------
-    # Spec-aligned handlers
+    # Spec-aligned endpoint handlers
     # ------------------------------------------------------------------
     async def _status(self, path, params, received_at_ms):
         return 200, {"ok": True, "name": self._config.get("name", "harbor"), "send_timestamp_ns": str(now_ns())}
@@ -426,6 +553,7 @@ class Harbor(DexCommon):
             body = ApproveTokenBody.parse(params)
         except ValueError as exc:
             return 400, self._validation_message(str(exc))
+
         try:
             api_response = await self._rest_client.approve_token(
                 client_request_id=body.client_request_id,
@@ -435,6 +563,7 @@ class Harbor(DexCommon):
             )
         except HarborAPIError as exc:
             return self._error_response("APPROVE", body.client_request_id, exc)
+
         ack = self._ack_response(api_response, request_type="APPROVE", client_request_id=body.client_request_id)
         return 200, ack.to_dict()
 
@@ -443,6 +572,7 @@ class Harbor(DexCommon):
             body = WithdrawBody.parse(params)
         except ValueError as exc:
             return 400, self._validation_message(str(exc))
+
         try:
             api_response = await self._rest_client.withdraw(
                 client_request_id=body.client_request_id,
@@ -452,6 +582,7 @@ class Harbor(DexCommon):
             )
         except HarborAPIError as exc:
             return self._error_response("TRANSFER", body.client_request_id, exc)
+
         ack = self._ack_response(api_response, request_type="TRANSFER", client_request_id=body.client_request_id)
         return 200, ack.to_dict()
 
@@ -460,6 +591,7 @@ class Harbor(DexCommon):
             body = InsertOrderBody.parse(params)
         except ValueError as exc:
             return 400, self._validation_message(str(exc))
+
         try:
             api_response = await self._rest_client.insert_order(
                 client_request_id=body.client_request_id,
@@ -477,6 +609,7 @@ class Harbor(DexCommon):
             return self._error_response("ORDER", body.client_request_id, exc)
         except ValueError as exc:
             return 400, self._validation_message(str(exc))
+
         ack = self._ack_response(
             api_response,
             request_type="ORDER",
@@ -490,6 +623,7 @@ class Harbor(DexCommon):
             body = AmendRequestBody.parse(params)
         except ValueError as exc:
             return 400, self._validation_message(str(exc))
+
         try:
             api_response = await self._rest_client.amend_request(
                 client_request_id=body.client_request_id,
@@ -500,6 +634,7 @@ class Harbor(DexCommon):
             return self._error_response("AMEND", body.client_request_id or body.order_id, exc)
         except ValueError as exc:
             return 400, self._validation_message(str(exc))
+
         ack = self._ack_response(api_response, request_type="AMEND", client_request_id=body.client_request_id)
         return 200, ack.to_dict()
 
@@ -508,10 +643,12 @@ class Harbor(DexCommon):
             query = CancelRequestQuery.parse(params)
         except ValueError as exc:
             return 400, self._validation_message(str(exc))
+
         try:
             api_response = await self._rest_client.cancel_request(client_request_id=query.client_request_id)
         except HarborAPIError as exc:
             return self._error_response("CANCEL", query.client_request_id, exc)
+
         ack = self._ack_response(api_response, request_type="CANCEL", client_request_id=query.client_request_id)
         return 200, ack.to_dict()
 
@@ -520,24 +657,15 @@ class Harbor(DexCommon):
             query = CancelAllQuery.parse(params)
         except ValueError as exc:
             return 400, self._validation_message(str(exc))
+
         try:
             api_response = await self._rest_client.cancel_all(
                 request_type=query.request_type,
                 instrument=query.instrument,
             )
         except HarborAPIError as exc:
-            if getattr(exc, "status_code", None) == 404:
-                ack = HarborRequestAck(
-                    request_id="",
-                    status="NOOP",
-                    client_request_id=query.request_type,
-                    request_type=query.request_type,
-                    order_id=None,
-                    detail={"reason": "upstream_cancel_all_not_available"},
-                    send_timestamp_ns=str(now_ns()),
-                )
-                return 200, ack.to_dict()
             return self._error_response("CANCEL", query.request_type, exc)
+
         ack = self._ack_response(api_response, request_type=query.request_type, client_request_id=None)
         return 200, ack.to_dict()
 
@@ -546,6 +674,7 @@ class Harbor(DexCommon):
             body = WrapUnwrapBody.parse(params)
         except ValueError as exc:
             return 400, self._validation_message(str(exc))
+
         try:
             api_response = await self._rest_client.wrap_unwrap_token(
                 client_request_id=body.client_request_id,
@@ -555,6 +684,7 @@ class Harbor(DexCommon):
             )
         except HarborAPIError as exc:
             return self._error_response("WRAP_UNWRAP", body.client_request_id, exc)
+
         ack = self._ack_response(api_response, request_type="WRAP_UNWRAP", client_request_id=body.client_request_id)
         return 200, ack.to_dict()
 
@@ -563,15 +693,18 @@ class Harbor(DexCommon):
             query = GetAllOpenRequestsQuery.parse(params)
         except ValueError as exc:
             return 400, self._validation_message(str(exc))
+
         try:
             api_response = await self._rest_client.get_all_open_requests(request_type=query.request_type)
         except HarborAPIError as exc:
-            if getattr(exc, "status_code", None) == 404:
-                response = HarborOpenRequestsResponse(request_type=query.request_type, requests=[], send_timestamp_ns=str(now_ns()))
-                return 200, response.to_dict()
             return self._error_response(query.request_type, None, exc)
+
         requests_payload = self._normalize_requests(api_response)
-        response = HarborOpenRequestsResponse(request_type=query.request_type, requests=requests_payload, send_timestamp_ns=str(now_ns()))
+        response = HarborOpenRequestsResponse(
+            request_type=query.request_type,
+            requests=requests_payload,
+            send_timestamp_ns=str(now_ns()),
+        )
         return 200, response.to_dict()
 
     async def get_request_status(self, path, params, received_at_ms):
@@ -579,10 +712,12 @@ class Harbor(DexCommon):
             query = GetRequestStatusQuery.parse(params)
         except ValueError as exc:
             return 400, self._validation_message(str(exc))
+
         try:
             api_response = await self._rest_client.get_request_status(client_request_id=query.client_request_id)
         except HarborAPIError as exc:
             return self._error_response("STATUS", query.client_request_id, exc)
+
         response = HarborRequestStatusResponse(
             client_request_id=query.client_request_id,
             request_type=str(api_response.get("type") or api_response.get("requestType", "UNKNOWN")),
@@ -594,7 +729,7 @@ class Harbor(DexCommon):
         return 200, response.to_dict()
 
     # ------------------------------------------------------------------
-    # Legacy handlers
+    # Legacy handlers retained for compatibility
     # ------------------------------------------------------------------
     async def _ping(self, path, params, received_at_ms):
         return 200, {"ok": True, "name": self._config.get("name", "harbor")}
@@ -619,10 +754,14 @@ class Harbor(DexCommon):
                 sym = market.get("symbol")
                 if sym:
                     self._markets[sym] = market
-            return 200, {"count": len(self._markets), "markets": {"markets": list(self._markets.values())}, "send_timestamp_ns": str(now_ns())}
+            return 200, {
+                "count": len(self._markets),
+                "markets": {"markets": list(self._markets.values())},
+                "send_timestamp_ns": str(now_ns()),
+            }
         except HarborAPIError as exc:
             status, err = self._harbor_error(exc)
-            return status, {**err, "upstream_status": getattr(exc, "status_code", status)}
+            return status, {**err.model_dump(), "upstream_status": getattr(exc, "status_code", status)}
 
     async def get_account_raw(self, path, params, received_at_ms):
         try:
@@ -630,7 +769,7 @@ class Harbor(DexCommon):
             return 200, {"account": payload, "send_timestamp_ns": str(now_ns())}
         except HarborAPIError as exc:
             status, err = self._harbor_error(exc)
-            return status, {**err, "upstream_status": getattr(exc, "status_code", status)}
+            return status, {**err.model_dump(), "upstream_status": getattr(exc, "status_code", status)}
 
     async def get_balance(self, path, params, received_at_ms) -> Tuple[int, Dict[str, Any]]:
         balances: List[Dict[str, str]] = []
@@ -649,24 +788,26 @@ class Harbor(DexCommon):
                 if symbol:
                     balances.append({"symbol": symbol, "balance": bal})
         except HarborAPIError as exc:
-            meta = {"warning": "upstream_error", "error": {"code": exc.status_code, "message": exc.message}}
+            meta = {
+                "warning": "upstream_error",
+                "error": {"code": exc.status_code, "message": exc.message},
+            }
         return 200, {"balances": {"exchange": balances}, **meta}
 
-    async def create_order(self, path, params, received_at_ms) -> Tuple[int, Dict[str, Any]]:
+    async def create_order(self, path, params, received_at_ms) -> Tuple[int, OrderResponse | OrderErrorResponse]:
         request = CreateOrderRequest(**params)
         try:
             market = await self._get_market(request.symbol)
         except HarborAPIError as exc:
-            status, body = self._harbor_error(exc)
-            return status, body
+            return self._harbor_error(exc)
         except KeyError:
-            return 400, {"error": {"message": f"Symbol {request.symbol} is not listed on Harbor"}}
+            return 400, OrderErrorResponse(error_code="UNKNOWN_SYMBOL", error_message=f"Symbol {request.symbol} is not listed on Harbor")
 
         try:
             price = ensure_multiple(Decimal(request.price), Decimal(market["priceTick"]), field_name="price")
             quantity = ensure_multiple(Decimal(request.quantity), Decimal(market["qtyTick"]), field_name="quantity")
         except ValueError as exc:
-            return 400, {"error": {"message": str(exc)}}
+            return 400, OrderErrorResponse(error_code="INVALID_TICK", error_message=str(exc))
 
         body = {
             "symbol": request.symbol,
@@ -680,15 +821,14 @@ class Harbor(DexCommon):
         try:
             api_resp = await self._rest_client.create_order(body)
         except HarborAPIError as exc:
-            status, body = self._harbor_error(exc)
-            return status, body
+            return self._harbor_error(exc)
 
         order = api_resp.get("order", api_resp)
         resp = self._map_order(order, send_timestamp=now_ns())
-        self._order_index[resp["client_order_id"]] = _OrderIndex(resp.get("symbol"), resp.get("order_id"))
+        self._order_index[resp.client_order_id] = _OrderIndex(resp.symbol, resp.order_id)
         return 200, resp
 
-    async def cancel_order(self, path, params, received_at_ms) -> Tuple[int, Dict[str, Any]]:
+    async def cancel_order(self, path, params, received_at_ms) -> Tuple[int, OrderResponse | OrderErrorResponse]:
         p = CancelOrderParams(**params)
         idx = self._order_index.get(p.client_order_id)
         symbol = idx.symbol if idx else None
@@ -697,33 +837,22 @@ class Harbor(DexCommon):
             await self._rest_client.cancel_order(symbol=symbol, order_id=order_id, client_order_id=p.client_order_id)
             order_payload = await self._rest_client.get_order(symbol=symbol, order_id=order_id, client_order_id=p.client_order_id)
         except HarborAPIError as exc:
-            status, body = self._harbor_error(exc)
-            return status, body
+            return self._harbor_error(exc)
         resp = self._map_order(order_payload.get("order", order_payload), send_timestamp=now_ns())
-        self._order_index[p.client_order_id] = _OrderIndex(resp.get("symbol"), resp.get("order_id"))
+        self._order_index[p.client_order_id] = _OrderIndex(resp.symbol, resp.order_id)
         return 200, resp
 
-    async def list_open_orders(self, path, params, received_at_ms) -> Tuple[int, Dict[str, Any]]:
-        """
-        GET /public/orders 以及 /private/harbor/list_open_orders
-        - 上游 200：返回规范化订单数组
-        - 上游 404：返回 200 + 空数组
-        - 其它错误：结构化 JSON 错误
-        """
+    async def list_open_orders(self, path, params, received_at_ms) -> Tuple[int, QueryLiveOrdersResponse | OrderErrorResponse]:
         try:
             payload = await self._rest_client.get_orders(status="open")
         except HarborAPIError as exc:
-            if getattr(exc, "status_code", None) == 404:
-                return 200, {"send_timestamp_ns": str(now_ns()), "orders": []}
-            status, body = self._harbor_error(exc)
-            return status, body
+            return self._harbor_error(exc)
 
         ts = now_ns()
         orders = [self._map_order(o, send_timestamp=ts) for o in payload]
         for o in orders:
-            coid = o.get("client_order_id")
-            self._order_index[coid] = _OrderIndex(o.get("symbol"), o.get("order_id"))
-        return 200, {"send_timestamp_ns": str(ts), "orders": orders}
+            self._order_index[o.client_order_id] = _OrderIndex(o.symbol, o.order_id)
+        return 200, QueryLiveOrdersResponse(send_timestamp_ns=ts, orders=orders)
 
     async def get_depth_snapshot(self, path, params, received_at_ms):
         symbol = params.get("symbol") if isinstance(params, dict) else None
@@ -734,19 +863,17 @@ class Harbor(DexCommon):
             depth = depth_payload.get("depth", depth_payload)
             return 200, {
                 "symbol": depth.get("symbol", symbol),
-                "lastUpdateId": depth.get("lastUpdateId", "0"),
+                "lastUpdateId": depth.get("lastUpdateId"),
                 "bids": depth.get("bids", []),
                 "asks": depth.get("asks", []),
-                "send_timestamp_ns": str(now_ns()),
+                "send_timestamp_ns": now_ns(),
             }
         except HarborAPIError as exc:
-            if getattr(exc, "status_code", None) == 404:
-                return 200, {"symbol": symbol, "lastUpdateId": "0", "bids": [], "asks": [], "send_timestamp_ns": str(now_ns())}
             status, err = self._harbor_error(exc)
-            return status, {**err, "upstream_status": getattr(exc, "status_code", status)}
+            return status, {**err.model_dump(), "upstream_status": getattr(exc, "status_code", status)}
 
     # ------------------------------------------------------------------
-    # DexCommon abstract hooks (unused in HTTP-only mode)
+    # DexCommon abstract requirements (unused for Harbor HTTP)
     # ------------------------------------------------------------------
     async def on_new_connection(self, ws):  # pragma: no cover
         return
@@ -773,17 +900,52 @@ class Harbor(DexCommon):
         return None
 
     async def _get_all_open_requests(self, path, params, received_at_ms):  # pragma: no cover
-        return await self.get_all_open_requests(path, params, received_at_ms)
+        return await DexCommon._get_all_open_requests(self, path, params, received_at_ms)
 
     async def _cancel_all(self, path, params, received_at_ms):  # pragma: no cover
-        return await self.cancel_all(path, params, received_at_ms)
+        return await DexCommon._cancel_all(self, path, params, received_at_ms)
 
-    def on_request_status_update(self, client_order_id, request_status: RequestStatus, tx_receipt: dict, mined_tx_hash: str = None):
+    def on_request_status_update(
+        self, client_order_id, request_status: RequestStatus, tx_receipt: dict, mined_tx_hash: str = None
+    ):
         super().on_request_status_update(client_order_id, request_status, tx_receipt, mined_tx_hash)
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+    def _deregister_default_routes(self, server: WebServer) -> None:
+        deregister = getattr(server, "deregister", None)
+        targets = [
+            ("GET", "/public/status"),
+            ("POST", "/private/approve-token"),
+            ("POST", "/private/withdraw"),
+            ("POST", "/private/amend-request"),
+            ("DELETE", "/private/cancel-request"),
+            ("DELETE", "/private/cancel-all"),
+            ("GET", "/public/get-all-open-requests"),
+            ("GET", "/public/get-request-status"),
+        ]
+
+        for method, path in targets:
+            if callable(deregister):
+                try:
+                    deregister(method, path)
+                    continue
+                except Exception:  # pragma: no cover - fallback path
+                    _LOGGER.debug("Unable to deregister %s %s via server.deregister, falling back", method, path)
+            self._fallback_deregister(server, method, path)
+
+    @staticmethod
+    def _fallback_deregister(server: WebServer, method: str, path: str) -> None:
+        app = getattr(server, "_WebServer__app", None)
+        router = getattr(app, "router", None)
+        routes = getattr(router, "_routes", None)
+        if routes is None:
+            return
+        router._routes = [
+            route for route in routes if not (getattr(route, "method", None) == method and str(getattr(route, "resource", "")) == path)
+        ]
+
     def _ack_response(
         self,
         api_response: Dict[str, Any] | List[Any],
@@ -849,10 +1011,15 @@ class Harbor(DexCommon):
             return [payload]
         return []
 
-    def _error_response(self, request_type: Optional[str], client_request_id: Optional[str], exc: HarborAPIError) -> Tuple[int, Dict[str, Any]]:
+    def _error_response(
+        self,
+        request_type: Optional[str],
+        client_request_id: Optional[str],
+        exc: HarborAPIError,
+    ) -> Tuple[int, Dict[str, Any]]:
         send_ts = str(now_ns())
         message = exc.message or "Unknown Harbor error"
-        payload: Dict[str, Any] = {
+        payload = {
             "error": {
                 "message": message,
                 "code": exc.status_code,
@@ -864,7 +1031,13 @@ class Harbor(DexCommon):
         }
         if exc.payload:
             payload["error"]["detail"] = exc.payload
-        _LOGGER.warning("Harbor API error type=%s client_request_id=%s request_id=%s: %s", request_type, client_request_id, exc.request_id, message)
+        _LOGGER.warning(
+            "Harbor API error for request_type=%s client_request_id=%s request_id=%s: %s",
+            request_type,
+            client_request_id,
+            exc.request_id,
+            message,
+        )
         return exc.status_code or 500, payload
 
     @staticmethod
@@ -881,7 +1054,7 @@ class Harbor(DexCommon):
                     self._markets[sym] = market
         return self._markets[symbol]
 
-    def _map_order(self, order_payload: Dict[str, Any], *, send_timestamp: int) -> Dict[str, Any]:
+    def _map_order(self, order_payload: Dict[str, Any], *, send_timestamp: int) -> OrderResponse:
         last_update = order_payload.get("updatedAt") or order_payload.get("createdAt") or "0"
         try:
             last_update_ns = int(last_update)
@@ -892,24 +1065,24 @@ class Harbor(DexCommon):
         order_type = (order_payload.get("type") or order_payload.get("timeInForce") or "").upper()
         side = (order_payload.get("side") or "").upper()
 
-        return {
-            "client_order_id": order_payload.get("clientOrderId") or order_payload.get("orderId"),
-            "order_id": str(order_payload.get("orderId")),
-            "price": str(order_payload.get("price")),
-            "quantity": str(order_payload.get("qty")),
-            "total_exec_quantity": str(order_payload.get("filledQty", order_payload.get("remainingQty", "0"))),
-            "last_update_timestamp_ns": last_update_ns,
-            "status": status or "UNKNOWN",
-            "reason": order_payload.get("rejectReason"),
-            "trades": [],
-            "order_type": order_type or "LIMIT",
-            "symbol": order_payload.get("symbol"),
-            "side": side or "BUY",
-            "place_tx_id": str(order_payload.get("orderId")),
-            "send_timestamp_ns": send_timestamp,
-        }
+        return OrderResponse(
+            client_order_id=order_payload.get("clientOrderId") or order_payload.get("orderId"),
+            order_id=str(order_payload.get("orderId")),
+            price=str(order_payload.get("price")),
+            quantity=str(order_payload.get("qty")),
+            total_exec_quantity=str(order_payload.get("filledQty", order_payload.get("remainingQty", "0"))),
+            last_update_timestamp_ns=last_update_ns,
+            status=status,
+            reason=order_payload.get("rejectReason"),
+            trades=[],
+            order_type=order_type or "LIMIT",
+            symbol=order_payload.get("symbol"),
+            side=side or "BUY",
+            place_tx_id=str(order_payload.get("orderId")),
+            send_timestamp_ns=send_timestamp,
+        )
 
-    def _harbor_error(self, exc: HarborAPIError) -> Tuple[int, Dict[str, Any]]:
+    def _harbor_error(self, exc: HarborAPIError) -> Tuple[int, OrderErrorResponse]:
         request_part = f" (request_id={exc.request_id})" if exc.request_id else ""
         message = f"Harbor error{request_part}: {exc.message}"
-        return exc.status_code or 500, {"error": {"code": exc.status_code, "message": message, "request_id": exc.request_id}, "send_timestamp_ns": str(now_ns())}
+        return exc.status_code, OrderErrorResponse(error_code="HARBOR_ERROR", error_message=message)
