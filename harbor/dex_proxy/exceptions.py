@@ -1,21 +1,28 @@
 from __future__ import annotations
+from typing import Any, Optional
 
-from dataclasses import dataclass
 
-
-@dataclass
 class HarborAPIError(Exception):
-    """Exception raised when the Harbor REST API returns an error."""
+    """Raised when a Harbor REST API call fails."""
 
-    status_code: int
-    message: str
-    request_id: str | None = None
-    payload: dict | None = None
+    def __init__(
+        self,
+        status_code: int,
+        message: str,
+        *,
+        request_id: Optional[str] = None,
+        payload: Optional[dict[str, Any]] = None,
+    ):
+        super().__init__(f"[{status_code}] {message}")
+        self.status_code = status_code
+        self.message = message
+        self.request_id = request_id
+        self.payload = payload or {}
 
-    def __str__(self) -> str:  # pragma: no cover - repr convenience
-        base = f"Harbor API error (status={self.status_code})"
+    def __str__(self) -> str:
+        base = f"HarborAPIError({self.status_code}): {self.message}"
         if self.request_id:
             base += f" [request_id={self.request_id}]"
-        if self.message:
-            base += f": {self.message}"
+        if self.payload:
+            base += f" | payload keys={list(self.payload.keys())}"
         return base
