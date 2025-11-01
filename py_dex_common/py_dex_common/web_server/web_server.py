@@ -170,7 +170,20 @@ class WebServer:
                     route.method == method and str(route.resource) == path
             ), f"[WebServer] duplicate route: {method} {path}"
 
-        self.__app.add_routes([web.route(method, path, wrapper(handler))])
+        # de-dupe & tolerate duplicate HEAD from GET
+        self.___routes_seen = getattr(self, "___routes_seen", set())
+        key = (method.upper(), path)
+        if key in self.___routes_seen:
+            return
+        try:
+            self.__app.add_routes([web.route(method, path, wrapper(handler))])
+            self.___routes_seen.add(key)
+        except RuntimeError as e:
+            msg = str(e)
+            if "HEAD is already registered" in msg or "will never be executed" in msg:
+                self.___routes_seen.add(key)
+                return
+            raise
 
     async def start(self):
         _logger.info('Starting')
