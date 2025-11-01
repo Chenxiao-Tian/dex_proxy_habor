@@ -14,6 +14,36 @@
 - Our recommended development environment is through ```Dockerfile.local```
 - Following steps assume ```dex_proxy``` repo as a working directory
 
+#### Harbor
+
+- Spec-aligned Harbor webserver endpoints:
+  - `GET /public/status`
+  - `POST /private/approve-token`
+  - `POST /private/withdraw`
+  - `POST /private/insert-order`
+  - `POST /private/amend-request`
+  - `DELETE /private/cancel-request`
+  - `DELETE /private/cancel-all`
+  - `POST /private/wrap-unwrap-token`
+  - `GET /public/get-all-open-requests`
+  - `GET /public/get-request-status`
+  - All timestamps returned by these endpoints are string nanoseconds and error responses echo the upstream `requestId` for observability.
+  - Do **not** cache `/xnode/inbound_addresses`; Harbor rotates vault destinations and the adapter fetches them on demand.
+- Example calls (assuming the adapter runs on `http://localhost:1958`):
+
+```bash
+curl -X POST http://localhost:1958/private/approve-token \
+  -H 'Content-Type: application/json' \
+  -d '{"client_request_id": "demo-approve-1", "token_symbol": "USDC", "amount": "100"}'
+
+curl -X POST http://localhost:1958/private/insert-order \
+  -H 'Content-Type: application/json' \
+  -d '{"client_request_id": "demo-order-1", "instrument": "btc.btc-eth.usdt", "side": "BUY", "order_type": "LIMIT", "base_ccy_symbol": "BTC", "quote_ccy_symbol": "USDT", "price": "100", "base_qty": "0.01"}'
+
+curl "http://localhost:1958/public/get-request-status?client_request_id=demo-order-1"
+
+curl -X DELETE "http://localhost:1958/private/cancel-request?client_request_id=demo-order-1"
+```
 
 #### GTE
 - Building the image
