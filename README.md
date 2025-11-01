@@ -1,26 +1,13 @@
-# Development Guide
-
 ### Development via localhost (This won't be possible for some projects like 'paradex' due to some dependency issues)
-- Navigate to the project you are working on
+- Navigate to the project you are working on and install the project
   - ```cd gte```
-  - Create virtual environment
-  - ```python3 -m venv venv```
-  - ```source venv/bin/activate```
-- Make sure you are using correct `pip` and `setuptools` versions:
-  - ```pip install pip==22.3.1 setuptools==59.6.0```
-- Install in editable mode (changes to the dex you are working on are seen immediately in the environment):
-  - ```pip install -e .```
+  - ```pip install .```
 
 - Run your dex
   - ```python3 -u -m dex_proxy.main -s -c gte.config.json -n gte```
 
 - Navigate to the openapi webpage to test the endpoints
   - ```http://localhost:1958/docs```
-
-- Test your dex
-  - ```pip install -e ".[dev]"```
-  - ```make test-functional```
-  - for deep dive into the tests, consult [README_TESTS](README_TESTS.md)
 
 ### Development via docker
 
@@ -137,19 +124,7 @@
   - ```pip install .```
   - ```python3 -u -m dex_proxy.main -s -c vert.config.json -n vert```
 
-#### Drft
-- Building the image
-  - ```docker build -t dex-proxy-drft -f ./Dockerfile.local .```
-- Running the container starts an image with an ```sshd``` listening binded to the host network
-  - ```docker run --volume ./:/app/auros -p 127.0.0.1:62227:22 -p 127.0.0.1:11958:11958 --name dex-proxy-drft -d dex-proxy-drft```
-- Attaching to an image can be accomplished with ```ssh``` (this allows us to forward ```ssh-agent``` through ```ssh```)
-  - ```ssh -o NoHostAuthenticationForLocalhost=yes -A root@localhost -p 62227```
-- While inside the container
-  - ```cd drft```
-  - ```pip install .```
-  - ```python3 -u -m dex_proxy.main -s -c drft.config.json -n drft```
-
-#### Notes
+#### Notes 
 - We are mounting our working directory directly to the image so you shouldn't need to rebuild the image to develop
 - We assume existence of valid ssh keys in the host ```ssh-agent``` and they are forwarded to the ```sshd``` inside the Docker image
 - If you are on MacOS you are probably using ```podman``` and want to replace ```docker``` accordingly
@@ -172,3 +147,4 @@
   select account, token, address from exchange_addresses where token='<token_name>' and address='<address>';
   ```
   - Verify the existence and correctness of the addresses on chain using a ```block explorer```.
+

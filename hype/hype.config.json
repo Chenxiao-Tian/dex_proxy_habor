@@ -72,31 +72,29 @@
     ],
     "dex": {
         "name": "hype",
-        "_chain_name": "Arbitrum Sepolia",
-        "chain_name": "Arbitrum Mainnet",
+        "chain_name": "Arbitrum Sepolia",
         "native_token": "ETH",
         "connectors": {
             "hype": {
                 "web3": {
-                    "_http": "https://arbitrum-sepolia.infura.io/v3/448189743138497aaef356d882bd5e85",
-                    "http": "https://arbitrum-mainnet.infura.io/v3/2167b33bbc8243b7861795f5270b6f58"
+                    "http": "https://arbitrum-sepolia.infura.io/v3/448189743138497aaef356d882bd5e85"
                 },
                 "websocket": {
-                    "_base_uri": "wss://api.hyperliquid-testnet.xyz/ws",
-                    "base_uri": "wss://api.hyperliquid.xyz/ws",
+                    "base_uri": "wss://api.hyperliquid-testnet.xyz/ws",
+                    "_base_uri": "wss://api.hyperliquid.xyz/ws",
                     "api_path": "",
                     "ws_ping_interval": 60
                 },
                 "rest": {
-                    "_base_uri": "https://api.hyperliquid-testnet.xyz",
-                    "base_uri": "https://api.hyperliquid.xyz",
+                    "base_uri": "https://api.hyperliquid-testnet.xyz",
+                    "_base_uri": "https://api.hyperliquid.xyz",
                     "api_path": "",
                     "request_timeout": 60,
                     "rate_limits": {
                         "limits": [
                             {
-                                "_key": "https://api.hyperliquid-testnet.xyz",
-                                "key": "https://api.hyperliquid.xyz",
+                                "key": "https://api.hyperliquid-testnet.xyz",
+                                "_key": "https://api.hyperliquid.xyz",
                                 "interval": 1,
                                 "limit": 1
                             }
@@ -128,6 +126,14 @@
         "exchange_token_refresh_interval_s": 240,
         "reload_coin_definitions_interval_s": 600,
         "max_signature_generators": 2,
+        "gas_price_tracker": {
+            "http_url": "https://arbitrum-sepolia.infura.io/v3/12a345a0a065429f9aec1a06ba94373e",
+            "ws_url": "wss://arbitrum-sepolia.infura.io/ws/v3/12a345a0a065429f9aec1a06ba94373e",
+            "use_fee_history": true,
+            "percentile_priority_fee_fast": 10,
+            "percentile_priority_fee_med": 5,
+            "percentile_priority_fee_slow": 2
+        },
         "request_cache": {
             "finalised_requests_cleanup_after_s": 600,
             "store_in_redis": false
@@ -136,7 +142,7 @@
             "poll_interval_s": 15
         },
         "fireblocks": {
-            "native_asset": "ETH-AETH",
+            "native_asset": "ETH",
             "token_types": [
                 "ERC20",
                 "BASE_ASSET"

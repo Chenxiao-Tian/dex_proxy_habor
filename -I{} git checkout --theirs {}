@@ -1,0 +1,31 @@
+[33mcommit 8e8b80238a7c6f04a666c01abf89bf8a09bb1035[m[33m ([m[1;36mHEAD[m[33m)[m
+[36mgpg: Signature made Tue Oct 28 22:55:27 2025    [m
+[36mgpg:                using RSA key 8DF16123256390DD4E864D6D16D05B006A026135[m
+[36mgpg: Good signature from "Chenxiao Tian <chenxiao.tian@auros.global>" [ultimate][m
+Author: Greg Markey <greg.markey@auros.global>
+Date:   Mon May 8 17:05:18 2023 +1000
+
+    empty commit to increment shasum
+
+[33mcommit dc2211931bf2ada5ea4b17d2a4fd7f4617904de1[m
+[36mgpg: Signature made Tue Oct 28 22:55:27 2025    [m
+[36mgpg:                using RSA key 8DF16123256390DD4E864D6D16D05B006A026135[m
+[36mgpg: Good signature from "Chenxiao Tian <chenxiao.tian@auros.global>" [ultimate][m
+Merge: a72eea4 f77aefd
+Author: Srijan Jaiswal <srijan.jaiswal@auros.global>
+Date:   Mon May 8 06:16:27 2023 +0000
+
+    Merge branch 'uni3-tokens-contract-addresses-whitelist' into 'master'
+    
+    uni3 tokens contract addresses whitelist
+    
+    See merge request auros/dex-proxy!3
+
+[33mcommit f77aefd9ef1a3cebf1d5cb60ff6449ea3ec9c066[m
+[36mgpg: Signature made Tue Oct 28 22:55:26 2025    [m
+[36mgpg:                using RSA key 8DF16123256390DD4E864D6D16D05B006A026135[m
+[36mgpg: Good signature from "Chenxiao Tian <chenxiao.tian@auros.global>" [ultimate][m
+Author: Srijan Jaiswal <srijan.jaiswal@auros.global>
+Date:   Mon May 8 06:16:27 2023 +0000
+
+    uni3 tokens contract addresses whitelist

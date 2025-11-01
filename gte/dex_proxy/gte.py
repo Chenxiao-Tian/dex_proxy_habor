@@ -28,17 +28,17 @@ class Gte(DexCommon):
         super().__init__(pantheon, config, server, event_sink)
         self._gte_config = config
         self.__is_readonly = self._gte_config['is_readonly']
-
+        
         self.__wallet_address = to_checksum_address(self._gte_config['wallet_address'])
         self.__client: Client | None = None
         self.__api: GteApi | None = None
-
+        
         self._server.register(
             "POST",
             "/private/create-order",
             self._create_order,
             request_model=schemas.CreateOrderRequest,
-            response_model=schemas.OrderResponse,
+            response_model=schemas.CreateOrderResponse,
             summary="Create a new order",
             tags=["private"],
             oapi_in=["gte"],
@@ -71,7 +71,7 @@ class Gte(DexCommon):
             "/public/order",
             self.__get_order,
             request_model=schemas.QueryOrderParams,
-            response_model=schemas.QueryLiveOrdersResponse,
+            response_model=schemas.QueryOrderResponse,
             response_errors={404: {"model": schemas.CancelOrderErrorResponse}},
             summary="Get a single order",
             tags=["public"],
@@ -146,21 +146,21 @@ class Gte(DexCommon):
 
     async def start(self, private_key: str) -> None:
         await super().start(private_key)
-
+        
         network = TESTNET_CONFIG
-
+        
         if not self.__is_readonly:
             web3 = await make_web3(network, self.__wallet_address, private_key)
             self.__client = Client(web3=web3, config=network, account=self.__wallet_address)
-
+            
             await self.__client.init()
         else:
             web3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(network.rpc_http))
             self.__client = Client(web3=web3, config=network)
-
+        
         self.__api = GteApi(self.pantheon, client=self.__client, event_sink=self._event_sink, wallet_address=self.__wallet_address)
         await self.__api.start()
-
+        
         self.started = True
 
     async def on_request_status_update(
@@ -172,7 +172,7 @@ class Gte(DexCommon):
     ) -> None:
         pass
 
-    # Generic API
+    # Generic API 
     async def _create_order(
         self, path: str, params: Dict[str, Any], received_at_ms: int
     ) -> Tuple[int, Dict[str, Any]]:
@@ -200,7 +200,7 @@ class Gte(DexCommon):
         _logger.debug(f"_query_order {inspect.currentframe().f_code.co_name}] "
             f"received_at_ms={received_at_ms}, path={path}, params={params}")
         raise NotImplementedError("not implemented yet")
-
+    
     async def __get_balance(
         self, path: str, params: Dict[str, Any], received_at_ms: int
     ) -> Tuple[int, Dict[str, Any]]:
@@ -215,7 +215,7 @@ class Gte(DexCommon):
         _logger.debug(f"_get_instrument_data {inspect.currentframe().f_code.co_name}] "
             f"received_at_ms={received_at_ms}, path={path}, params={params}")
         return 200, await self.__api.get_instrument_data()
-
+    
     async def __get_instrument_definitions(
         self, path: str, params: Dict[str, Any], received_at_ms: int
     ) -> Tuple[int, Dict[str, Any]]:
@@ -283,7 +283,7 @@ class Gte(DexCommon):
         self, request: Any, priority_fee: Any
     ) -> Any:
         raise NotImplementedError("get-gas-price stub")
-
+    
     async def _get_all_open_requests(
         self, path: str, params: Dict[str, Any], received_at_ms: int
     ) -> Tuple[int, Dict[str, Any]]:

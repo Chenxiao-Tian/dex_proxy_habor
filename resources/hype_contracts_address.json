@@ -38,16 +38,15 @@
                     "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
                     "0x159cB15043485DfbFBab866c61F8851671575b1A",
                     "0x8c19E9AD4D2c3db1a0966b1b91DE325274E233cf",
-                    "0x023A3D058020fB76cCa98f01b3c48C8938A22355",
-                    "0x8bb7E218D49754054691b28f0b6fCe07A3C37791"
+                    "0x023A3D058020fB76cCa98f01b3c48C8938A22355"
                 ]
             },
             {
-                "symbol": "MNT",
-                "address": "0x3c3a81e81dc49a522a592e7622a7e711c06bf354",
-                "valid_withdrawal_addresses": [
-                    "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974"
-                ]
+              "symbol": "MNT",
+              "address": "0x3c3a81e81dc49a522a592e7622a7e711c06bf354",
+              "valid_withdrawal_addresses": [
+                "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974"
+              ]
             }
         ],
         "bridge_address": "0x2Df1c51E09aECF9cacB7bc98cB1742757f163dF7"
@@ -91,106 +90,6 @@
                     "0xebe163781f141102c6ba2220bb13481b9f4b538c",
                     "0x8bee7340304a051b16cecee05fb8c999db3b65ed"
                 ]
-            },
-            {
-                "symbol": "UBTC",
-                "_details": "curl -X GET https://api.hyperunit.xyz/gen/hyperliquid/bitcoin/btc/3FzAC31y1yTsHsXrQwKUTA8hhX5iQgnhei",
-                "address": "0x8f254b963e8468305d409b33aa137c67",
-                "valid_withdrawal_addresses": [
-                    "0xB949D53aBC1f181FAB63E32E4b0A1E0C25050558",
-                    "0x064c27986Bb8c2CbF5C9cc672A0F4aeE37d4a20b"
-                ],
-                "unit_withdrawal_address_mappings": {
-                    "19VLauSfjKX7kbUuBENWBfufxJybEoiG83": "0xB949D53aBC1f181FAB63E32E4b0A1E0C25050558",
-                    "3FzAC31y1yTsHsXrQwKUTA8hhX5iQgnhei": "0x064c27986Bb8c2CbF5C9cc672A0F4aeE37d4a20b"
-                }
-            },
-            {
-                "symbol": "UETH",
-                "_details": "curl -X GET https://api.hyperunit.xyz/gen/hyperliquid/ethereum/eth/0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
-                "address": "0xe1edd30daaf5caac3fe63569e24748da",
-                "valid_withdrawal_addresses": [
-                    "0xa254191f35bE5901F56C6465761F2c64132204D9",
-                    "0x18dC49491F768B79A7946bF8c2AA9797804D89A2"
-                ],
-                "unit_withdrawal_address_mappings": {
-                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD": "0xa254191f35bE5901F56C6465761F2c64132204D9",
-                    "0xc72f6cc407b39437723fd2f5e9168a79d158a499": "0x18dC49491F768B79A7946bF8c2AA9797804D89A2"
-                }
-            },
-            {
-                "symbol": "USOL",
-                "_details": "curl -X GET https://api.hyperunit.xyz/gen/hyperliquid/solana/sol/2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5",
-                "address": "0x49b67c39f5566535de22b29b0e51e685",
-                "valid_withdrawal_addresses": [
-                    "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
-                    "0x8AEd108899153f73a19605d80041ef300B75b27A"
-                ],
-                "unit_withdrawal_address_mappings": {
-                    "2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5": "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
-                    "3ATp7waptopFefKsqbgmF7omXt2BN5oUofpcPUJVsXCn": "0x8AEd108899153f73a19605d80041ef300B75b27A"
-                }
-            },
-            {
-                "symbol": "UPUMP",
-                "_details": "curl -X GET https://api.hyperunit.xyz/gen/hyperliquid/solana/pump/2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5",
-                "address": "0x544e60f98a36d7b22c0fb5824b84f795",
-                "valid_withdrawal_addresses": [
-                    "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
-                    "0x8AEd108899153f73a19605d80041ef300B75b27A"
-                ],
-                "unit_withdrawal_address_mappings": {
-                    "2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5": "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
-                    "3ATp7waptopFefKsqbgmF7omXt2BN5oUofpcPUJVsXCn": "0x8AEd108899153f73a19605d80041ef300B75b27A"
-                }
-            },
-            {
-                "symbol": "UBONK",
-                "_details": "curl -X GET https://api.hyperunit.xyz/gen/hyperliquid/solana/bonk/2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5",
-                "address": "0xb113d34e351cf195733c98442530c099",
-                "valid_withdrawal_addresses": [
-                    "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
-                    "0x8AEd108899153f73a19605d80041ef300B75b27A"
-                ],
-                "unit_withdrawal_address_mappings": {
-                    "2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5": "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
-                    "3ATp7waptopFefKsqbgmF7omXt2BN5oUofpcPUJVsXCn": "0x8AEd108899153f73a19605d80041ef300B75b27A"
-                }
-            },
-            {
-                "symbol": "UFART",
-                "_details": "curl -X GET https://api.hyperunit.xyz/gen/hyperliquid/solana/fart/2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5",
-                "address": "0x7650808198966e4285687d3deb556ccc",
-                "valid_withdrawal_addresses": [
-                    "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
-                    "0x8AEd108899153f73a19605d80041ef300B75b27A"
-                ],
-                "unit_withdrawal_address_mappings": {
-                    "2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5": "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
-                    "3ATp7waptopFefKsqbgmF7omXt2BN5oUofpcPUJVsXCn": "0x8AEd108899153f73a19605d80041ef300B75b27A"
-                }
-            },
-            {
-                "symbol": "UDZ",
-                "_details": "curl -X GET https://api.hyperunit.xyz/gen/hyperliquid/solana/2z/2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5",
-                "address": "0x7650808198966e4285687d3deb556ccc",
-                "valid_withdrawal_addresses": [
-                    "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
-                    "0x8AEd108899153f73a19605d80041ef300B75b27A",
-                    "0x198350063dDcA3b0cADE88ae7398E7bb51ad09CB",
-                    "0xb0CC5084A339877b0a151Be28DA0D6C6718cAD49",
-                    "0x8a3457ff1C565e5A290aE1Ec09DAAddEBd57D00a",
-                    "0x99b134C6B3367D9db724CBd5A7c715e21c43cAE8",
-                    "0xf702A74648FA8f1A1c6240c5fF993DA8C8116EE9"
-                ],
-                "unit_withdrawal_address_mappings": {
-                    "2fv8v15z4a95nsJVVLxGbpFvFLJ9YgATUE8T7Qmj7FR5": "0xbAcb3C03F1d3Dc08dc8B71d057d65323a0322718",
-                    "3ATp7waptopFefKsqbgmF7omXt2BN5oUofpcPUJVsXCn": "0x8AEd108899153f73a19605d80041ef300B75b27A",
-                    "BRmGR1P7SBpN1qf9AGAi8gVf2zKpC8HUJvV624RksqHD": "0x198350063dDcA3b0cADE88ae7398E7bb51ad09CB",
-                    "5resAYKS1SV9GBxhXBpCeAUVWNMTWW7c5F7kDSZK5rFg": "0xb0CC5084A339877b0a151Be28DA0D6C6718cAD49",
-                    "47BQHRAZhV9SG94sU1VzqKk4kTSBvtg2E8QuQZokRnzw": "0x8a3457ff1C565e5A290aE1Ec09DAAddEBd57D00a",
-                    "3G7baZkGVvyyh9tfn1E78NXEmdeVDjT5N4uSDGpq56Yx": "0x99b134C6B3367D9db724CBd5A7c715e21c43cAE8"
-                }
             }
         ]
     }

@@ -4,7 +4,8 @@ import ujson
 import logging
 
 from eth_account import Account as EthAccount
-from eth_account.messages import encode_structured_data
+# from eth_account.messages import encode_structured_data
+from eth_account.messages import encode_typed_data
 from .starknet_messages import StarknetMessages
 
 from starkware.crypto.signature.signature import EC_ORDER
@@ -147,7 +148,7 @@ class KeyUtils(object):
     def sign_stark_key_msg(
         eth_private_key: int, stark_key_msg: dict
     ) -> str:
-        encoded_msg = encode_structured_data(primitive=stark_key_msg)
+        encoded_msg = encode_typed_data(stark_key_msg)
         signed_msg = EthAccount.sign_message(encoded_msg, eth_private_key)
         return signed_msg.signature.hex()
 

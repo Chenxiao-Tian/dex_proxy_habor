@@ -1,5 +1,4 @@
 stages:
-  - test
   - build
   - authorise
 
@@ -119,12 +118,6 @@ stages:
   - PROCESS_NAME: dex_proxy-uni34-arb-1
     ENVIRONMENT: prod
     SOURCE_PATH: uniswaps
-  - PROCESS_NAME: dex_proxy-drft-1
-    ENVIRONMENT: prod
-    SOURCE_PATH: drft
-  - PROCESS_NAME: dex_proxy-drft-test-1
-    ENVIRONMENT: dev
-    SOURCE_PATH: drft
 
 
 # Typescript enclaves.
@@ -181,9 +174,6 @@ variables:
   # Set to `true` in order to force all pipeline jobs to execute.
   # You do not need to change it here: you can set it in the UI when you press "New pipeline".
   FORCE_BUILD: "false"
-  # https://kenetic.atlassian.net/wiki/x/BYCX0w
-  KUBERNETES_CPU_LIMIT: 12
-  KUBERNETES_MEMORY_LIMIT: 12Gi
 
 
 default:
@@ -194,9 +184,6 @@ default:
     # library/docker:24-dind
     - name: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker@sha256:962ad28b5cddb82c7cadbf222a71c403bd97ef1814005624bd8a3697cbb58bba
       alias: docker
-      variables:
-        # required for dind k8s executor:
-        HEALTHCHECK_TCP_PORT: 2375
   before_script:
     - docker login -u $CI_DEPENDENCY_PROXY_USER -p $CI_DEPENDENCY_PROXY_PASSWORD $CI_DEPENDENCY_PROXY_SERVER
     - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
@@ -330,7 +317,6 @@ build enclaves (python):
   extends:
     - .build enclaves
     - .build on changes (python)
-  needs: []
   parallel:
     matrix: *python-enclaves
 
@@ -339,7 +325,6 @@ build enclaves (ts):
   extends:
     - .build enclaves
     - .build on changes (ts)
-  needs: []
   parallel:
     matrix: *ts-enclaves
 
@@ -348,7 +333,6 @@ build enclaves (other):
   extends:
     - .build enclaves
     - .build on changes (other)
-  needs: []
   parallel:
     matrix: *other-enclaves
 
@@ -364,7 +348,6 @@ build containers (ts):
   extends:
     - .build containers
     - .build on changes (ts)
-  needs: []
   parallel:
     matrix: *ts-containers
 
@@ -458,54 +441,3 @@ authorise enclaves (other):
       optional: true
       parallel:
         matrix: *other-enclaves
-
-.drft test files to monitor for changes: &drft-test-files-to-monitor-for-changes
-  - .gitlab-ci.yml
-  - drft/**/*
-  - py_dex_common/**/*
-  - py_dex_web3/**/*
-  - DockerfileTests.dockerfile
-  - .dockerignore-tests
-
-
-.run drft tests:
-  rules:
-    - if: '$CI_COMMIT_MESSAGE =~ /\[skip-func-tests-drft\]/'
-      when: never
-    - if: '$SKIP_FUNC_TESTS == "all"'
-      when: never
-    - if: '$SKIP_FUNC_TESTS =~ /(^|,)drft(,|$)/'
-      when: never
-    - if: $FORCE_BUILD == "true"
-    - if: $CI_COMMIT_BRANCH
-      changes:
-        paths: *drft-test-files-to-monitor-for-changes
-
-test drft:
-  stage: test
-  extends:
-    - .run drft tests
-  needs: []
-  variables:
-    DOCKER_BUILDKIT: "1"
-  before_script:
-    - yum install -y make
-  script:
-    - echo ${SSH_PRIVATE_KEY_BASE64} | base64 -d -w 0 > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - eval $(ssh-agent -s)
-    - ssh-add ~/.ssh/id_rsa
-    - ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
-    - cd drft && make docker-build-tests
-    - mkdir -p test_reports
-    - echo "Running functional test suite inside container (with host network)"
-    - make docker-make-test-functional-ci
-  artifacts:
-    when: always
-    expire_in: 14 days
-    paths:
-      - drft/test_reports/report.xml
-      - drft/test_reports/pytest.log
-      - drft/test_reports/.pytest_cache/d/.xprocess/dex_proxy_process/xprocess.log
-    reports:
-      junit: drft/test_reports/report.xml

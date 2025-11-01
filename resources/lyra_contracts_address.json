@@ -30,9 +30,7 @@
             "risk_manager_addresses": {
                 "SM": "0x28c9ddF9A3B29c2E6a561c1BC520954e5A33de5D",
                 "PM_BTC": "0x45DA02B9cCF384d7DbDD7b2b13e705BADB43Db0D",
-                "PM_ETH": "0xe7cD9370CdE6C9b5eAbCe8f86d01822d3de205A0",
-                "PM2_BTC": "0xC7adAB7A2b92019098dA55Ba4C5A8C65Ae7e52DC",
-                "PM2_ETH": "0xc755DAe3fd295A687adf3e192387163f813F0598"
+                "PM_ETH": "0xe7cD9370CdE6C9b5eAbCe8f86d01822d3de205A0"
             },
             "l1_standard_bridge_address": "0x61E44dC0dae6888B5a301887732217d5725B0bFf",
             "l2_standard_bridge_address": "0x4200000000000000000000000000000000000010",
@@ -371,8 +369,7 @@
             {
                 "symbol": "USDC",
                 "valid_withdrawal_addresses": [
-                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B",
-                    "0x8B285654D562105bE5b850Dd9AE149FCC25Ac945"
+                    "0xB212A02805406CE7Bcc8a342e8B7133095cA162B"
                 ]
             },
             {
@@ -401,16 +398,8 @@
                 ]
             }
         ],
-        "whitelisted_bidding_wallets": [
-            "0xb4c4BbD9974D7F4D6e0814A7f9aA1f018F032818"
-        ],
-        "whitelisted_bidding_subaccount_ids": [
-            252,
-            253,
-            5303,
-            5304,
-            23711
-        ]
+        "whitelisted_bidding_wallets": [ "0xb4c4BbD9974D7F4D6e0814A7f9aA1f018F032818" ],
+        "whitelisted_bidding_subaccount_ids": [ 252, 253, 5303, 5304, 23711 ]
     },
     "Arbitrum Mainnet": {
         "bridge_details": {
@@ -501,11 +490,13 @@
         "tokens": [
             {
                 "symbol": "ETH",
-                "valid_withdrawal_addresses": []
+                "valid_withdrawal_addresses": [
+                ]
             },
             {
                 "symbol": "WETH",
-                "valid_withdrawal_addresses": []
+                "valid_withdrawal_addresses": [
+                ]
             },
             {
                 "symbol": "USDC.e",
@@ -515,14 +506,16 @@
             },
             {
                 "symbol": "WBTC",
-                "valid_withdrawal_addresses": []
+                "valid_withdrawal_addresses": [
+                ]
             },
             {
                 "symbol": "WEETH",
-                "valid_withdrawal_addresses": []
+                "valid_withdrawal_addresses": [
+                ]
             }
         ],
-        "lyra_chain_tokens": [
+        "lyra_chain_tokens":[
             {
                 "symbol": "ETH",
                 "valid_withdrawal_addresses": [
@@ -560,99 +553,91 @@
                 ]
             }
         ],
-        "whitelisted_bidding_wallets": [
-            "0xb4c4BbD9974D7F4D6e0814A7f9aA1f018F032818"
-        ],
-        "whitelisted_bidding_subaccount_ids": [
-            252,
-            253,
-            5303,
-            5304,
-            23711
-        ]
+        "whitelisted_bidding_wallets": [ "0xb4c4BbD9974D7F4D6e0814A7f9aA1f018F032818" ],
+        "whitelisted_bidding_subaccount_ids": [ 252, 253, 5303, 5304, 23711 ]
     },
     "Ethereum Sepolia Testnet": {
         "bridge_details": {
-            "cash_addresses": {
-                "WETH": "0x41675b7746AE0E464f2594d258CF399c392A179C",
-                "WSTETH": "0x8dca1bc475fb6008165186061398e318dd3e5f06",
-                "USDC": "0x6caf294DaC985ff653d5aE75b4FF8E0A66025928",
-                "SNX": "0x2c5fed9208034f49723f91179ceefb8f42dbba32",
-                "DRV": "0x057fd0dEF0BEf37Bf36Aef9CB550faf88428C5D0"
-            },
-            "matching_address": "0x3cc154e220c2197c5337b7Bd13363DD127Bc0C6E",
-            "deposit_module_address": "0x43223Db33AdA0575D2E100829543f8B04A37a1ec",
-            "withdraw_module_address": "0xe850641C5207dc5E9423fB15f89ae6031A05fd92",
-            "transfer_module_address": "0x0CFC1a4a90741aB242cAfaCD798b409E12e68926",
-            "subaccount_module_address": "0xb9ed1cc0c50bca7a391a6819e9cAb466f5501d73",
-            "trade_module_address": "0x87F2863866D85E3192a35A73b388BD625D83f2be",
-            "rfq_module_address": "0x9371352CCef6f5b36EfDFE90942fFE622Ab77F1D",
-            "action_typehash": "0x4d7a9f27c403ff9c0f19bce61d76d82f9aa29f8d6d4b0c5474607d9770d1af17",
-            "domain_separator": "0x9bcf4dc06df5d8bf23af818d5716491b995020f377d3b7b64c29ed14e3dd1105",
-            "risk_manager_addresses": {
-                "SM": "0x28bE681F7bEa6f465cbcA1D25A2125fe7533391C",
-                "PM_BTC": "0xbaC0328cd4Af53d52F9266Cdbd5bf46720320A20",
-                "PM_ETH": "0xDF448056d7bf3f9Ca13d713114e17f1B7470DeBF"
-            },
-            "l1_standard_bridge_address": "0x80F6C67BF87576A0F88C0A84667015F32ED46bB6",
-            "l2_standard_bridge_address": "0x4200000000000000000000000000000000000010",
-            "tokens": [
-                {
-                    "symbol": "USDC",
-                    "bridge_type": "socket_v1",
-                    "_l1_token_address": "0x7E07E15D2a87A24492740D16f5bdF58c16db0c4E",
-                    "l1_token_address": "0x565810cbfa3Cf1390963E5aFa2fB953795686339",
-                    "l2_token_address": "0xe80F2a02398BBf1ab2C9cc52caD1978159c215BD",
-                    "l1_socket_bridge_address": "0x040993fbF458b95871Cd2D73Ee2E09F4AF6d56bB",
-                    "l1_socket_bridge_connector_address": "0x5800249621DA520aDFdCa16da20d8A5Fc0f814d8",
-                    "l2_socket_bridge_address": "0xbd9f6198a220046e944d704b7ff2a68b778f4a44",
-                    "l2_socket_bridge_connector_address": "0x03027410f25c527d5aeb3e6e56a6389611dcb2a9"
-                },
-                {
-                    "symbol": "WETH",
-                    "bridge_type": "socket_v1",
-                    "l1_token_address": "0xE67ABDA0D43f7AC8f37876bBF00D1DFadbB93aaa",
-                    "l2_token_address": "0x3a34565D81156cF0B1b9bC5f14FD00333bcf6B93",
-                    "l1_socket_bridge_address": "0xd9cB39b5ad36C6D2ec4E8d5337B62a1C1B71BAcc",
-                    "l1_socket_bridge_connector_address": "0x0Fcfee220f4e3FA1e3fA361525Cee0334DdDB8a3",
-                    "l2_socket_bridge_address": "0xdcABb6d7E88396498FFF4CD987F60e354BF2a44b",
-                    "l2_socket_bridge_connector_address": "0x03027410f25c527d5aeb3e6e56a6389611dcb2a9"
-                },
-                {
-                    "symbol": "WSTETH",
-                    "bridge_type": "socket_v1",
-                    "l1_token_address": "0x2A69EFA58248647D57D0A3a09e7ED38D2a8343d2",
-                    "l2_token_address": "0x37Db2a7cFb832442861F0053db422bDEA20DE847",
-                    "l1_socket_bridge_address": "0x383848aA8e899E9B913aA54fC81E67a53640FC71",
-                    "l1_socket_bridge_connector_address": "0x333bBAF743605EE2Ae3669cDD38c7677379Fce7A",
-                    "l2_socket_bridge_address": "0x0A2C3cd2B14AfE1eDFa81B53Dc4AF095f993d836",
-                    "l2_socket_bridge_connector_address": "0xBa56CE374eF372332A16d080fd755335F84d59a0"
-                },
-                {
-                    "symbol": "SNX",
-                    "bridge_type": "socket_v1",
-                    "l1_token_address": "0x9D7b6f4ffE5d654d67A013599Efbe669d56B6134",
-                    "l2_token_address": "0x751FD1d1B327D6d842cD57CAAEABf581836cFF5F",
-                    "l1_socket_bridge_address": "0x0A7104f2cBeC2E9c7FDC91097D7b7099078E85eB",
-                    "l1_socket_bridge_connector_address": "0xE46401d94ebF0ccdCc5337Bb7DA940DBD032e177",
-                    "l2_socket_bridge_address": "0x6654d10da9A657C920f7fA67d6b3e443B9917d7A",
-                    "l2_socket_bridge_connector_address": "0x03027410f25c527d5aeb3e6e56a6389611dcb2a9"
-                },
-                {
-                    "symbol": "DRV",
-                    "bridge_type": "layerzero",
-                    "l1_token_address": "0xeCAAd20Fe81818E4Ce1EB35E463f681084ab2DD5",
-                    "l2_token_address": "0x3FBFD80EF7591658d1D7DdEC067F413eFd6f985c",
-                    "l1_layerzero_bridge_address": "0xeCAAd20Fe81818E4Ce1EB35E463f681084ab2DD5",
-                    "l2_layerzero_bridge_address": "0x3FBFD80EF7591658d1D7DdEC067F413eFd6f985c",
-                    "l1_layerzero_chain_eid": 40161,
-                    "l2_layerzero_chain_eid": 40308
-                },
-                {
-                    "symbol": "STDRV",
-                    "l2_token_address": "0xbe9dbda519e15a1c0d238cea0b3dad47a484a6ff"
-                }
-            ]
+          "cash_addresses": {
+              "WETH": "0x41675b7746AE0E464f2594d258CF399c392A179C",
+              "WSTETH": "0x8dca1bc475fb6008165186061398e318dd3e5f06",
+              "USDC": "0x6caf294DaC985ff653d5aE75b4FF8E0A66025928",
+              "SNX": "0x2c5fed9208034f49723f91179ceefb8f42dbba32",
+              "DRV": "0x057fd0dEF0BEf37Bf36Aef9CB550faf88428C5D0"
+          },
+          "matching_address": "0x3cc154e220c2197c5337b7Bd13363DD127Bc0C6E",
+          "deposit_module_address": "0x43223Db33AdA0575D2E100829543f8B04A37a1ec",
+          "withdraw_module_address": "0xe850641C5207dc5E9423fB15f89ae6031A05fd92",
+          "transfer_module_address": "0x0CFC1a4a90741aB242cAfaCD798b409E12e68926",
+          "subaccount_module_address": "0xb9ed1cc0c50bca7a391a6819e9cAb466f5501d73",
+          "trade_module_address": "0x87F2863866D85E3192a35A73b388BD625D83f2be",
+          "rfq_module_address": "0x9371352CCef6f5b36EfDFE90942fFE622Ab77F1D",
+          "action_typehash": "0x4d7a9f27c403ff9c0f19bce61d76d82f9aa29f8d6d4b0c5474607d9770d1af17",
+          "domain_separator": "0x9bcf4dc06df5d8bf23af818d5716491b995020f377d3b7b64c29ed14e3dd1105",
+          "risk_manager_addresses": {
+              "SM": "0x28bE681F7bEa6f465cbcA1D25A2125fe7533391C",
+              "PM_BTC": "0xbaC0328cd4Af53d52F9266Cdbd5bf46720320A20",
+              "PM_ETH": "0xDF448056d7bf3f9Ca13d713114e17f1B7470DeBF"
+          },
+          "l1_standard_bridge_address": "0x80F6C67BF87576A0F88C0A84667015F32ED46bB6",
+          "l2_standard_bridge_address": "0x4200000000000000000000000000000000000010",
+          "tokens": [
+              {
+                "symbol": "USDC",
+                "bridge_type": "socket_v1",
+                "_l1_token_address": "0x7E07E15D2a87A24492740D16f5bdF58c16db0c4E",
+                "l1_token_address": "0x565810cbfa3Cf1390963E5aFa2fB953795686339",
+                "l2_token_address": "0xe80F2a02398BBf1ab2C9cc52caD1978159c215BD",
+                "l1_socket_bridge_address": "0x040993fbF458b95871Cd2D73Ee2E09F4AF6d56bB",
+                "l1_socket_bridge_connector_address": "0x5800249621DA520aDFdCa16da20d8A5Fc0f814d8",
+                "l2_socket_bridge_address": "0xbd9f6198a220046e944d704b7ff2a68b778f4a44",
+                "l2_socket_bridge_connector_address": "0x03027410f25c527d5aeb3e6e56a6389611dcb2a9"
+              },
+              {
+                "symbol": "WETH",
+                "bridge_type": "socket_v1",
+                "l1_token_address": "0xE67ABDA0D43f7AC8f37876bBF00D1DFadbB93aaa",
+                "l2_token_address": "0x3a34565D81156cF0B1b9bC5f14FD00333bcf6B93",
+                "l1_socket_bridge_address": "0xd9cB39b5ad36C6D2ec4E8d5337B62a1C1B71BAcc",
+                "l1_socket_bridge_connector_address": "0x0Fcfee220f4e3FA1e3fA361525Cee0334DdDB8a3",
+                "l2_socket_bridge_address": "0xdcABb6d7E88396498FFF4CD987F60e354BF2a44b",
+                "l2_socket_bridge_connector_address": "0x03027410f25c527d5aeb3e6e56a6389611dcb2a9"
+              },
+              {
+                "symbol": "WSTETH",
+                "bridge_type": "socket_v1",
+                "l1_token_address": "0x2A69EFA58248647D57D0A3a09e7ED38D2a8343d2",
+                "l2_token_address": "0x37Db2a7cFb832442861F0053db422bDEA20DE847",
+                "l1_socket_bridge_address": "0x383848aA8e899E9B913aA54fC81E67a53640FC71",
+                "l1_socket_bridge_connector_address": "0x333bBAF743605EE2Ae3669cDD38c7677379Fce7A",
+                "l2_socket_bridge_address": "0x0A2C3cd2B14AfE1eDFa81B53Dc4AF095f993d836",
+                "l2_socket_bridge_connector_address": "0xBa56CE374eF372332A16d080fd755335F84d59a0"
+              },
+              {
+                "symbol": "SNX",
+                "bridge_type": "socket_v1",
+                "l1_token_address": "0x9D7b6f4ffE5d654d67A013599Efbe669d56B6134",
+                "l2_token_address": "0x751FD1d1B327D6d842cD57CAAEABf581836cFF5F",
+                "l1_socket_bridge_address": "0x0A7104f2cBeC2E9c7FDC91097D7b7099078E85eB",
+                "l1_socket_bridge_connector_address": "0xE46401d94ebF0ccdCc5337Bb7DA940DBD032e177",
+                "l2_socket_bridge_address": "0x6654d10da9A657C920f7fA67d6b3e443B9917d7A",
+                "l2_socket_bridge_connector_address": "0x03027410f25c527d5aeb3e6e56a6389611dcb2a9"
+              },
+              {
+                "symbol": "DRV",
+                "bridge_type": "layerzero",
+                "l1_token_address": "0xeCAAd20Fe81818E4Ce1EB35E463f681084ab2DD5",
+                "l2_token_address": "0x3FBFD80EF7591658d1D7DdEC067F413eFd6f985c",
+                "l1_layerzero_bridge_address": "0xeCAAd20Fe81818E4Ce1EB35E463f681084ab2DD5",
+                "l2_layerzero_bridge_address": "0x3FBFD80EF7591658d1D7DdEC067F413eFd6f985c",
+                "l1_layerzero_chain_eid": 40161,
+                "l2_layerzero_chain_eid": 40308
+              },
+              {
+                "symbol": "STDRV",
+                "l2_token_address": "0xbe9dbda519e15a1c0d238cea0b3dad47a484a6ff"
+              }
+          ]
         },
         "tokens": [
             {
@@ -670,7 +655,7 @@
                 ]
             }
         ],
-        "lyra_chain_tokens": [
+        "lyra_chain_tokens":[
             {
                 "symbol": "ETH",
                 "valid_withdrawal_addresses": [

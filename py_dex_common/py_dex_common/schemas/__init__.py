@@ -31,14 +31,15 @@ from .status import (
 )
 
 from .balance import (
+    BalanceItem,
     BalanceResponse
 )
 
 from .cancel_orders import (
     CancelAllOrdersResponse,
-    CancelOrderErrorResponse,
+    CancelAllOrdersErrorResponse,
     CancelOrderParams,
-    CancelOrderSuccess
+    #CancelOrderSuccess
 )
 
 from .other_movements import (
@@ -74,9 +75,11 @@ from .tts import (
 from .order_trade import (
     CreateOrderRequest,
     OrderResponse,
-    QueryLiveOrdersResponse,
-    CreateOrderErrorResponse,
+    OrderErrorResponse,
+
     QueryOrderParams,
+    #QueryOrderResponse,
+    QueryLiveOrdersResponse
 )
 from .error_response import (
     ErrorResponse

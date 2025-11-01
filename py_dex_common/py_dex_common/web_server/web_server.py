@@ -43,8 +43,6 @@ class WebServer:
 
         self.__request_id: int = 0
 
-        self.__route_registry = {}
-
     def __get_next_request_id(self) -> int:
         self.__request_id += 1
         return self.__request_id
@@ -136,14 +134,6 @@ class WebServer:
 
         def wrapper(wrapped):
             async def inner(request: web.Request):
-                if (method, path) not in self.__route_registry:
-                    return web.json_response(
-                        data={
-                            "error_code": "NOT_FOUND",
-                            "error_message": f"Resource not found or request is invalid.",
-                        },
-                        status=400,
-                    )
                 received_at_ms = int(time.time() * 1000)
                 request_id = self.__get_next_request_id()
 
@@ -165,24 +155,8 @@ class WebServer:
 
                 try:
                     status, data = await wrapped(request.path, params, received_at_ms)
-                except ValueError as e:
-                    _logger.error(
-                        f"[{request_id}] error=Invalid request, message={e}, received_at_ms={received_at_ms}, remote={request.remote}, method={request.method}, path={request.path}, params={params}"
-                    )
-                    return web.json_response(
-                        data={
-                            "error_code": "INVALID_REQUEST",
-                            "error_message": f"Invalid request. error={e}",
-                        },
-                        status=400,
-                    )
                 except Exception as e:
-                    _logger.exception("uncatched exception in handler", exc_info=e)
-                    status = 500
-                    data = {
-                        "error_code": "INTERNAL_SERVER_ERROR",
-                        "error_message": str(e),
-                    }
+                    return web.json_response(data={"error": {"message": str(e)}}, status=500)
 
                 _logger.debug(f'[{request_id}] status={status}, data={data}')
                 return web.json_response(data=data, status=status,
@@ -195,16 +169,7 @@ class WebServer:
                     route.method == method and str(route.resource) == path
             ), f"[WebServer] duplicate route: {method} {path}"
 
-        self.__route_registry[(method, path)] = handler
         self.__app.add_routes([web.route(method, path, wrapper(handler))])
-
-    def deregister(self, method, path):
-        """Deregister the handler by removing it from the internal registry."""
-        if (method, path) in self.__route_registry:
-            del self.__route_registry[(method, path)]
-            _logger.info(f"Deregistered route {method} {path}")
-        else:
-            _logger.warning(f"Tried to deregister unknown route {method} {path}")
 
     async def start(self):
         _logger.info('Starting')

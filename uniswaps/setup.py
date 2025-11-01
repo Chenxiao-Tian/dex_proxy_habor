@@ -10,6 +10,6 @@ uniswap_shared_path = os.path.abspath("../uniswap_shared")
 setup(
     [
         f"uniswap_shared @ file://{uniswap_shared_path}",
-        "pyutils[web3] @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.17",
+        "pyutils[web3] @ git+ssh://git@bitbucket.org/kenetic/pyutils.git@pyutils-1.18.4",
     ]
 )

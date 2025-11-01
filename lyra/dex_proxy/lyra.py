@@ -462,7 +462,7 @@ class Lyra(DexCommon):
     async def __create_subaccount(self, path: str, params: dict, received_at_ms: int) -> Tuple[int, dict]:
         try:
             assert (
-                params["subaccount_type"] in ["PM_BTC", "PM2_BTC", "PM_ETH", "PM2_ETH", "SM"]
+                params["subaccount_type"] == "PM_BTC" or params["subaccount_type"] == "PM_ETH" or params["subaccount_type"] == "SM"
             ), "Unknown subaccount_type"
             subaccount_type = params["subaccount_type"]
 

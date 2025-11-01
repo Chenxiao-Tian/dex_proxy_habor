@@ -58,18 +58,18 @@ class Edex(DexCommon):
             "GET",
             "/public/orders",
             self._query_live_orders,
-            response_model=schemas.QueryLiveOrdersResponse,
+            response_model=local_schemas.QueryLiveOrdersResponse,
             summary="List live orders",
             tags=["edex"],
             oapi_in=["edex"],
         )
-
+        
         self._server.register(
             "POST",
             "/private/create-order",
             self._create_order,
             request_model=schemas.CreateOrderRequest,
-            response_model=schemas.OrderResponse,
+            response_model=schemas.CreateOrderResponse,
             summary="Create a new order",
             tags=["private"],
             oapi_in=["edex"],
@@ -102,7 +102,7 @@ class Edex(DexCommon):
             "/public/order",
             self._query_order,
             request_model=schemas.QueryOrderParams,
-            response_model=schemas.OrderResponse,
+            response_model=schemas.QueryOrderResponse,
             response_errors={404: {"model": schemas.CancelOrderErrorResponse}},
             summary="Get a single order",
             tags=["public"],
@@ -188,7 +188,7 @@ class Edex(DexCommon):
     ) -> None:
         pass
 
-    # Custom EDEX API
+    # Custom EDEX API 
     async def _initialize_user(
         self, path: str, params: Dict[str, Any], received_at_ms: int
     ) -> Tuple[int, Dict[str, Any]]:
@@ -210,13 +210,13 @@ class Edex(DexCommon):
             f"received_at_ms={received_at_ms}, path={path}, params={params}")
         return 200, local_schemas.UpdateMarginTradingResponse.model_config["json_schema_extra"]["examples"]["disable_success"]
 
-    # Generic API
+    # Generic API 
     async def _create_order(
         self, path: str, params: Dict[str, Any], received_at_ms: int
     ) -> Tuple[int, Dict[str, Any]]:
         _logger.debug(f"test {inspect.currentframe().f_code.co_name}] "
             f"received_at_ms={received_at_ms}, path={path}, params={params}")
-        return 200, schemas.OrderResponse.model_config["json_schema_extra"]["example"]
+        return 200, schemas.CreateOrderResponse.model_config["json_schema_extra"]["examples"]["create_success"]
 
     async def _cancel_order(
         self, path: str, params: Dict[str, Any], received_at_ms: int
@@ -239,14 +239,14 @@ class Edex(DexCommon):
             raise ValueError("Invalid order ID")
         _logger.debug(f"test {inspect.currentframe().f_code.co_name}] "
             f"received_at_ms={received_at_ms}, path={path}, params={params}")
-        return 200, schemas.OrderResponse.model_config["json_schema_extra"]["example"]  # type: ignore
+        return 200, schemas.QueryOrderResponse.model_config["json_schema_extra"]["example"]  # type: ignore
 
     async def _query_live_orders(
         self, path: str, params: Dict[str, Any], received_at_ms: int
     ) -> Tuple[int, Dict[str, Any]]:
         _logger.debug(f"test {inspect.currentframe().f_code.co_name}] "
             f"received_at_ms={received_at_ms}, path={path}, params={params}")
-        return 200, schemas.QueryLiveOrdersResponse.model_config["json_schema_extra"]["example"]  # type: ignore
+        return 200, local_schemas.QueryLiveOrdersResponse.model_config["json_schema_extra"]["example"]  # type: ignore
 
     async def _get_balance(
         self, path: str, params: Dict[str, Any], received_at_ms: int
@@ -261,7 +261,7 @@ class Edex(DexCommon):
         _logger.debug(f"test {inspect.currentframe().f_code.co_name}] "
             f"received_at_ms={received_at_ms}, path={path}, params={params}")
         return 200, schemas.InstrumentDataResponse.model_config["json_schema_extra"]["example"]
-
+    
     async def _get_instrument_definitions(
         self, path: str, params: Dict[str, Any], received_at_ms: int
     ) -> Tuple[int, Dict[str, Any]]:
@@ -297,6 +297,7 @@ class Edex(DexCommon):
             f"received_at_ms={received_at_ms}, path={path}, params={params}")
         return 200, schemas.TradesResponse.model_config["json_schema_extra"]["example"]
 
+
     # Implementations from base class
     async def _approve(
         self, request: Any, gas_price_wei: int, nonce: Optional[int] = None
@@ -322,6 +323,7 @@ class Edex(DexCommon):
         self, request: Any, priority_fee: Any
     ) -> Any:
         raise NotImplementedError("get-gas-price stub")
+
 
     async def _get_all_open_requests(
         self,

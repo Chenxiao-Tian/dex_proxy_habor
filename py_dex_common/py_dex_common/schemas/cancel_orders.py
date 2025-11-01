@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field
 
-from .order_trade import TradeDetail
+from .order_trade import TradeDetail, OrderErrorResponse
 
 
 class CancelOrderParams(BaseModel):
@@ -53,23 +53,29 @@ class CancelOrderSuccess(BaseModel):
     }
 
 
-class CancelOrderErrorResponse(BaseModel):
+class CancelAllOrdersErrorResponse(OrderErrorResponse):
     error_code: str = Field(
         ...,
-        description="Error code indicating why cancellation failed",
-        example="ORDER_NOT_FOUND"
+        description="Error code indicating why cancellation of some orders failed",
+        examples=["ORDER_NOT_FOUND"]
     )
     error_message: str = Field(
         ...,
         description="Human-readable error message",
-        example="order 123 not found"
+        examples=["order 123 not found"]
+    )
+    cancelled: List[int] = Field(
+        ...,
+        description="List of auros_order_id values that were cancelled",
+        examples=[[1, 2, 3]]
     )
 
     model_config = {
         "json_schema_extra": {
             "example": {
                 "error_code": "ORDER_NOT_FOUND",
-                "error_message": "order 123 not found"
+                "error_message": "order 123 not found",
+                "cancelled": [1, 2, 3]
             }
         }
     }
