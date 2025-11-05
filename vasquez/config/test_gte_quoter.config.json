@@ -1,0 +1,62 @@
+{
+  "logging": {
+    "level": "info",
+    "async": false,
+    "overrides": [
+      {
+        "logger_name": "pantheon.app_health",
+        "level": "info"
+      },
+      {
+        "logger_name": "web3.providers.HTTPProvider",
+        "level": "info"
+      },
+      {
+        "logger_name": "web3.providers.AsyncHTTPProvider",
+        "level": "info"
+      },
+      {
+        "logger_name": "web3.RequestManager",
+        "level": "info"
+      },
+      {
+        "logger_name": "aio_pika.exchange",
+        "level": "info"
+      }
+    ]
+  },
+  "RabbitMQ": {
+    "url": "amqp://dev-sng-rmq.kdev"
+  },
+  "market_data": {
+    "md_no_mvf": {
+      "type": "market_data_server_connection",
+      "exchanges": [
+        "bina",
+        "okex"
+      ],
+      "url": "fastlane://prod-tky-market6.kprod:21980"
+    }
+  },
+  "strategy": {
+    "type": "naive_mm",
+    "name": "gte-degen-trader",
+    "portfolio_tag": "MM",
+    "strategy_tag": "MM GTE",
+    "quoters": {
+      "FX-ETH/USD": {
+        "cbs": "ETHUSDT",
+        "quote_ref_price": 1,
+        "base_ref_price": 1,
+        "ref_price": 1,
+        "quote_order_value": 1,
+        "max_balance_threshold": 100,
+        "min_balance_threshold": 100
+      }
+    },
+    "gateway": "gte",
+    "balance_provider": {
+      "account": "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68"
+    }
+  }
+}
