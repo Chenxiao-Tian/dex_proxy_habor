@@ -1,0 +1,16 @@
+{
+    "tokens": [
+        {
+            "token": "USDC",
+            "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "valid_withdrawal_addresses": [
+                "5resAYKS1SV9GBxhXBpCeAUVWNMTWW7c5F7kDSZK5rFg",
+                "3G7baZkGVvyyh9tfn1E78NXEmdeVDjT5N4uSDGpq56Yx",
+                "HGcLNwiV77YhxEL6RLBR6HkwdzN27upWAv6NeWpvMKuC",
+                "47BQHRAZhV9SG94sU1VzqKk4kTSBvtg2E8QuQZokRnzw",
+                "4zmC6SvacVPnEK75Liw8fwejVc8SfqKNVoKs8oFFvCwE"
+            ],
+            "decimals": 6
+        }
+    ]
+}

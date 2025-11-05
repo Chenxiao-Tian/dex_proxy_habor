@@ -1,0 +1,91 @@
+{
+  "logging": {
+    "level": "debug",
+    "overrides": [
+      {
+        "logger_name": "aio_pika",
+        "level": "info"
+      },
+      {
+        "logger_name": "botocore",
+        "level": "info"
+      },
+      {
+        "logger_name": "aiormq.connection",
+        "level": "info"
+      },
+      {
+        "logger_name": "aiormq.channel",
+        "level": "critical"
+      },
+      {
+        "logger_name": "urllib3.connectionpool",
+        "level": "info"
+      },
+      {
+        "logger_name": "web3.RequestManager",
+        "level": "info"
+      },
+      {
+        "logger_name": "web3.providers.HTTPProvider",
+        "level": "info"
+      },
+      {
+        "logger_name": "pantheon.app_health",
+        "level": "info"
+      },
+      {
+        "logger_name": "aio_pika.exchange",
+        "level": "info"
+      },
+      {
+        "logger_name": "aiohttp.access",
+        "level": "warn"
+      },
+      {
+        "logger_name": "websockets",
+        "level": "info"
+      },
+      {
+        "logger_name": "gas_tracker",
+        "level": "warn"
+      }
+    ]
+  },
+  "RabbitMQ": {
+    "url": "amqp://dev-ore-rmq.kdev"
+  },
+  "Redis": {
+    "host": "localhost",
+    "port": 6379
+  },
+  "server": {
+    "port": 1958
+  },
+  "key_store_file_path": "./dexes/uniswap_v3/test/wallet.json",
+  "dex": {
+    "name": "chainBera-kod3",
+    "chain_name": "Berachain Mainnet For Testing",
+    "native_token": "BERA",
+    "resources_file_path": "/../../resources/kod3_bera_contracts_address.json",
+    "ws_subscription_for_mined_txs": false,
+    "connectors": {
+      "kodiak_v3": {
+        "web3": {
+          "http": "http://prod-fra-bera2.kprod:8545"
+        },
+        "websocket": {
+          "base_uri": "ws://prod-fra-bera2.kprod:8546"
+        }
+      }
+    },
+    "max_allowed_gas_price_gwei": 50,
+    "request_cache": {
+      "finalised_requests_cleanup_after_s": 1000,
+      "store_in_redis": false
+    },
+    "transactions_status_poller": {
+      "poll_interval_s": 15
+    }
+  }
+}

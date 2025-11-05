@@ -1,0 +1,96 @@
+{
+    "Arbitrum Mainnet": {
+        "tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0x52c5233d3d12e9d5522759ace8b551d926b797d1",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0xc6B501eF63285F899B3943773EbA1B4731e95D03",
+                    "0x6e1250d16e7d1df8ee756c7f209d9fea9c7c3f6c",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0xFF0CEfDbd6bf757cc0CC361ddfBdE432186Ccaa6",
+                    "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65",
+                    "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5",
+                    "0x159cB15043485DfbFBab866c61F8851671575b1A",
+                    "0x8c19E9AD4D2c3db1a0966b1b91DE325274E233cf",
+                    "0xC4c945CBC846A3cC43C1F2eAc555EE9d86A7fcd3",
+                    "0x023A3D058020fB76cCa98f01b3c48C8938A22355"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+                "valid_withdrawal_addresses": [
+                    "0x52c5233d3d12e9d5522759ace8b551d926b797d1",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0xFF0CEfDbd6bf757cc0CC361ddfBdE432186Ccaa6",
+                    "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974",
+                    "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+                    "0x86B8B24C4e2c15E6Be786b6E1d95012866F27d34",
+                    "0x9d07dd295726ade4680fe5249fd7b9bdc15af480",
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0x159cB15043485DfbFBab866c61F8851671575b1A",
+                    "0x8c19E9AD4D2c3db1a0966b1b91DE325274E233cf",
+                    "0x023A3D058020fB76cCa98f01b3c48C8938A22355"
+                ]
+            },
+            {
+              "symbol": "MNT",
+              "address": "0x3c3a81e81dc49a522a592e7622a7e711c06bf354",
+              "valid_withdrawal_addresses": [
+                "0x07B6c7bC3d7dc0f36133b542eA51aA7Ac560E974"
+              ]
+            }
+        ],
+        "bridge_address": "0x2Df1c51E09aECF9cacB7bc98cB1742757f163dF7"
+    },
+    "Arbitrum Sepolia": {
+        "tokens": [
+            {
+                "symbol": "ETH",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68",
+                    "0x194c851021ABc7f64B51D11b58e251A8370d54dc"
+                ]
+            },
+            {
+                "symbol": "USDC",
+                "address": "0x1870Dc7A474e045026F9ef053d5bB20a250Cc084",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x8cea31ff6878CEe0D91751F8406E165Af147Ec68",
+                    "0x194c851021ABc7f64B51D11b58e251A8370d54dc"
+                ]
+            }
+        ],
+        "bridge_address": "0x279c9462fdba349550b49a23de27dd19d5891baa"
+    },
+    "Hyperliquid": {
+        "tokens": [
+            {
+                "symbol": "PURR",
+                "address": "0xc1fb593aeffbeb02f85e0308e9956a90",
+                "valid_withdrawal_addresses": [
+                    "0xebe163781f141102c6ba2220bb13481b9f4b538c",
+                    "0x8bee7340304a051b16cecee05fb8c999db3b65ed"
+                ]
+            },
+            {
+                "symbol": "HYPE",
+                "address": "0x0d01dc56dcaaca66ad901c959b4011ec",
+                "valid_withdrawal_addresses": [
+                    "0xebe163781f141102c6ba2220bb13481b9f4b538c",
+                    "0x8bee7340304a051b16cecee05fb8c999db3b65ed"
+                ]
+            }
+        ]
+    }
+}

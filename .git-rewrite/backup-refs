@@ -1,0 +1,16 @@
+a2fe43617846970bf36a8a6323b459ce087ad4f7 commit	refs/heads/main
+ecd4f69fb58276460d3940bb0cabeccaef19b8a7 commit	refs/remotes/origin/HEAD
+81399feec1a2e31e225a1c9966e6621a451ca210 commit	refs/remotes/origin/Harbor_kuru_signed
+22b8b01762a17bfac7290bcf065a0e89503857c1 commit	refs/remotes/origin/codex/align-harbor-webserver-endpoints-with-dex-proxy
+ca9794971068d47e1a00b9f678ee5f61e4e4ea4b commit	refs/remotes/origin/codex/integrate-harbor-with-dex-proxy-adapter
+9e6c99d68bba5f4d90e976bb31eabab06573d83c commit	refs/remotes/origin/codex/integrate-harbor-with-dex-proxy-adapter-09c0bo
+97d1e39508d35894b307f86762ee29ae9272c048 commit	refs/remotes/origin/codex/integrate-harbor-with-dex-proxy-adapter-0ndfhs
+16b04db258b0cb62456c19ce06f89ea8ee6a2463 commit	refs/remotes/origin/codex/integrate-harbor-with-dex-proxy-adapter-5968as
+b505e47955831fe85dfc69e39d84a6c06b027187 commit	refs/remotes/origin/codex/integrate-harbor-with-dex-proxy-adapter-dhbsgr
+787f073f78c9dc3d305178635f2a657bfa65a648 commit	refs/remotes/origin/codex/integrate-harbor-with-dex-proxy-adapter-dlxm88
+5e4f2d984a64cfca7aca0ffd74a77ec0624fe2b6 commit	refs/remotes/origin/codex/integrate-harbor-with-dex-proxy-adapter-f71g4e
+941ad0f40bad0c2aaceab711535b679b61f2cb54 commit	refs/remotes/origin/codex/integrate-harbor-with-dex-proxy-adapter-uvhicm
+81399feec1a2e31e225a1c9966e6621a451ca210 commit	refs/remotes/origin/harbor/http-endpoints-2025-11-01
+ecd4f69fb58276460d3940bb0cabeccaef19b8a7 commit	refs/remotes/origin/main
+d711365d95af263d018bd59c8c7ed50fa4713838 tag	refs/tags/harbor-v0.1.0
+7dcf0f1c546b0ce3b39930803a22c6507546f942 tag	refs/tags/harbor_sync_2025-11-01

@@ -1,0 +1,9 @@
+{
+    "client_order_id": "1",
+    "pool_id": "0x538091bde22b3e38aae569ed1fb8621714c8193bc6819ea2e5ebb9ae700a42d2",
+    "quantity": "1",
+    "price": "51",
+    "side": "SELL",
+    "order_type": "GTC",
+    "expiration_ts": "1735145773250"
+}

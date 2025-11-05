@@ -1,0 +1,35 @@
+{
+  "app": {},
+  "logging": {
+    "log_thread_id": true,
+    "default_level": "trace",
+    "overrides": [
+      {
+        "logger_name": "Rmq:",
+        "level": "info"
+      },
+      {
+        "logger_name": "HealthPublisher",
+        "level": "info"
+      }
+    ]
+  },
+  "rabbitmq": {
+    "url": "amqp://dev-sng-rmq.kdev"
+  },
+  "js_app_server": {
+    "node_args": [
+      "--trace-deprecation"
+    ],
+    "applications": {
+      "DEX": {
+        "source_url": "packed/main.js",
+        "runtime_cfg": {
+          "logging": {
+            "level": "debug"
+          }
+        }
+      }
+    }
+  }
+}

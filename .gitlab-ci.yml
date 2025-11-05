@@ -1,0 +1,443 @@
+stages:
+  - build
+  - authorise
+
+
+# Define an enclaved application. Supported keys:
+# `PROCESS_NAME`:    (str) Must match the name of the apps config.json.
+# `ENVIRONMENT`:     (str) Either "prod" or "dev".
+# `USE_ATTESTATION`: (str, default "true") Determines if secret retrieval requires attestation. You should generally
+#                                          not need to define this!
+# `SOURCE_PATH`:     (str) For python implementations only; specifies the source path in the repository containing
+#                          the specific dex venue libraries.
+
+# Python enclaves.
+.python-enclaves: &python-enclaves
+  - PROCESS_NAME: dex_proxy-dexa-main
+    ENVIRONMENT: prod
+    SOURCE_PATH: dexalot
+  - PROCESS_NAME: dex_proxy-dexa-fuji
+    ENVIRONMENT: dev
+    SOURCE_PATH: dexalot
+  - PROCESS_NAME: dex_proxy-uni3-goerli-4
+    ENVIRONMENT: dev
+    SOURCE_PATH: uniswap_v3
+  - PROCESS_NAME: dex_proxy-uni3-goerli-5
+    ENVIRONMENT: dev
+    SOURCE_PATH: uniswap_v3
+  - PROCESS_NAME: dex_proxy-chainEth-uni3-main-1
+    ENVIRONMENT: prod
+    SOURCE_PATH: uniswap_v3_blx
+  - PROCESS_NAME: dex_proxy-eth-uni3-2
+    ENVIRONMENT: prod
+    SOURCE_PATH: uniswap_v3
+  - PROCESS_NAME: dex_proxy-pdex-main
+    ENVIRONMENT: prod
+    SOURCE_PATH: paradex
+  - PROCESS_NAME: dex_proxy-pdex-main-2
+    ENVIRONMENT: prod
+    SOURCE_PATH: paradex
+  - PROCESS_NAME: dex_proxy-pdex-main-3
+    ENVIRONMENT: prod
+    SOURCE_PATH: paradex
+  - PROCESS_NAME: dex_proxy-pdex-main-4
+    ENVIRONMENT: prod
+    SOURCE_PATH: paradex
+  - PROCESS_NAME: dex_proxy-pdex-rpi
+    ENVIRONMENT: prod
+    SOURCE_PATH: paradex
+  - PROCESS_NAME: dex_proxy-pdex-testnet
+    ENVIRONMENT: dev
+    SOURCE_PATH: paradex
+  - PROCESS_NAME: dex_proxy-lyra-testnet
+    ENVIRONMENT: dev
+    SOURCE_PATH: lyra
+  - PROCESS_NAME: dex_proxy-lyra-1
+    ENVIRONMENT: prod
+    SOURCE_PATH: lyra
+  - PROCESS_NAME: dex_proxy-lyra-2
+    ENVIRONMENT: prod
+    SOURCE_PATH: lyra
+  - PROCESS_NAME: dex_proxy-lyra-3
+    ENVIRONMENT: prod
+    SOURCE_PATH: lyra
+  - PROCESS_NAME: dex_proxy-lyra-4
+    ENVIRONMENT: prod
+    SOURCE_PATH: lyra
+  - PROCESS_NAME: dex_proxy-lyra-5
+    ENVIRONMENT: prod
+    SOURCE_PATH: lyra
+  - PROCESS_NAME: dex_proxy-lyra-6
+    ENVIRONMENT: prod
+    SOURCE_PATH: lyra
+  - PROCESS_NAME: dex_proxy-lyra-7
+    ENVIRONMENT: prod
+    SOURCE_PATH: lyra
+  - PROCESS_NAME: dex_proxy-lyra-8
+    ENVIRONMENT: prod
+    SOURCE_PATH: lyra
+  - PROCESS_NAME: dex_proxy-hype-testnet
+    ENVIRONMENT: dev
+    SOURCE_PATH: hype
+  - PROCESS_NAME: dex_proxy-hype-1
+    ENVIRONMENT: prod
+    SOURCE_PATH: hype
+  - PROCESS_NAME: dex_proxy-per-testnet
+    ENVIRONMENT: dev
+    SOURCE_PATH: per
+  #- PROCESS_NAME: dex_proxy-per-sol  # This is running off a special per-sol branch
+  #  ENVIRONMENT:  prod
+  #  SOURCE_PATH: per
+  - PROCESS_NAME: dex_proxy-chainEth-native-test
+    ENVIRONMENT: dev
+    SOURCE_PATH: native
+  - PROCESS_NAME: dex_proxy-chainArb-native-test
+    ENVIRONMENT: dev
+    SOURCE_PATH: native
+  - PROCESS_NAME: dex_proxy-chainEth-native-main
+    ENVIRONMENT: prod
+    SOURCE_PATH: native
+  - PROCESS_NAME: dex_proxy-chainArb-native-main
+    ENVIRONMENT: prod
+    SOURCE_PATH: native
+  - PROCESS_NAME: dex_proxy-uni3-arb-1
+    ENVIRONMENT: prod
+    SOURCE_PATH: uniswap_v3
+  - PROCESS_NAME: dex_proxy-chainBera-kod3-1
+    ENVIRONMENT: prod
+    SOURCE_PATH: uniswap_v3
+  - PROCESS_NAME: dex_proxy-uni4-uni-1
+    ENVIRONMENT: prod
+    SOURCE_PATH: uniswap_v4
+  - PROCESS_NAME: dex_proxy-chainBase-aero-1
+    ENVIRONMENT: prod
+    SOURCE_PATH: uniswap_v3
+  - PROCESS_NAME: dex_proxy-gte-test
+    ENVIRONMENT: dev
+    SOURCE_PATH: gte
+  - PROCESS_NAME: dex_proxy-uni34-arb-1
+    ENVIRONMENT: prod
+    SOURCE_PATH: uniswaps
+
+
+# Typescript enclaves.
+.ts-enclaves: &ts-enclaves
+  - PROCESS_NAME: dex_proxy-dbv3-test-1
+    ENVIRONMENT: dev
+    TS_DEX_PROXY: "true"
+  - PROCESS_NAME: dex_proxy-dbv3-1
+    ENVIRONMENT: prod
+    TS_DEX_PROXY: "true"
+  - PROCESS_NAME: dex_proxy-deep-test-1
+    ENVIRONMENT: dev
+    TS_DEX_PROXY: "true"
+  - PROCESS_NAME: dex_proxy-deep-test-2
+    ENVIRONMENT: dev
+    TS_DEX_PROXY: "true"
+  - PROCESS_NAME: dex_proxy-deep-main
+    ENVIRONMENT: prod
+    TS_DEX_PROXY: "true"
+  - PROCESS_NAME: dex_proxy-deep-main-2
+    ENVIRONMENT: prod
+    TS_DEX_PROXY: "true"
+  - PROCESS_NAME: dex_proxy-deep-3
+    ENVIRONMENT: prod
+    TS_DEX_PROXY: "true"
+
+
+# Bespoke enclaves. These are usually built with software we didn't write ourselves.
+.other-enclaves: &other-enclaves
+  - PROCESS_NAME: flip-lp-main
+    ENVIRONMENT: prod
+    DOCKERFILE: Dockerfile.fliplp
+    VAULT_SECRET_FIELD: signing_key0
+
+
+# Some applications are only containerised, and not enclaved. Supported keys:
+# `CONTAINER_NAME`: (str) Determines name of the image that will be pushed to registry.
+# `DOCKERFILE`:     (str) Relative (to repository root) path to the dockerfile for this container.
+
+# Typescript containers.
+.ts-containers: &ts-containers
+  - CONTAINER_NAME: dex-proxy-deepbook
+    DOCKERFILE: Dockerfile.deepbook
+
+
+variables:
+  ENCLAVE_BUILD_IMAGE: registry.gitlab.com/auros/enclave-builder@sha256:e941a945c81cd911d2f436684f6c9ba08dd5f6a0da8aa7fa05fb43b533623274
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+  # The following must actually be defined in the project CI/CD variables. They are explicitly included here, to
+  # remind you.
+  VAULT_SERVER_URL: https://vault.auros.be
+  VAULT_AUTH_PATH: jwt-gitlab-com
+  # Set to `true` in order to force all pipeline jobs to execute.
+  # You do not need to change it here: you can set it in the UI when you press "New pipeline".
+  FORCE_BUILD: "false"
+
+
+default:
+  image:
+    name: $ENCLAVE_BUILD_IMAGE
+    entrypoint: [ "" ]
+  services:
+    # library/docker:24-dind
+    - name: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker@sha256:962ad28b5cddb82c7cadbf222a71c403bd97ef1814005624bd8a3697cbb58bba
+      alias: docker
+  before_script:
+    - docker login -u $CI_DEPENDENCY_PROXY_USER -p $CI_DEPENDENCY_PROXY_PASSWORD $CI_DEPENDENCY_PROXY_SERVER
+    - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
+  retry: 1
+
+
+# Define lists of files that, when changed, will create a build job for the corresponding apps. These are reused in
+# later parts of the CI configuration.
+.python files to monitor for changes: &python-files-to-monitor-for-changes
+  - .gitlab-ci.yml
+  - Dockerfile
+  - container/**/*
+  - resources/**/*
+  - py_dex_common/**/*
+  - ${SOURCE_PATH}/**/*
+
+
+.ts files to monitor for changes: &ts-files-to-monitor-for-changes
+  - .gitlab-ci.yml
+  - Dockerfile
+  - container/**/*
+  - resources/**/*
+  - Dockerfile.ts
+  - Dockerfile.deepbook
+  - ts/**/*
+
+
+.other files to monitor for changes: &other-files-to-monitor-for-changes
+  - .gitlab-ci.yml
+  - Dockerfile
+  - container/**/*
+  - ${DOCKERFILE}
+
+
+# Boilerplate job rules. We don't necessarily use `extends` for all of these due to how the yaml merge behaviour works.
+.build on all commits:
+  rules:
+    - if: $FORCE_BUILD == "true"
+    - if: $CI_COMMIT_BRANCH
+
+
+.build on merge requests:
+  rules:
+    - if: $FORCE_BUILD == "true"
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+
+
+.build on changes (python):
+  rules:
+    - if: $FORCE_BUILD == "true"
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        paths: *python-files-to-monitor-for-changes
+
+
+.build on changes (ts):
+  rules:
+    - if: $FORCE_BUILD == "true"
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        paths: *ts-files-to-monitor-for-changes
+
+
+.build on changes (other):
+  rules:
+    - if: $FORCE_BUILD == "true"
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        paths: *other-files-to-monitor-for-changes
+
+
+# This is a template job. We instantiate it later for the different types of dex-proxies,
+# such as ts, python and "other".
+.build enclaves:
+  stage: build
+  script:
+    - export CONTAINER_NAME=${PROCESS_NAME}
+    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-${ENVIRONMENT}.git
+    - echo ${SSH_PRIVATE_KEY_BASE64} | base64 -d -w 0 > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - git clone --depth 1 ${CONFIG_REPO_URI} _config
+    - "[[ \"${VAULT_APPROLE_ID}\" ]] || { echo \"VAULT_APPROLE_ID is not defined\"; exit 1; }"
+    - "[[ \"${VAULT_SECRET_ID}\" ]] || { echo \"VAULT_SECRET_ID is not defined\"; exit 1; }"
+    - "[[ \"${VAULT_WALLET_NAME}\" ]] || { echo \"VAULT_WALLET_NAME is not defined\"; exit 1; }"
+    - "[[ \"${VAULT_SECRET_FIELD}\" ]] && { export ADDITIONAL_BUILD_ARGS=\"${ADDITIONAL_BUILD_ARGS} --build-arg VAULT_SECRET_FIELD=${VAULT_SECRET_FIELD}\"; }"
+    - "[[ \"${SOURCE_PATH}\" ]] && { export ADDITIONAL_BUILD_ARGS=\"${ADDITIONAL_BUILD_ARGS} --build-arg SOURCE_PATH=${SOURCE_PATH}\"; }"
+    - "[[ \"${KMS_KEY_ID}\" ]] || { echo \"KMS_KEY_ID is not defined\"; exit 1; }"
+    - "[[ \"${TS_DEX_PROXY}\" ]] && { export DOCKERFILE=Dockerfile.ts; }"
+    - "[[ -f _config/${PROCESS_NAME}.json ]] || { echo \"No config found for ${PROCESS_NAME}\"; exit 1; }"
+    - export CONTEXT_ID=$(jq -r '.enclave.cid | select(. != null)' _config/${PROCESS_NAME}.json)
+    - "[[ \"${CONTEXT_ID}\" ]] || { echo \"Cannot read .enclave.cid from config.json\"; exit 1; }"
+    - rm -rf _config
+    # Save the Gitlab job JWT token to file.
+    - echo -En ${VAULT_ID_TOKEN} > jwt.json
+    - /opt/auros/ImageBuilder.sh --enclave --sign
+    - cp measurements.json measurements-${PROCESS_NAME}.json
+    - cp signature.crt signature-${PROCESS_NAME}.crt
+  variables:
+    VAULT_AUTH_ROLE: gitlab-com-${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}-${PROCESS_NAME}-pipeline-enclave-build
+    GIT_DEPTH: 0
+  id_tokens:
+    VAULT_ID_TOKEN:
+      aud: https://vault.auros.be
+  secrets:
+    VAULT_APPROLE_ID:
+      vault: secure-builds/gitlab-com/${CI_PROJECT_PATH}/${PROCESS_NAME}-approle-id/value@kv
+      token: ${VAULT_ID_TOKEN}
+      file: false
+    VAULT_SECRET_ID:
+      vault: secure-builds/gitlab-com/${CI_PROJECT_PATH}/${PROCESS_NAME}-secret-id/value@kv
+      token: ${VAULT_ID_TOKEN}
+      file: false
+    VAULT_WALLET_NAME:
+      vault: secure-builds/gitlab-com/${CI_PROJECT_PATH}/${PROCESS_NAME}-wallet-name/value@kv
+      token: ${VAULT_ID_TOKEN}
+      file: false
+    KMS_KEY_ID:
+      vault: secure-builds/gitlab-com/${CI_PROJECT_PATH}/${PROCESS_NAME}-kms-key-id/value@kv
+      token: ${VAULT_ID_TOKEN}
+      file: false
+  artifacts:
+    expire_in: "1 yrs"
+    paths:
+      # PCR measurements; image PCRs must match the content of this file.
+      - measurements-${PROCESS_NAME}.json
+      # Image signing certificate. Key is discarded so it can never be reused.
+      - signature-${PROCESS_NAME}.crt
+
+
+build enclaves (python):
+  extends:
+    - .build enclaves
+    - .build on changes (python)
+  parallel:
+    matrix: *python-enclaves
+
+
+build enclaves (ts):
+  extends:
+    - .build enclaves
+    - .build on changes (ts)
+  parallel:
+    matrix: *ts-enclaves
+
+
+build enclaves (other):
+  extends:
+    - .build enclaves
+    - .build on changes (other)
+  parallel:
+    matrix: *other-enclaves
+
+
+# Some auxiliary applications in this repo need to be containerised, but not with an enclave userland.
+.build containers:
+  stage: build
+  script:
+    - /opt/auros/ImageBuilder.sh
+
+
+build containers (ts):
+  extends:
+    - .build containers
+    - .build on changes (ts)
+  parallel:
+    matrix: *ts-containers
+
+
+.authorise enclaves:
+  stage: authorise
+  environment:
+    name: ${ENVIRONMENT}
+  script:
+    - "[[ \"${USE_ATTESTATION}\" =~ [Ff]alse ]] && { echo \"Attestation is not enabled for this build\"; exit 0; }"
+    - "[[ \"${ENVIRONMENT}\" == \"prod\" && \"${CI_COMMIT_REF_PROTECTED}\" == \"false\" ]] && { echo \"This job is running for a production enclave in an unprotected branch; Vault will refuse your authorisation request. How did you even get here?\"; exit 1; }"
+    - export CONFIG_REPO_URI=git@bitbucket.org:kenetic/config-${ENVIRONMENT}.git
+    - echo ${SSH_PRIVATE_KEY_BASE64} | base64 -d -w 0 > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - git clone --depth 1 ${CONFIG_REPO_URI} _config
+    - HOST_AFFINITY=$(jq -r '.app.host_affinity' _config/${PROCESS_NAME}.json)
+    - "[[ \"${HOST_AFFINITY}\" == \"null\" ]] && { echo \"Cannot determine host affinity for authorisation; check that 'app.host_affinity' is set in config.json\"; exit 1; }"
+    # Save the Gitlab job JWT token to file.
+    - echo -En ${VAULT_ID_TOKEN} > jwt.json
+    - enclave-authz --auth-mount ${VAULT_AUTH_PATH} -a legacy --jwt jwt.json -i ${HOST_AFFINITY} --pcr0 $(jq -r '.Measurements.PCR0' measurements-${PROCESS_NAME}.json) --pcr8 $(jq -r '.Measurements.PCR8' measurements-${PROCESS_NAME}.json) ${PROCESS_NAME}
+  id_tokens:
+    VAULT_ID_TOKEN:
+      aud: https://vault.auros.be
+  variables:
+    # infra/terraform/environment/operational/sng/k8s
+    # auth/jwt-gitlab-com/role
+    VAULT_AUTH_ROLE: gitlab-com-${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}-${PROCESS_NAME}-pipeline-enclave-authz
+
+
+authorise enclaves (python):
+  extends:
+    - .authorise enclaves
+  rules:
+    - if: $FORCE_BUILD == "true"
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      when: never
+    - if: $ENVIRONMENT == "dev" || ($ENVIRONMENT == "prod" && $CI_COMMIT_REF_PROTECTED == "true")
+      changes:
+        paths: *python-files-to-monitor-for-changes
+      when: manual
+  parallel:
+    matrix: *python-enclaves
+  needs:
+    - job: build enclaves (python)
+      artifacts: true
+      optional: true
+      parallel:
+        matrix: *python-enclaves
+
+
+authorise enclaves (ts):
+  extends:
+    - .authorise enclaves
+  rules:
+    - if: $FORCE_BUILD == "true"
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      when: never
+    - if: $ENVIRONMENT == "dev" || ($ENVIRONMENT == "prod" && $CI_COMMIT_REF_PROTECTED == "true")
+      changes:
+        paths: *ts-files-to-monitor-for-changes
+      when: manual
+  parallel:
+    matrix: *ts-enclaves
+  needs:
+    - job: build enclaves (ts)
+      artifacts: true
+      optional: true
+      parallel:
+        matrix: *ts-enclaves
+
+
+authorise enclaves (other):
+  extends:
+    - .authorise enclaves
+  rules:
+    - if: $FORCE_BUILD == "true"
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      when: never
+    - if: $ENVIRONMENT == "dev" || ($ENVIRONMENT == "prod" && $CI_COMMIT_REF_PROTECTED == "true")
+      when: manual
+      changes:
+        paths: *other-files-to-monitor-for-changes
+  parallel:
+    matrix: *other-enclaves
+  needs:
+    - job: build enclaves (other)
+      artifacts: true
+      optional: true
+      parallel:
+        matrix: *other-enclaves

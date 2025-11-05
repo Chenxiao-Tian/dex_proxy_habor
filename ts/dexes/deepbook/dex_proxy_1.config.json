@@ -1,0 +1,61 @@
+{
+  "logging": {
+    "level": "debug"
+  },
+  "key_store_file_path": "./dexes/deepbook/test/wallet_1.txt",
+  "server": {
+    "port": 3001
+  },
+  "dex": {
+    "name": "deepbook",
+    "log_responses": true,
+    "chain_name": "Sui Mainnet for Test",
+    "wallet_address": "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c",
+    "exchange_connectors": {
+      "rest": {
+        "url": "https://sui-mainnet.g.allthatnode.com/full/json_rpc",
+        "comment_1": "The following header section is only required by ATN. Comment it out if using a different RPC service",
+        "headers": {
+          "x-allthatnode-api-key": "8c39945f254f431e9d0911db789dbe78"
+        }
+     },
+      "ws": {
+        "url": "wss://sui-mainnet-rpc.allthatnode.com/jUaHO5Ln9iumZgs24kEbKPvxT2buRqLp",
+        "rpc_call_timeout_s": 30,
+        "reconnect_timeout_s": 3,
+        "max_reconnects": 5
+      }
+    },
+    "_account_cap_ids": {
+      "_tag": "testnet",
+      "main": "0x27db71ddf34661fe5c49901d737b4ecc7482e1b9cd4541a5512d9f1a9401d07a",
+      "children": [
+        "0x2605db4d2e7028c8679fcc006fe2c247f51006f900c3881103303475343adff2",
+        "0x1087331ff37a00ec630f24eb8612f8c701cecda9298f7686bd8ca95212f5a5c7",
+        "0x0cc98ca37176afff5c8265f988382132828ef9dc13f9545047047b168a8f9ca7",
+        "0x7bb93fe4894260d11ad8dd8549d8b0a39d1fe2d8315d2d542d378284a04aff18"
+      ]
+    },
+    "account_cap_ids": {
+      "_tag": "mainnet",
+      "main": "0xf092bffceae36c2be27fb2c96c1f5f5c250896002e894ddeeeddbd51e76a6150",
+      "children": [
+        "0xb47ed28f16c9ee1c905e39d2853079366c427ca0fc299097bde8facfe973f587",
+        "0x6af60569ff7661e94cfa1e752b758fd76ea6f9898329884207c9ab55e1f5d741",
+        "0x1ddc145ede758cea8a83d826bea21f39a4cd0811e905e5f214d1f51c8a4e2145",
+        "0x44a67686dca88e0f97ba697bff7b827cb227b593d0362033c9d917590ce57f7d",
+        "0x4561b232553bc40c1e3e08c8e6f666f5ef00fb4ac79337d91b1fb6f67f9c6964",
+        "0xec89aba3dfe692dd3db64c8c514a3fb6b8b41a08a1fe92699318da85d72a9ae2"
+      ]
+    },
+    "gas_manager": {
+      "balance_per_instance_mist": "2,000,000,000",
+      "min_balance_per_instance_mist": "1,000,000,000",
+      "gas_budget_mist": "100,000,000",
+      "sync_interval_s": 30
+    },
+    "order_cache": {
+      "purge_interval_s": 600
+    }
+  }
+}

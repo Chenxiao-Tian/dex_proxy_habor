@@ -1,0 +1,143 @@
+{
+    "Arbitrum Mainnet": {
+        "subaccounts": {},
+        "tokens": [
+            {
+                "name": "USDC",
+                "__coin_address_reference": " https://stargateprotocol.gitbook.io/stargate/v2-developer-docs/technical-reference/v2-supported-networks-and-assets",
+                "address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+                "bridges": {
+                    "__bridge_address_reference": " https://stargateprotocol.gitbook.io/stargate/v2-developer-docs/technical-reference/mainnet-contracts",
+                    "bridge_address":  "0xe8CDF27AcD73a434D661C84887215F7598e7d0d3",
+                    "__chain_eids_reference": "https://docs.layerzero.network/v2/deployments/deployed-contracts",
+                    "destination_chains": [
+                        {
+                            "__comment": "Sonic Mainnet EID",
+                            "eid": 30332
+                        }
+                    ]
+                },
+                "valid_withdrawal_addresses": [
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD"
+                ]
+            },
+            {
+                "name": "ETH",
+                "is_native_token": true,
+                "valid_withdrawal_addresses": [
+                    "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+                    "0xe71cab44917bf40b072b47138a76006558cb29c6",
+                    "0x5f8215ee653cb7225c741c7aa8591468d1f158b8",
+                    "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD"
+                ]
+            }
+        ],
+        "bridge_eid_by_network_name": {
+            "SONIC": 30332,
+            "ARBITRUM": 30110
+        }
+    },
+    "Sonic Mainnet": {
+        "subaccounts": {
+            "vertex_1s1_sonic": "0x1c574bf92ae7c274efcf5395c9eee275c0c2b1d1000000000000000000000001"
+        },
+        "tokens": [
+            {
+                "name": "USDC.e",
+                "address": "0x29219dd400f2Bf60E5a23d13Be72B486D4038894",
+                "bridges": {
+                    "bridge_address":  "0xA272fFe20cFfe769CdFc4b63088DCD2C82a2D8F9",
+                    "destination_chains": [
+                        {
+                            "__comment": "Arbitrum Mainnet EID",
+                            "eid": 30110
+                        }
+                    ]
+                },
+                "valid_withdrawal_addresses": []
+            },
+            {
+                "name": "S",
+                "is_native_token": true,
+                "valid_withdrawal_addresses": []
+            }
+        ],
+        "bridge_eid_by_network_name": {
+            "SONIC": 30332,
+            "ARBITRUM": 30110
+        }
+    },
+    "Arbitrum Sepolia Testnet": {
+        "subaccounts": {
+            "vertex_1s1": "0x03cde1e0bc6c1e096505253b310cf454b0b462fb64656661756c745f31000000"
+        },
+        "tokens": [
+            {
+                "name": "USDC",
+                "__vertx_mock_address": "0xD32ea1C76ef1c296F131DD4C5B2A0aac3b22485a",
+                "__comment": "stargate mock address https://stargateprotocol.gitbook.io/stargate/developers/contract-addresses/testnet#arbitrum-sepolia-testnet",
+                "address": "0x3253a335e7bffb4790aa4c25c4250d206e9b9773",
+                "bridges": {
+                    "bridge_address":  "0x543BdA7c6cA4384FE90B1F5929bb851F52888983",
+                    "destination_chains": [
+                        {
+                            "__comment": "Optimism Sepolia EID",
+                            "eid": 40232
+                        }
+                    ]
+                },
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            },
+            {
+                "name": "ETH",
+                "is_native_token": true,
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            }
+        ],
+        "bridge_eid_by_network_name": {
+            "SONIC": 40349,
+            "ARBITRUM": 40231,
+            "OPTIMISM": 40232
+        }
+    },
+    "Sonic Blaze Testnet": {
+        "subaccounts": {
+            "vertex_1s2": "0x03cde1e0bc6c1e096505253b310cf454b0b462fb64656661756c740000000000",
+            "vertex_1s3": "0x03cde1e0bc6c1e096505253b310cf454b0b462fb64656661756c745f31000000"
+        },
+        "tokens": [
+            {
+                "name": "USDC.e",
+                "__comment_1": "Vertex mock USDC.e address",
+                "__comment_2": "Stargate bridge does not support USDC on Sonic blaze",
+                "address": "0xbC47901f4d2C5fc871ae0037Ea05c3F614690781",
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            },
+            {
+                "name": "S",
+                "is_native_token": true,
+                "valid_withdrawal_addresses": [
+                    "0x03CdE1E0bc6C1e096505253b310Cf454b0b462FB",
+                    "0x95a1190b12f553A9c04cB36b76E3d0150E72770d"
+                ]
+            }
+        ],
+        "bridge_eid_by_network_name": {
+            "SONIC": 40349,
+            "ARBITRUM": 40231,
+            "OPTIMISM": 40232
+        }
+     }
+}

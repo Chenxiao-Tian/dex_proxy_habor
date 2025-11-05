@@ -1,0 +1,154 @@
+{
+  "logging": {
+    "level": "debug",
+    "overrides": [
+      {
+          "logger_name": "aio_pika",
+          "level": "info"
+      },
+      {
+          "logger_name": "botocore",
+          "level": "info"
+      },
+      {
+          "logger_name": "aiormq.connection",
+          "level": "info"
+      },
+      {
+          "logger_name": "aiormq.channel",
+          "level": "critical"
+      },
+      {
+          "logger_name": "urllib3.connectionpool",
+          "level": "info"
+      },
+      {
+          "logger_name": "web3.RequestManager",
+          "level": "info"
+      },
+      {
+          "logger_name": "web3.providers.HTTPProvider",
+          "level": "info"
+      },
+      {
+          "logger_name": "pantheon.app_health",
+          "level": "info"
+      },
+      {
+          "logger_name": "aio_pika.exchange",
+          "level": "info"
+      },
+      {
+          "logger_name": "aiohttp.access",
+          "level": "warn"
+      },
+      {
+          "logger_name": "websockets",
+          "level": "info"
+      },
+      {
+          "logger_name": "gas_tracker",
+          "level": "warn"
+      },
+      {
+        "logger_name": "HTTP",
+        "level": "warn"
+      },
+      {
+        "logger_name": "httpcore.http11",
+        "level": "warn"
+      },
+      {
+        "logger_name": "httpcore.connection",
+        "level": "warn"
+      },
+      {
+        "logger_name": "httpx",
+        "level": "warn"
+      }
+    ]
+  },
+  "Redis": {
+    "host": "dev-sng-red0.kdev",
+    "port": 6379
+  },
+  "RabbitMQ": {
+    "url": "amqp://dev-ore-rmq.kdev"
+  },
+  "server": {
+    "port": 1958
+  },
+  "solana_secret_file_path": "./secret.txt",
+  "dex": {
+    "name": "drft",
+    "mode": "READWRITE",
+    "url": "https://kora-8cwrc2-fast-mainnet.helius-rpc.com",
+    "env": "mainnet",
+    "account": "drift_test_0",
+    "markets_refresh_interval_s": 900,
+    "order_cache": {
+      "finalised_requests_cleanup_after_s": 600,
+      "finalised_requests_cleanup_poll_interval_s": 30
+    },
+    "request_cache": {
+      "finalised_requests_cleanup_after_s": 600,
+      "store_in_redis": false
+    },
+    "clients_pool": {
+      "public_key": "5BGjbSVSt8RmBWNNt9FQqg5sCB6LWsQPuEaMsgdnHBSs",
+      "subaccounts": {
+        "drift_test_0": {
+          "sub_account_id": 0,
+          "public_key": "BBygdQqM29eTKNhkXKV1fonFzT6gmnEEkCMqaiCNJu6w"
+        },
+        "drift_1s2_unified": {
+          "sub_account_id": 1,
+          "public_key": "EfYuXyK9EZU33knSt7iK8vxQeau8aV8EhWqi5bUbguz8"
+        },
+        "drift_1s3_unified": {
+          "sub_account_id": 2,
+          "public_key": "DzF9wLrcGdbjJDF3XRiMg1EC6smf1wn8QWJMiCJZTZpS"
+        }
+      },
+      "skip_solana_preflight_checks": false,
+      "blockhash_refresh_interval_secs": 1,
+      "compute_unit_limit": 600000,
+      "compute_unit_price": 0,
+      "urls": {
+        "helius": "https://kora-8cwrc2-fast-mainnet.helius-rpc.com"
+      },
+      "refresh_leading_client_interval_s": 10
+    },
+    "event_subscribers": {
+      "enabled": true,
+      "type": "polling",
+      "urls": {
+        "helius": "https://kora-8cwrc2-fast-mainnet.helius-rpc.com"
+      },
+      "_type": "websocket",
+      "_urls": {
+        "helius": "wss://kora-8cwrc2-fast-mainnet.helius-rpc.com"
+      }
+    },
+    "rest_order_poller": {
+      "url": "https://data.api.drift.trade/user/",
+      "request_timeout_s": 5,
+      "start_polling_after_insert_s": 30,
+      "refetch_order_action_records_after_s": 30,
+      "order_records_poll_interval_ms": 5000,
+      "order_action_records_poll_interval_ms": 5000,
+      "mark_insert_failed_only_after_s": 180,
+      "finalising_rejected_inserts_poll_interval_ms": 5000
+    },
+    "makers": {
+      "url": "https://dlob.drift.trade/l3",
+      "request_timeout_s": 5,
+      "max_number_of_makers": 1
+    },
+    "api": {
+      "base_url": "https://18j4mizwxe.execute-api.eu-west-1.amazonaws.com/live/",
+      "api_key": "hkugmRbuKV6fa6TO4jErl9LmYdLwOBJSyv3HgtO7",
+      "timeout_s": 10
+    }
+  }
+}

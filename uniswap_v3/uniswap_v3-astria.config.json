@@ -1,0 +1,91 @@
+{
+  "logging": {
+    "level": "debug",
+    "overrides": [
+      {
+        "logger_name": "aio_pika",
+        "level": "info"
+      },
+      {
+        "logger_name": "botocore",
+        "level": "info"
+      },
+      {
+        "logger_name": "aiormq.connection",
+        "level": "info"
+      },
+      {
+        "logger_name": "aiormq.channel",
+        "level": "critical"
+      },
+      {
+        "logger_name": "urllib3.connectionpool",
+        "level": "info"
+      },
+      {
+        "logger_name": "web3.RequestManager",
+        "level": "info"
+      },
+      {
+        "logger_name": "web3.providers.HTTPProvider",
+        "level": "info"
+      },
+      {
+        "logger_name": "pantheon.app_health",
+        "level": "info"
+      },
+      {
+        "logger_name": "aio_pika.exchange",
+        "level": "info"
+      },
+      {
+        "logger_name": "aiohttp.access",
+        "level": "warn"
+      },
+      {
+        "logger_name": "websockets",
+        "level": "info"
+      },
+      {
+        "logger_name": "gas_tracker",
+        "level": "warn"
+      }
+    ]
+  },
+  "RabbitMQ": {
+    "url": "amqp://dev-ore-rmq.kdev"
+  },
+  "Redis": {
+    "host": "localhost",
+    "port": 6379
+  },
+  "server": {
+    "port": 1958
+  },
+  "key_store_file_path": "./dexes/uniswap_v3/test/wallet.json",
+  "dex": {
+    "name": "chainFlame-uni3",
+    "chain_name": "Astria Mainnet For Testing",
+    "native_token": "TIA",
+    "resources_file_path": "/../../resources/uni3_astria_contracts_address.json",
+    "ws_subscription_for_mined_txs": false,
+    "connectors": {
+      "uniswap_v3_astria": {
+        "web3": {
+          "http": "https://rpc.flame.astria.org"
+        },
+        "websocket": {
+          "base_uri": "wss://ws.flame.astria.org"
+        }
+      }
+    },
+    "max_allowed_gas_price_gwei": 1000000000000,
+    "request_cache": {
+      "finalised_requests_cleanup_after_s": 1000,
+      "store_in_redis": false
+    },
+    "transactions_status_poller": {
+      "poll_interval_s": 1
+    }
+  }
+}

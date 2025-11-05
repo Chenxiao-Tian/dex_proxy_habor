@@ -1,0 +1,27 @@
+{
+    "pool_id": "0x538091bde22b3e38aae569ed1fb8621714c8193bc6819ea2e5ebb9ae700a42d2",
+    "expiration_ts": "1735145773250",
+    "orders": [
+        {
+            "client_order_id": "1",
+            "quantity": "0.001",
+            "price": "51",
+            "side": "BUY",
+            "order_type": "GTC"
+        },
+        {
+            "client_order_id": "2",
+            "quantity": "0.005",
+            "price": "51",
+            "side": "BUY",
+            "order_type": "GTC"
+        },
+        {
+            "client_order_id": "3",
+            "quantity": "0.009",
+            "price": "51.333",
+            "side": "BUY",
+            "order_type": "GTC"
+        }
+    ]
+}

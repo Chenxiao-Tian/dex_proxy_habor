@@ -1,0 +1,61 @@
+{
+  "logging": {
+    "level": "debug"
+  },
+  "key_store_file_path": "./dexes/deepbook_v3/wallets/wallet.txt",
+  "server": {
+    "port": 3000
+  },
+  "dex": {
+    "name": "deepbook_v3",
+    "log_responses": true,
+    "chain_name": "Sui Mainnet for Test",
+    "env": "mainnet",
+    "subscribe_to_events": false,
+    "wallet_address": "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c",
+    "trading_balance_manager": "0x1fe5a96fb4510de480663b1f9a14307d4e584e309d560c1dd36dcdf9556ab84c",
+    "supported_balance_managers": [
+      "0x1fe5a96fb4510de480663b1f9a14307d4e584e309d560c1dd36dcdf9556ab84c",
+      "0x960e649b943f43294ab6573f661a92b995cb86d646e47aa9f87ec5def1a68704"
+    ],
+    "withdraw_settled_amounts_interval_s": 300,
+    "track_leading_client_poll_interval_s": 10,
+    "allow_next_withdrawal_after_s": 30,
+    "exchange_connectors": {
+      "rest": [
+        {
+          "name": "ATN",
+          "url": "https://sui-mainnet.g.allthatnode.com/full/json_rpc",
+          "comment_1": "The following header section is only required by ATN. Comment it out if using a different RPC service",
+          "headers": {
+            "x-allthatnode-api-key": "8c39945f254f431e9d0911db789dbe78"
+          }
+        },
+        {
+          "name": "public_fullnode",
+          "url": "https://fullnode.mainnet.sui.io:443"
+        },
+        {
+          "name": "mysten_labs",
+          "url": "https://mysten-rpc.mainnet.sui.io:443"
+        }
+      ],
+      "ws": {
+        "url": "wss://sui-mainnet-rpc.allthatnode.com/jUaHO5Ln9iumZgs24kEbKPvxT2buRqLp",
+        "rpc_call_timeout_s": 30,
+        "reconnect_timeout_s": 3,
+        "max_reconnects": 5
+      }
+    },
+    "gas_manager": {
+      "max_balance_per_instance_mist": "1,000,000,000",
+      "min_balance_per_instance_mist": "100,000,000",
+      "gas_budget_mist": "100,000,000",
+      "sync_interval_s": 30,
+      "gas_coin_expected_count": 2
+    },
+    "order_cache": {
+      "purge_interval_s": 600
+    }
+  }
+}

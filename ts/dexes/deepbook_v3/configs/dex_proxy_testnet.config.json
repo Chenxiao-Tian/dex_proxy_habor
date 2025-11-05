@@ -1,0 +1,53 @@
+{
+  "logging": {
+    "level": "debug"
+  },
+  "key_store_file_path": "./dexes/deepbook_v3/wallets/wallet.txt",
+  "server": {
+    "port": 3000
+  },
+  "dex": {
+    "name": "deepbook_v3",
+    "log_responses": true,
+    "chain_name": "Sui Testnet",
+    "env": "testnet",
+    "subscribe_to_events": false,
+    "wallet_address": "0x6bb57d9fe982786dda345723fca19f772cae2d9b76ee22cd47337e7b1ec2718c",
+    "trading_balance_manager": "0xff40dfdaa475ffa9d86d5e74d321f1f275a079b4e70891ad51bc88fdddfde775",
+    "supported_balance_managers": [
+      "0xff40dfdaa475ffa9d86d5e74d321f1f275a079b4e70891ad51bc88fdddfde775",
+      "0xbf4c69e04de3a8d48393d3717e6287b73b575f54726fdf1709b4a5927bd96672"
+    ],
+    "withdraw_settled_amounts_interval_s": 60,
+    "track_leading_client_poll_interval_s": 10,
+    "allow_next_withdrawal_after_s": 30,
+    "exchange_connectors": {
+      "rest": [
+        {
+          "name": "public_fullnode",
+          "url": "https://fullnode.testnet.sui.io:443"
+        },
+        {
+          "name": "mysten_labs",
+          "url": "https://mysten-rpc.testnet.sui.io:443"
+        }
+      ],
+      "ws": {
+        "url": "wss://rpc.ankr.com/sui/ws/5bcaecaab6d6d910804b8eac4b9654fa66334afe065c137abe6b5f1da35448cc",
+        "rpc_call_timeout_s": 30,
+        "reconnect_timeout_s": 3,
+        "max_reconnects": 5
+      }
+    },
+    "gas_manager": {
+      "max_balance_per_instance_mist": "2,000,000,000",
+      "min_balance_per_instance_mist": "1,000,000,000",
+      "gas_budget_mist": "100,000,000",
+      "sync_interval_s": 30,
+      "gas_coin_expected_count": 6
+    },
+    "order_cache": {
+      "purge_interval_s": 600
+    }
+  }
+}

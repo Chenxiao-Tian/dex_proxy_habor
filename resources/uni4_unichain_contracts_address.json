@@ -1,0 +1,51 @@
+{
+  "Unichain": {
+    "tokens": [
+      {
+        "symbol": "ETH",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5",
+          "0x52c5233d3d12e9d5522759ace8b551d926b797d1",
+          "0x9E6C41845C54afa7f80Ef974A92E8E18773c7D83"
+        ]
+      },
+      {
+        "symbol": "USDC",
+        "address": "0x078d782b760474a361dda0af3839290b0ef57ad6",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5",
+          "0x983bAe285269A9057Ebeb468d8fD8751cBd4D751"
+        ]
+      },
+      {
+        "symbol": "USDT0",
+        "address": "0x9151434b16b9763660705744891fa906f660ecc5",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5",
+          "0x52c5233d3d12e9d5522759ace8b551d926b797d1"
+        ]
+      },
+      {
+        "symbol": "UNI",
+        "address": "0x8f187aa05619a017077f5308904739877ce9ea21",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+        ]
+      },
+      {
+        "symbol": "WBTC",
+        "address": "0x927b51f251480a681271180da4de28d44ec4afb8",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+        ]
+      }
+    ],
+    "chain_id": 130,
+    "pool_manager_address": "0x1F98400000000000000000000000000000000004",
+    "__pool_manager_comment": "Uniswap V4 use centralized pool manager for swapping, no more individual pool address",
+    "universal_router_address": "0xEf740bf23aCaE26f6492B10de645D6B98dC8Eaf3",
+    "__universal_router_comment": "V4 only supports universal router, no specific router like V3",
+    "permit2_address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+    "__permit2_comment": "universal router requires permit2 for token allowance"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "Berachain": {
+    "tokens": [
+      {
+        "symbol": "BERA",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5",
+          "0x27bffb0f09c18539f9a47a39958bb149fe42a155",
+          "0xe71cab44917bf40b072b47138a76006558cb29c6",
+          "0xcfb7E94D71aB3C65479dacD9d8f2159184Ca17ED",
+          "0x8BEe7340304a051B16ceCee05fB8c999Db3b65eD",
+          "0x8363BAC15405D82966aebC3E5e65E0D5bE5aC531",
+          "0x52c5233d3d12e9d5522759ace8b551d926b797d1",
+          "0x9672ddb0502cbea47da7edfcd5212063fb3de0a5",
+          "0xadd3c21a8bf315fa17caa8f5d9c18a8e899d277a"
+        ]
+      },
+      {
+        "symbol": "WBTC",
+        "address": "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+        ]
+      },
+      {
+        "symbol": "WETH",
+        "address": "0x2F6F07CDcf3588944Bf4C42aC74ff24bF56e7590",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+        ]
+      },
+      {
+        "symbol": "WBERA",
+        "address": "0x6969696969696969696969696969696969696969",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+        ]
+      },
+      {
+        "symbol": "USDC",
+        "address": "0x549943e04f40284185054145c6E4e9568C1D3241",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+        ]
+      },
+      {
+        "symbol": "HONEY",
+        "address": "0xFCBD14DC51f0A4d49d5E53C2E0950e0bC26d0Dce",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+        ]
+      }
+    ],
+    "uniswap_router_address": "0xe301E48F77963D3F7DbD2a4796962Bd7f3867Fb4"
+  }
+}

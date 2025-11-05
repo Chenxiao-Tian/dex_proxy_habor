@@ -1,0 +1,45 @@
+{
+  "logging": {
+    "level": "debug"
+  },
+  "key_store_file_path": "./test/wallet_2.txt",
+  "server": {
+    "port": 3002
+  },
+  "dex": {
+    "log_responses": true,
+    "chain_name": "Sui Mainnet for Test",
+    "wallet_address": "0xefaf8e50dcca14d62edd8f2497a2bb07ae33fdefd795db0b0d70a3e9c4cbc3c0",
+    "exchange_connectors": {
+      "rest": {
+        "url": "https://sui-mainnet.g.allthatnode.com/full/json_rpc",
+        "comment_1": "The following header section is only required by ATN. Comment it out if using a different RPC service",
+        "headers": {
+          "x-allthatnode-api-key": "8c39945f254f431e9d0911db789dbe78"
+        }
+     },
+      "ws": {
+        "url": "wss://sui-mainnet-rpc.allthatnode.com/jUaHO5Ln9iumZgs24kEbKPvxT2buRqLp",
+        "rpc_call_timeout_s": 30,
+        "reconnect_timeout_s": 3,
+        "max_reconnects": 5
+      }
+    },
+    "account_cap_ids": {
+      "_tag": "mainnet",
+      "main": "0x27b7899981b4d6a4a7ff0b8c6eaecfbd8190147990739952d1c7cfb1ace53e3e",
+      "children": [
+        "0xe0d1089aa8eb01ed13969a84c80460b8b202b8c4ad58303df37fcd9ac1d85565"
+      ]
+    },
+    "gas_manager": {
+      "balance_per_instance_mist": "2,000,000,000",
+      "min_balance_per_instance_mist": "1,000,000,000",
+      "gas_budget_mist": "100,000,000",
+      "sync_interval_s": 30
+    },
+    "order_cache": {
+      "purge_interval_s": 600
+    }
+  }
+}

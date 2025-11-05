@@ -1,0 +1,51 @@
+{
+  "Astria Mainnet": {
+    "tokens": [
+      {
+        "symbol": "TIA",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+        ]
+      },
+      {
+        "symbol": "USDC",
+        "address": "0x3f65144F387f6545bF4B19a1B39C94231E1c849F",
+        "valid_withdrawal_addresses": [
+          "0xBEbC1b7e8CB5c3eB0CF60C910ed6724739806AB5"
+        ]
+      }
+    ],
+    "_comment_0": "https://docs.astria.org/flame/flame-mainnet-alpha#uniswap-v3",
+    "uniswap_router_address": "0x29bBaFf21695fA41e446c4f37c07C699d9f08021"
+  },
+  "Astria Mainnet For Testing": {
+    "_comment_1": "Astria Mainnet For Testing: it has valid astria mainnet tokens address but the withdrawal_addresses are of our internal test wallets, it is created for testing purposes",
+    "tokens": [
+      {
+        "symbol": "TIA",
+        "valid_withdrawal_addresses": [
+          "0x95a1190b12f553A9c04cB36b76E3d0150E72770d",
+          "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+        ]
+      },
+      {
+        "symbol": "WTIA",
+        "address": "0x61B7794B6A0Cc383B367c327B91E5Ba85915a071",
+        "valid_withdrawal_addresses": [
+          "0x95a1190b12f553A9c04cB36b76E3d0150E72770d",
+          "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+        ]
+      },
+      {
+        "symbol": "USDC",
+        "address": "0x3f65144F387f6545bF4B19a1B39C94231E1c849F",
+        "valid_withdrawal_addresses": [
+          "0x95a1190b12f553A9c04cB36b76E3d0150E72770d",
+          "0x43dc53e0b5786677d100b431fd80d8e2f5a5ec65"
+        ]
+      }
+    ],
+    "_comment_0": "https://docs.astria.org/flame/flame-mainnet-alpha#uniswap-v3",
+    "uniswap_router_address": "0x29bBaFf21695fA41e446c4f37c07C699d9f08021"
+  }
+}
