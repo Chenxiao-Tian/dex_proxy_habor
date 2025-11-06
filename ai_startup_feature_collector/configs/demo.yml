@@ -1,0 +1,34 @@
+project:
+  name: sample_ai_startup_run
+  output_dir: outputs
+
+startups:
+  - name: SynthAI Labs
+    website: https://synthai.example
+    description: |
+      SynthAI builds multimodal foundation models for robotics and creative tooling.
+    tags: [ai, robotics, creative-tools]
+    competitors: ["OpenAI", "Figure AI", "Runway"]
+    founders: ["alice-wu", "david-chen"]
+
+founders:
+  alice-wu:
+    name: Alice Wu
+    linkedin: https://www.linkedin.com/in/alicewu
+    bio: "Former robotics lead at Boston Dynamics with MIT PhD in Computer Science."
+  david-chen:
+    name: David Chen
+    linkedin: https://www.linkedin.com/in/davidchen
+    bio: "Serial founder, ex-Google Brain researcher focusing on reinforcement learning."
+
+pipelines:
+  fundamentals:
+    enabled: true
+    data_sources: [product_hunt, crunchbase, open_corporates, github, social]
+  founders:
+    enabled: true
+    embedding_model: text-embedding-3-large
+  external:
+    enabled: true
+    serp_engine: serpapi
+    topics: ["robotics foundation models", "creative ai tools market size"]
