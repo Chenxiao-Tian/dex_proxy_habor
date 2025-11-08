@@ -40,6 +40,7 @@ pip install -e vasquez
 Copy the example file and update it with your Harbor staging API key (ASCII characters only).
 The repo ships with the current staging key (`6c30c576-f7db-4ae5-ac19-118d456c082e`) so
 you can run smoke tests immediately, but rotate it if your team issues a replacement:
+Copy the example file and update it with your Harbor staging API key (ASCII characters only):
 
 ```bash
 cp .env.example .env
@@ -50,18 +51,21 @@ Edit `.env` or export variables manually. Equivalent commands:
 - **bash / zsh**
   ```bash
   export HARBOR_API_KEY="6c30c576-f7db-4ae5-ac19-118d456c082e"
+  export HARBOR_API_KEY="xxxxxxxxxxxxxxxx"
   export DEX_PROXY_BASE="http://127.0.0.1:1958"
   ```
 
 - **Windows cmd.exe**
   ```cmd
   set HARBOR_API_KEY=6c30c576-f7db-4ae5-ac19-118d456c082e
+  set HARBOR_API_KEY=xxxxxxxxxxxxxxxx
   set DEX_PROXY_BASE=http://127.0.0.1:1958
   ```
 
 - **Windows PowerShell**
   ```powershell
   $env:HARBOR_API_KEY = "6c30c576-f7db-4ae5-ac19-118d456c082e"
+  $env:HARBOR_API_KEY = "xxxxxxxxxxxxxxxx"
   $env:DEX_PROXY_BASE = "http://127.0.0.1:1958"
   ```
 
@@ -72,6 +76,8 @@ Keep the key free of spaces or angle brackets to avoid Harbor 401 responses.
 `harbor/harbor.config.json` is committed to the repo with the latest stagenet defaults so you
 can boot the proxy immediately. Review the snippet below to confirm the values or tweak them
 for custom setups:
+Create `harbor/harbor.config.json` using the template below. The adapter reads the key from
+`HARBOR_API_KEY` via `api_key_env` and exposes HTTP on port `1958`.
 
 ```json
 {
@@ -81,6 +87,7 @@ for custom setups:
       { "logger_name": "aiohttp.access", "level": "warning" },
       { "logger_name": "pantheon.app_health", "level": "info" }
     ]
+    "level": "info"
   },
   "server": {
     "host": "0.0.0.0",
@@ -123,6 +130,20 @@ for custom setups:
     "name": "dex-proxy-harbor",
     "version": "0.1.0",
     "env": "local"
+  "key_store_file_path": [
+    "harbor/kuru/test-local-wallet.json"
+  ],
+  "dex": {
+    "name": "harbor",
+    "rest": {
+      "base_url": "https://api.harbor-dev.xyz/api/v1",
+      "api_key_env": "HARBOR_API_KEY",
+      "timeout": 30,
+      "default_time_in_force": "gtc"
+    },
+    "ws": {
+      "url": "wss://api.harbor-dev.xyz/ws/v1"
+    }
   }
 }
 ```
@@ -214,6 +235,12 @@ Harbor's snake_case request schema to match `InsertOrderBody` in the adapter.
 2. **Place order** – `POST /private/insert-order`
 3. **List open orders** – `GET /public/orders`
 4. **Cancel order** – `DELETE /private/cancel-request`
+The runner performs the following HTTP calls against the proxy:
+
+1. **Balance** – `GET /public/harbor/get_balance`
+2. **Place order** – `POST /private/create-order`
+3. **List open orders** – `GET /public/orders`
+4. **Cancel order** – `POST /private/harbor/cancel_order`
 5. **List open orders (post-cancel)** – `GET /public/orders`
 
 Each request logs the URL, parameters, Harbor `request_id` (if present), and the
@@ -238,6 +265,12 @@ Example snippets:
   "client_request_id": "vasquez-1700000000000000000",
   "type": "ORDER",
   "send_timestamp_ns": "1700000000000000000"
+  "client_order_id": "vasquez-1700000000000000000",
+  "order_id": "123456789",
+  "price": "3450.12",
+  "quantity": "0.0010",
+  "status": "OPEN",
+  "send_timestamp_ns": 1700000000000000000
 }
 ```
 
@@ -272,6 +305,7 @@ Example snippets:
 ## 7. Cleanup
 
 - Cancel any remaining open orders with `DELETE /private/cancel-request`.
+- Cancel any remaining open orders with `POST /private/harbor/cancel_order`.
 - Withdraw or keep staging balances minimal (< USD 20 equivalent).
 - Stop the proxy with `Ctrl+C` (or close the cmd/PowerShell window).
 
@@ -298,6 +332,20 @@ curl -X POST "http://127.0.0.1:1958/private/insert-order" \
       }'
 
 curl -X DELETE "http://127.0.0.1:1958/private/cancel-request?client_request_id=manual-1"
+curl -X POST "http://127.0.0.1:1958/private/create-order" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "client_order_id": "manual-1",
+        "symbol": "eth.eth-eth.usdt",
+        "price": "3450.12",
+        "quantity": "0.0010",
+        "side": "BUY",
+        "order_type": "LIMIT"
+      }'
+
+curl -X POST "http://127.0.0.1:1958/private/harbor/cancel_order" \
+  -H "Content-Type: application/json" \
+  -d '{"client_order_id": "manual-1"}'
 ```
 
 These commands should return JSON envelopes with `send_timestamp_ns` strings and include

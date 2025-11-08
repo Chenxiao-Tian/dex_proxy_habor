@@ -270,12 +270,24 @@ async def main() -> int:
         }
         insert_response = await _http_post(session, args.base, "/private/insert-order", json_body=insert_body)
         _LOGGER.info("Insert-order response: %s", json.dumps(insert_response, indent=2))
+        create_body = {
+            "client_order_id": client_order_id,
+            "symbol": market.instrument,
+            "price": format(price, "f"),
+            "quantity": format(qty, "f"),
+            "side": args.side,
+            "order_type": "LIMIT",
+        }
+        create_response = await _http_post(session, args.base, "/private/create-order", json_body=create_body)
+        _LOGGER.info("Create-order response: %s", json.dumps(create_response, indent=2))
 
         open_orders = await _http_get(session, args.base, "/public/orders")
         _LOGGER.info("Open orders: %s", json.dumps(open_orders, indent=2))
 
         cancel_params = {"client_request_id": client_order_id}
         cancel_response = await _http_delete(session, args.base, "/private/cancel-request", params=cancel_params)
+        cancel_body = {"client_order_id": client_order_id}
+        cancel_response = await _http_post(session, args.base, "/private/harbor/cancel_order", json_body=cancel_body)
         _LOGGER.info("Cancel response: %s", json.dumps(cancel_response, indent=2))
 
         final_orders = await _http_get(session, args.base, "/public/orders")
