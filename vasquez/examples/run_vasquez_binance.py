@@ -188,6 +188,23 @@ async def _http_post(
         return payload
 
 
+async def _http_delete(
+    session: aiohttp.ClientSession,
+    base: str,
+    path: str,
+    *,
+    params: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    url = f"{base.rstrip('/')}{path}"
+    _LOGGER.info("DELETE %s params=%s", url, params)
+    async with session.delete(url, params=params) as resp:
+        payload = await resp.json()
+        _LOGGER.info("<- %s status=%s request_id=%s", path, resp.status, _extract_request_id(payload))
+        if resp.status >= 400:
+            raise RuntimeError(f"DELETE {path} failed with status {resp.status}: {json.dumps(payload)}")
+        return payload
+
+
 async def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", required=True, help="Base URL of the running dex-proxy instance")
@@ -241,6 +258,18 @@ async def main() -> int:
         _LOGGER.info("Balances response: %s", json.dumps(balances, indent=2))
 
         client_order_id = f"{args.client_prefix}-{time.time_ns()}"
+        insert_body = {
+            "client_request_id": client_order_id,
+            "instrument": market.instrument,
+            "side": args.side,
+            "order_type": "LIMIT",
+            "base_ccy_symbol": market.base_symbol,
+            "quote_ccy_symbol": market.quote_symbol,
+            "price": format(price, "f"),
+            "base_qty": format(qty, "f"),
+        }
+        insert_response = await _http_post(session, args.base, "/private/insert-order", json_body=insert_body)
+        _LOGGER.info("Insert-order response: %s", json.dumps(insert_response, indent=2))
         create_body = {
             "client_order_id": client_order_id,
             "symbol": market.instrument,
@@ -255,6 +284,8 @@ async def main() -> int:
         open_orders = await _http_get(session, args.base, "/public/orders")
         _LOGGER.info("Open orders: %s", json.dumps(open_orders, indent=2))
 
+        cancel_params = {"client_request_id": client_order_id}
+        cancel_response = await _http_delete(session, args.base, "/private/cancel-request", params=cancel_params)
         cancel_body = {"client_order_id": client_order_id}
         cancel_response = await _http_post(session, args.base, "/private/harbor/cancel_order", json_body=cancel_body)
         _LOGGER.info("Cancel response: %s", json.dumps(cancel_response, indent=2))

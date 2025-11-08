@@ -37,6 +37,9 @@ pip install -e vasquez
 
 ### 1.2 Environment variables
 
+Copy the example file and update it with your Harbor staging API key (ASCII characters only).
+The repo ships with the current staging key (`6c30c576-f7db-4ae5-ac19-118d456c082e`) so
+you can run smoke tests immediately, but rotate it if your team issues a replacement:
 Copy the example file and update it with your Harbor staging API key (ASCII characters only):
 
 ```bash
@@ -47,18 +50,21 @@ Edit `.env` or export variables manually. Equivalent commands:
 
 - **bash / zsh**
   ```bash
+  export HARBOR_API_KEY="6c30c576-f7db-4ae5-ac19-118d456c082e"
   export HARBOR_API_KEY="xxxxxxxxxxxxxxxx"
   export DEX_PROXY_BASE="http://127.0.0.1:1958"
   ```
 
 - **Windows cmd.exe**
   ```cmd
+  set HARBOR_API_KEY=6c30c576-f7db-4ae5-ac19-118d456c082e
   set HARBOR_API_KEY=xxxxxxxxxxxxxxxx
   set DEX_PROXY_BASE=http://127.0.0.1:1958
   ```
 
 - **Windows PowerShell**
   ```powershell
+  $env:HARBOR_API_KEY = "6c30c576-f7db-4ae5-ac19-118d456c082e"
   $env:HARBOR_API_KEY = "xxxxxxxxxxxxxxxx"
   $env:DEX_PROXY_BASE = "http://127.0.0.1:1958"
   ```
@@ -67,18 +73,63 @@ Keep the key free of spaces or angle brackets to avoid Harbor 401 responses.
 
 ### 1.3 Harbor config (harbor/harbor.config.json)
 
+`harbor/harbor.config.json` is committed to the repo with the latest stagenet defaults so you
+can boot the proxy immediately. Review the snippet below to confirm the values or tweak them
+for custom setups:
 Create `harbor/harbor.config.json` using the template below. The adapter reads the key from
 `HARBOR_API_KEY` via `api_key_env` and exposes HTTP on port `1958`.
 
 ```json
 {
   "logging": {
+    "level": "debug",
+    "overrides": [
+      { "logger_name": "aiohttp.access", "level": "warning" },
+      { "logger_name": "pantheon.app_health", "level": "info" }
+    ]
     "level": "info"
   },
   "server": {
     "host": "0.0.0.0",
     "port": 1958
   },
+  "RabbitMQ": { "url": "amqp://localhost" },
+  "key_store_file_path": "kuru/test-local-wallet.json",
+  "dex": {
+    "name": "harbor",
+    "env": "stagenet",
+    "base_url": "https://api.harbor-dev.xyz/api/v1",
+    "ws_url": "wss://api.harbor-dev.xyz/api/v1/ws",
+    "rest": {
+      "base_url": "https://api.harbor-dev.xyz/api/v1",
+      "api_key_env": "HARBOR_API_KEY",
+      "default_time_in_force": "gtc",
+      "timeout": 20,
+      "proxy": null,
+      "trust_env": true,
+      "verify_ssl": true
+    },
+    "ws": {
+      "url": "wss://api.harbor-dev.xyz/api/v1/ws",
+      "reconnect_interval": 10
+    },
+    "request_cache": {
+      "enabled": true,
+      "request_ttl_s": 2,
+      "capacity": 512,
+      "finalised_requests_cleanup_after_s": 600,
+      "store_in_redis": false
+    },
+    "transactions_status_poller": {
+      "poll_interval_s": 30
+    },
+    "eth_from_addr": "0xD1287859F3197C05c67578E3d64092e6639b1000",
+    "btc_from_addr": "bc1qu5s2s97g0s0a0pnhe7h2jxj0aexue8u6wjgxsj"
+  },
+  "app": {
+    "name": "dex-proxy-harbor",
+    "version": "0.1.0",
+    "env": "local"
   "key_store_file_path": [
     "harbor/kuru/test-local-wallet.json"
   ],
@@ -177,6 +228,13 @@ BUY) or adds one tick above the best ask (for SELL) before aligning to Harbor ti
 
 ## 5. End-to-end validation flow
 
+The runner performs the following HTTP calls against the proxy. The insert-order body uses
+Harbor's snake_case request schema to match `InsertOrderBody` in the adapter.
+
+1. **Balance** – `GET /public/harbor/get_balance`
+2. **Place order** – `POST /private/insert-order`
+3. **List open orders** – `GET /public/orders`
+4. **Cancel order** – `DELETE /private/cancel-request`
 The runner performs the following HTTP calls against the proxy:
 
 1. **Balance** – `GET /public/harbor/get_balance`
@@ -201,6 +259,12 @@ Example snippets:
 
 ```json
 {
+  "request_id": "abc123",
+  "status": "PENDING",
+  "order_id": "987654321",
+  "client_request_id": "vasquez-1700000000000000000",
+  "type": "ORDER",
+  "send_timestamp_ns": "1700000000000000000"
   "client_order_id": "vasquez-1700000000000000000",
   "order_id": "123456789",
   "price": "3450.12",
@@ -240,6 +304,7 @@ Example snippets:
 
 ## 7. Cleanup
 
+- Cancel any remaining open orders with `DELETE /private/cancel-request`.
 - Cancel any remaining open orders with `POST /private/harbor/cancel_order`.
 - Withdraw or keep staging balances minimal (< USD 20 equivalent).
 - Stop the proxy with `Ctrl+C` (or close the cmd/PowerShell window).
@@ -253,6 +318,20 @@ curl "http://127.0.0.1:1958/public/harbor/get_balance"
 
 curl "http://127.0.0.1:1958/public/orders"
 
+curl -X POST "http://127.0.0.1:1958/private/insert-order" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "client_request_id": "manual-1",
+        "instrument": "eth.eth-eth.usdt",
+        "side": "BUY",
+        "order_type": "LIMIT",
+        "base_ccy_symbol": "ETH",
+        "quote_ccy_symbol": "USDT",
+        "price": "3450.12",
+        "base_qty": "0.0010"
+      }'
+
+curl -X DELETE "http://127.0.0.1:1958/private/cancel-request?client_request_id=manual-1"
 curl -X POST "http://127.0.0.1:1958/private/create-order" \
   -H "Content-Type: application/json" \
   -d '{
