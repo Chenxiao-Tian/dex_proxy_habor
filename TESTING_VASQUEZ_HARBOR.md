@@ -37,6 +37,7 @@ pip install -e vasquez
 
 ### 1.2 Environment variables
 
+Copy the example file, then update it with your Harbor staging API key (ASCII characters only):
 Copy the example file and update it with your Harbor staging API key (ASCII characters only).
 The repo ships with the current staging key (`6c30c576-f7db-4ae5-ac19-118d456c082e`) so
 you can run smoke tests immediately, but rotate it if your team issues a replacement:
@@ -50,6 +51,7 @@ Edit `.env` or export variables manually. Equivalent commands:
 
 - **bash / zsh**
   ```bash
+  export HARBOR_API_KEY="<your-harbor-api-key>"
   export HARBOR_API_KEY="6c30c576-f7db-4ae5-ac19-118d456c082e"
   export HARBOR_API_KEY="xxxxxxxxxxxxxxxx"
   export DEX_PROXY_BASE="http://127.0.0.1:1958"
@@ -57,6 +59,7 @@ Edit `.env` or export variables manually. Equivalent commands:
 
 - **Windows cmd.exe**
   ```cmd
+  set HARBOR_API_KEY=<your-harbor-api-key>
   set HARBOR_API_KEY=6c30c576-f7db-4ae5-ac19-118d456c082e
   set HARBOR_API_KEY=xxxxxxxxxxxxxxxx
   set DEX_PROXY_BASE=http://127.0.0.1:1958
@@ -64,6 +67,7 @@ Edit `.env` or export variables manually. Equivalent commands:
 
 - **Windows PowerShell**
   ```powershell
+  $env:HARBOR_API_KEY = "<your-harbor-api-key>"
   $env:HARBOR_API_KEY = "6c30c576-f7db-4ae5-ac19-118d456c082e"
   $env:HARBOR_API_KEY = "xxxxxxxxxxxxxxxx"
   $env:DEX_PROXY_BASE = "http://127.0.0.1:1958"
