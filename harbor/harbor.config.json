@@ -1,0 +1,51 @@
+{
+  "logging": {
+    "level": "debug",
+    "overrides": [
+      { "logger_name": "aiohttp.access", "level": "warning" },
+      { "logger_name": "pantheon.app_health", "level": "info" }
+    ]
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 1958
+  },
+  "RabbitMQ": { "url": "amqp://localhost" },
+  "key_store_file_path": "kuru/test-local-wallet.json",
+  "dex": {
+    "name": "harbor",
+    "env": "stagenet",
+    "base_url": "https://api.harbor-dev.xyz/api/v1",
+    "ws_url": "wss://api.harbor-dev.xyz/api/v1/ws",
+    "rest": {
+      "base_url": "https://api.harbor-dev.xyz/api/v1",
+      "api_key_env": "HARBOR_API_KEY",
+      "default_time_in_force": "gtc",
+      "timeout": 20,
+      "proxy": null,
+      "trust_env": true,
+      "verify_ssl": true
+    },
+    "ws": {
+      "url": "wss://api.harbor-dev.xyz/api/v1/ws",
+      "reconnect_interval": 10
+    },
+    "request_cache": {
+      "enabled": true,
+      "request_ttl_s": 2,
+      "capacity": 512,
+      "finalised_requests_cleanup_after_s": 600,
+      "store_in_redis": false
+    },
+    "transactions_status_poller": {
+      "poll_interval_s": 30
+    },
+    "eth_from_addr": "0xD1287859F3197C05c67578E3d64092e6639b1000",
+    "btc_from_addr": "bc1qu5s2s97g0s0a0pnhe7h2jxj0aexue8u6wjgxsj"
+  },
+  "app": {
+    "name": "dex-proxy-harbor",
+    "version": "0.1.0",
+    "env": "local"
+  }
+}

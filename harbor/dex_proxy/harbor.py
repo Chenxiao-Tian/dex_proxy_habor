@@ -768,7 +768,7 @@ class Harbor(DexCommon):
         order = api_resp.get("order", api_resp)
         resp = self._map_order(order, send_timestamp=now_ns())
         self._order_index[resp.client_order_id] = _OrderIndex(resp.symbol, resp.order_id)
-        return 200, resp
+        return 200, resp.model_dump(mode="json")
 
     async def cancel_order(self, path, params, received_at_ms) -> Tuple[int, OrderResponse | OrderErrorResponse]:
         p = CancelOrderParams(**params)
@@ -782,7 +782,7 @@ class Harbor(DexCommon):
             return self._harbor_error(exc)
         resp = self._map_order(order_payload.get("order", order_payload), send_timestamp=now_ns())
         self._order_index[p.client_order_id] = _OrderIndex(resp.symbol, resp.order_id)
-        return 200, resp
+        return 200, resp.model_dump(mode="json")
 
     async def list_open_orders(self, path, params, received_at_ms) -> Tuple[int, QueryLiveOrdersResponse | OrderErrorResponse]:
         try:
@@ -794,7 +794,8 @@ class Harbor(DexCommon):
         orders = [self._map_order(o, send_timestamp=ts) for o in payload]
         for o in orders:
             self._order_index[o.client_order_id] = _OrderIndex(o.symbol, o.order_id)
-        return 200, QueryLiveOrdersResponse(send_timestamp_ns=ts, orders=orders)
+        response = QueryLiveOrdersResponse(send_timestamp_ns=ts, orders=orders)
+        return 200, response.model_dump(mode="json")
 
     async def get_depth_snapshot(self, path, params, received_at_ms):
         symbol = params.get("symbol") if isinstance(params, dict) else None

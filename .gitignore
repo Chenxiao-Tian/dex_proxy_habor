@@ -14,5 +14,3 @@ dist/
 dex-venv/ 
 .venv/ 
 
-# local harbor config
-harbor/harbor.config.json
