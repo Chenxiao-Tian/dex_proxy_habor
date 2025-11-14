@@ -1,11 +1,9 @@
 {
   "logging": {
     "level": "debug",
-    "file": "harbor_debug.log",
     "overrides": [
-      { "logger_name": "aiohttp.access", "level": "info" },
-      { "logger_name": "pantheon.app_health", "level": "info" },
-      { "logger_name": "py_dex_common.web_server", "level": "debug" }
+      { "logger_name": "aiohttp.access", "level": "warning" },
+      { "logger_name": "pantheon.app_health", "level": "info" }
     ]
   },
   "server": {

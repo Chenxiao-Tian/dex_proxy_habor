@@ -1,0 +1,1 @@
+{"error": {"message": "Not Found", "code": 404, "request_id": null, "type": "DEPTH", "client_request_id": "eth.eth-eth.usdt", "detail": {"code": 5, "message": "Not Found"}}, "send_timestamp_ns": "1762573374477306000"}

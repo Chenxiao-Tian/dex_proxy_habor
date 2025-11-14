@@ -1,301 +1,239 @@
-"""Run Vasquez against the Harbor dex-proxy using Binance Spot market data."""
+#!/usr/bin/env python3
+"""
+Vasquez demo: fetch Binance top-of-book, align to Harbor ticks, and place a LIMIT order
+with robust error handling and balance pre-check.
 
+Usage (Windows CMD):
+  set BINANCE_BASE=https://api.binance.us
+  python -m vasquez.examples.run_vasquez_binance ^
+    --base http://127.0.0.1:1958 ^
+    --instrument eth.eth-eth.usdt ^
+    --symbol ETHUSDT --side BUY --qty 0.001 --log-level INFO
+"""
 from __future__ import annotations
 
+import os
+import sys
+import json
 import argparse
 import asyncio
-import json
 import logging
-import time
-from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, List
 
 import aiohttp
 
-from harbor.dex_proxy.utils import ensure_multiple, now_ns
+try:
+    # prefer your local client if present
+    from vasquez.marketdata.binance_client import BinanceMarketDataClient
+except Exception:
+    # tiny fallback so the script is self-contained
+    class BinanceMarketDataClient:
+        def __init__(self, base: Optional[str] = None, session: Optional[aiohttp.ClientSession] = None):
+            self.base = base or os.getenv("BINANCE_BASE") or "https://api.binance.com"
+            self.session = session or aiohttp.ClientSession()
 
-from vasquez.marketdata.binance_client import BinanceClient
+        async def _get(self, path: str, params: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+            url = self.base.rstrip("/") + path
+            async with self.session.get(url, params=params, timeout=10) as resp:
+                # Some regions (e.g. CN) return 451; prefer readable text on error
+                text = await resp.text()
+                if resp.status >= 400:
+                    raise RuntimeError(f"GET {url} failed {resp.status}: {text}")
+                try:
+                    return json.loads(text)
+                except Exception:
+                    raise RuntimeError(f"GET {url} returned non-json: {text!r}")
 
-_LOGGER = logging.getLogger("vasquez.examples.run_vasquez_binance")
+        async def fetch_book_ticker(self, symbol: str) -> Dict[str, Any]:
+            return await self._get("/api/v3/ticker/bookTicker", params={"symbol": symbol.upper()})
 
-SUPPORTED_QUOTES = ("USDT", "USDC", "FDUSD", "TUSD", "BUSD", "BTC")
-
-
-@dataclass
-class HarborMarket:
-    instrument: str
-    base_symbol: str
-    quote_symbol: str
-    price_tick: Decimal
-    qty_tick: Decimal
-
-
-def _split_symbol(symbol: str) -> Tuple[str, str]:
-    symbol_upper = symbol.upper().replace("/", "")
-    for quote in SUPPORTED_QUOTES:
-        if symbol_upper.endswith(quote):
-            base = symbol_upper[: -len(quote)]
-            if not base:
-                break
-            return base, quote
-    raise ValueError(f"Unable to split symbol '{symbol}'. Provide --base-symbol/--quote-symbol explicitly.")
-
-
-def _extract_markets(payload: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
-    markets = payload.get("markets")
-    if isinstance(markets, dict):
-        inner = markets.get("markets")
-        if isinstance(inner, list):
-            return inner
-    if isinstance(markets, list):
-        return markets
-    if isinstance(payload, list):
-        return payload
-    return []
+        async def close(self):
+            if not self.session.closed:
+                await self.session.close()
 
 
-def _normalise_symbol(value: Optional[str]) -> str:
-    return (value or "").strip()
+# --- util: tick alignment (kept here to avoid import drift) ---
+from decimal import ROUND_FLOOR, ROUND_HALF_UP
+
+def ensure_multiple(value: str | float | Decimal, tick: str | float | Decimal, mode: str = "floor") -> Decimal:
+    """
+    Align value to a multiple of tick.
+    mode: "floor" (down) or "nearest" (ROUND_HALF_UP).
+    """
+    v = Decimal(str(value))
+    t = Decimal(str(tick))
+    if t <= 0:
+        raise ValueError("tick must be > 0")
+
+    q = v / t
+    if mode in ("floor", "down"):
+        q = q.to_integral_value(rounding=ROUND_FLOOR)
+    elif mode in ("nearest", "round"):
+        q = q.to_integral_value(rounding=ROUND_HALF_UP)
+    else:
+        raise ValueError(f"unknown mode={mode!r}")
+    return (q * t).quantize(t)
 
 
-def _match_market(candidate: Dict[str, Any], base: str, quote: str) -> bool:
-    base = base.upper()
-    quote = quote.upper()
-    base_fields = [
-        candidate.get("baseCcySymbol"),
-        candidate.get("baseSymbol"),
-        candidate.get("baseAsset"),
-    ]
-    quote_fields = [
-        candidate.get("quoteCcySymbol"),
-        candidate.get("quoteSymbol"),
-        candidate.get("quoteAsset"),
-    ]
-    symbol = _normalise_symbol(candidate.get("symbol") or candidate.get("instrument"))
-    symbol_upper = symbol.upper()
-    base_fields.extend(part for part in symbol_upper.replace("-", ".").split(".") if part)
-    quote_fields.extend(part for part in symbol_upper.replace("-", ".").split(".") if part)
-    return base in {f.upper() for f in base_fields if isinstance(f, str)} and quote in {
-        f.upper() for f in quote_fields if isinstance(f, str)
-    }
+def _decimalize(x: Any) -> Decimal:
+    return Decimal(str(x))
 
 
-def _select_market(payload: Dict[str, Any], *, instrument: Optional[str], base: str, quote: str) -> HarborMarket:
-    markets = list(_extract_markets(payload))
-    if not markets:
-        raise RuntimeError("Harbor markets payload is empty; confirm the proxy is running and the API key is valid.")
-
-    chosen: Optional[Dict[str, Any]] = None
+def _pick_market(markets_payload: Dict[str, Any], instrument: Optional[str],
+                 base: str, quote: str) -> Dict[str, Any]:
+    markets = markets_payload.get("markets", {}).get("markets", [])
     if instrument:
-        for market in markets:
-            symbol = _normalise_symbol(market.get("symbol") or market.get("instrument"))
-            if symbol.lower() == instrument.lower():
-                chosen = market
-                break
-    if chosen is None:
-        matches = [m for m in markets if _match_market(m, base, quote)]
-        if len(matches) == 1:
-            chosen = matches[0]
-        elif len(matches) > 1:
-            raise RuntimeError(
-                f"Multiple Harbor instruments match base={base} quote={quote}. Provide --instrument explicitly."
-            )
-    if chosen is None:
-        raise RuntimeError(
-            f"No Harbor instrument found for base={base} quote={quote}. Use --instrument to select one manually."
-        )
-
-    instrument_name = _normalise_symbol(chosen.get("symbol") or chosen.get("instrument"))
-    try:
-        price_tick = Decimal(str(chosen.get("priceTick")))
-        qty_tick = Decimal(str(chosen.get("qtyTick")))
-    except Exception as exc:  # pragma: no cover - defensive guard for unexpected payloads
-        raise RuntimeError(f"Harbor market entry is missing tick data: {json.dumps(chosen, indent=2)}") from exc
-
-    base_symbol = _normalise_symbol(
-        chosen.get("baseCcySymbol") or chosen.get("baseSymbol") or chosen.get("baseAsset") or base
-    )
-    quote_symbol = _normalise_symbol(
-        chosen.get("quoteCcySymbol") or chosen.get("quoteSymbol") or chosen.get("quoteAsset") or quote
-    )
-
-    return HarborMarket(
-        instrument=instrument_name,
-        base_symbol=base_symbol.upper(),
-        quote_symbol=quote_symbol.upper(),
-        price_tick=price_tick,
-        qty_tick=qty_tick,
-    )
+        for m in markets:
+            if m.get("symbol") == instrument:
+                return m
+        raise RuntimeError(f"Instrument {instrument!r} not found in markets.")
+    # fallback by base/quote
+    cand = [m for m in markets if m.get("baseAsset", "").startswith(base + ".")
+            and m.get("quoteAsset", "").endswith(".USDT-0XDAC17F958D2EE523A2206206994597C13D831EC7")]
+    if len(cand) == 1:
+        return cand[0]
+    if len(cand) > 1:
+        raise RuntimeError(f"Multiple Harbor instruments match base={base} quote=USDT. Provide --instrument explicitly.")
+    raise RuntimeError(f"No Harbor instrument matches base={base} quote=USDT.")
 
 
-def _align_price(raw_price: Decimal, *, tick: Decimal, side: str) -> Decimal:
-    adjusted = ensure_multiple(raw_price, tick, field_name="price")
-    if side == "SELL" and adjusted < raw_price:
-        adjusted += tick
-    if adjusted <= 0:
-        adjusted = tick
-    return adjusted
-
-
-def _align_qty(raw_qty: Decimal, *, tick: Decimal) -> Decimal:
-    adjusted = ensure_multiple(raw_qty, tick, field_name="quantity")
-    if adjusted <= 0:
-        raise ValueError("Quantity rounds down to zero with current qtyTick. Increase --qty.")
-    return adjusted
-
-
-def _extract_request_id(payload: Any) -> Optional[str]:
-    if isinstance(payload, dict):
-        for key in ("request_id", "requestId", "id"):
-            value = payload.get(key)
-            if isinstance(value, str):
-                return value
-        error = payload.get("error")
-        if isinstance(error, dict):
-            for key in ("request_id", "requestId", "id"):
-                value = error.get(key)
-                if isinstance(value, str):
-                    return value
-    return None
-
-
-async def _http_get(session: aiohttp.ClientSession, base: str, path: str, *, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    url = f"{base.rstrip('/')}{path}"
-    _LOGGER.info("GET %s params=%s", url, params)
-    async with session.get(url, params=params) as resp:
-        payload = await resp.json()
-        _LOGGER.info("<- %s status=%s request_id=%s", path, resp.status, _extract_request_id(payload))
+async def _http_get(session: aiohttp.ClientSession, base: str, path: str) -> Dict[str, Any]:
+    url = base.rstrip("/") + path
+    async with session.get(url, timeout=15) as resp:
+        text = await resp.text()
         if resp.status >= 400:
-            raise RuntimeError(f"GET {path} failed with status {resp.status}: {json.dumps(payload)}")
-        return payload
+            # best-effort parse json, else show raw text
+            try:
+                data = json.loads(text)
+            except Exception:
+                data = {"status": resp.status, "text": text}
+            raise RuntimeError(f"GET {path} failed {resp.status}: {data}")
+        try:
+            return json.loads(text)
+        except Exception:
+            raise RuntimeError(f"GET {path} non-json: {text!r}")
 
 
-async def _http_post(
-    session: aiohttp.ClientSession,
-    base: str,
-    path: str,
-    *,
-    json_body: Dict[str, Any],
-) -> Dict[str, Any]:
-    url = f"{base.rstrip('/')}{path}"
-    _LOGGER.info("POST %s body=%s", url, json.dumps(json_body))
-    async with session.post(url, json=json_body) as resp:
-        payload = await resp.json()
-        _LOGGER.info("<- %s status=%s request_id=%s", path, resp.status, _extract_request_id(payload))
+async def _http_post(session: aiohttp.ClientSession, base: str, path: str, json_body: Dict[str, Any]) -> Dict[str, Any]:
+    url = base.rstrip("/") + path
+    async with session.post(url, json=json_body, timeout=20) as resp:
+        text = await resp.text()
+        # prefer readable failure even if server returns a pydantic object repr
         if resp.status >= 400:
-            raise RuntimeError(f"POST {path} failed with status {resp.status}: {json.dumps(payload)}")
-        return payload
+            try:
+                data = json.loads(text)
+            except Exception:
+                data = text
+            raise RuntimeError(f"POST {path} failed {resp.status}: {data}")
+        try:
+            return json.loads(text)
+        except Exception:
+            return {"text": text, "status": resp.status}
 
 
-async def _http_delete(
-    session: aiohttp.ClientSession,
-    base: str,
-    path: str,
-    *,
-    params: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    url = f"{base.rstrip('/')}{path}"
-    _LOGGER.info("DELETE %s params=%s", url, params)
-    async with session.delete(url, params=params) as resp:
-        payload = await resp.json()
-        _LOGGER.info("<- %s status=%s request_id=%s", path, resp.status, _extract_request_id(payload))
-        if resp.status >= 400:
-            raise RuntimeError(f"DELETE {path} failed with status {resp.status}: {json.dumps(payload)}")
-        return payload
+INSERT_PATHS: Tuple[str, ...] = (
+    "/private/insert-order",
+    "/private/harbor/insert-order",
+    "/private/create-order",
+    "/private/harbor/create-order",
+    "/private/harbor/create_order",  # alias some builds expose
+)
+
+async def _try_paths_post(session: aiohttp.ClientSession, base: str, paths: Tuple[str, ...], json_body: Dict[str, Any]) -> Dict[str, Any]:
+    last_err: Optional[Exception] = None
+    for p in paths:
+        try:
+            logging.info("POST %s %s", base, p)
+            return await _http_post(session, base, p, json_body=json_body)
+        except Exception as e:
+            logging.warning("POST %s failed: %s", p, e)
+            last_err = e
+    assert last_err is not None
+    raise last_err
+
+
+def _parse_args() -> argparse.Namespace:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--base", required=True, help="dex-proxy base, e.g. http://127.0.0.1:1958")
+    ap.add_argument("--instrument", required=False, help="Harbor instrument symbol, e.g. eth.eth-eth.usdt")
+    ap.add_argument("--symbol", required=True, help="Binance symbol, e.g. ETHUSDT")
+    ap.add_argument("--side", required=True, choices=["BUY", "SELL"])
+    ap.add_argument("--qty", type=str, required=True, help="base qty to trade (string ok)")
+    ap.add_argument("--price", type=str, required=False, help="optional limit price; if omitted, use best bid/ask")
+    ap.add_argument("--tick-round", default="floor", choices=["floor", "nearest"], help="tick rounding mode")
+    ap.add_argument("--log-level", default="INFO")
+    ap.add_argument("--dry-run", action="store_true", help="only compute price/qty and exit without placing order")
+    return ap.parse_args()
 
 
 async def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", required=True, help="Base URL of the running dex-proxy instance")
-    parser.add_argument("--symbol", default="ETHUSDT", help="Binance symbol to source price data from (default: ETHUSDT)")
-    parser.add_argument("--side", choices=["BUY", "SELL"], default="BUY", help="Order side (default: BUY)")
-    parser.add_argument("--qty", type=Decimal, default=Decimal("0.001"), help="Base asset quantity to trade")
-    parser.add_argument(
-        "--price-offset-ticks",
-        type=int,
-        default=1,
-        help="How many price ticks to step away from the top of book (default: 1)",
-    )
-    parser.add_argument("--instrument", help="Override Harbor instrument symbol if automatic mapping fails")
-    parser.add_argument("--client-prefix", default="vasquez", help="Prefix for generated client order ids")
-    parser.add_argument("--log-level", default="INFO", help="Python logging level (default: INFO)")
-    args = parser.parse_args()
-
+    args = _parse_args()
     logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.INFO), format="%(asctime)s %(levelname)s %(message)s")
 
-    base_symbol, quote_symbol = _split_symbol(args.symbol)
-    _LOGGER.info("Resolved Binance symbol %s -> base=%s quote=%s", args.symbol, base_symbol, quote_symbol)
-
+    # 1) fetch markets & select instrument
     async with aiohttp.ClientSession() as session:
         markets_payload = await _http_get(session, args.base, "/public/harbor/get_markets")
-        market = _select_market(markets_payload, instrument=args.instrument, base=base_symbol, quote=quote_symbol)
-        _LOGGER.info(
-            "Selected Harbor instrument %s (base=%s quote=%s priceTick=%s qtyTick=%s)",
-            market.instrument,
-            market.base_symbol,
-            market.quote_symbol,
-            market.price_tick,
-            market.qty_tick,
-        )
+        # If symbol looks like ETHUSDT, split it
+        base_sym, quote_sym = args.symbol[:-4], args.symbol[-4:]
+        m = _pick_market(markets_payload, args.instrument, base=base_sym, quote=quote_sym)
+        logging.info("Selected Harbor instrument %s (base=%s quote=%s priceTick=%s qtyTick=%s)",
+                     m["symbol"], m["baseAsset"], m["quoteAsset"], m["priceTick"], m["qtyTick"])
+        price_tick = _decimalize(m["priceTick"])
+        qty_tick = _decimalize(m["qtyTick"])
 
-        async with BinanceClient(session=session) as binance:
-            book = await binance.fetch_book_ticker(args.symbol)
-            best_bid = Decimal(book["bidPrice"])
-            best_ask = Decimal(book["askPrice"])
-            _LOGGER.info("Binance best bid=%s ask=%s", best_bid, best_ask)
-
-        offset = Decimal(args.price_offset_ticks) * market.price_tick
-        if args.side == "BUY":
-            raw_price = best_bid - offset
+        # 2) get price from Binance if not provided
+        if args.price:
+            raw_price = _decimalize(args.price)
         else:
-            raw_price = best_ask + offset
-        price = _align_price(raw_price, tick=market.price_tick, side=args.side)
-        qty = _align_qty(args.qty, tick=market.qty_tick)
-        _LOGGER.info("Tick-aligned price=%s qty=%s", price, qty)
+            md = BinanceMarketDataClient(session=session)
+            ticker = await md.fetch_book_ticker(args.symbol.upper())
+            bid = _decimalize(ticker["bidPrice"])
+            ask = _decimalize(ticker["askPrice"])
+            logging.info("Binance best bid=%s ask=%s", bid, ask)
+            raw_price = bid if args.side == "BUY" else ask
 
-        balances = await _http_get(session, args.base, "/public/harbor/get_balance")
-        _LOGGER.info("Balances response: %s", json.dumps(balances, indent=2))
+        price = ensure_multiple(raw_price, price_tick, mode=args.tick_round)
+        qty = ensure_multiple(args.qty, qty_tick, mode="floor")  # qty 一律向下取整
+        logging.info("Tick-aligned price=%s qty=%s", price, qty)
 
-        client_order_id = f"{args.client_prefix}-{time.time_ns()}"
-        insert_body = {
-            "client_request_id": client_order_id,
-            "instrument": market.instrument,
+        if args.dry_run:
+            print(json.dumps({
+                "instrument": m["symbol"],
+                "side": args.side,
+                "price": str(price),
+                "base_qty": str(qty),
+                "note": "dry-run only"
+            }, indent=2))
+            return 0
+
+        # 3) pre-check balance; if empty, give a helpful message and exit
+        bal = await _http_get(session, args.base, "/public/harbor/get_balance")
+        exch = bal.get("balances", {}).get("exchange", [])
+        if not exch:
+            logging.warning("Your exchange balance is empty; Harbor will reject the order.")
+            logging.warning("Action needed: deposit a small amount of USDT to the vault/router first, then retry.")
+            return 2
+
+        # 4) try posting to a few compatible endpoints
+        body = {
+            "client_request_id": f"vasquez-{os.getpid()}-{asyncio.get_running_loop().time()}",
+            "instrument": m["symbol"],
             "side": args.side,
             "order_type": "LIMIT",
-            "base_ccy_symbol": market.base_symbol,
-            "quote_ccy_symbol": market.quote_symbol,
-            "price": format(price, "f"),
-            "base_qty": format(qty, "f"),
+            "base_ccy_symbol": m["baseAsset"],
+            "quote_ccy_symbol": m["quoteAsset"],
+            "price": str(price),
+            "base_qty": str(qty),
         }
-        insert_response = await _http_post(session, args.base, "/private/insert-order", json_body=insert_body)
-        _LOGGER.info("Insert-order response: %s", json.dumps(insert_response, indent=2))
-        create_body = {
-            "client_order_id": client_order_id,
-            "symbol": market.instrument,
-            "price": format(price, "f"),
-            "quantity": format(qty, "f"),
-            "side": args.side,
-            "order_type": "LIMIT",
-        }
-        create_response = await _http_post(session, args.base, "/private/create-order", json_body=create_body)
-        _LOGGER.info("Create-order response: %s", json.dumps(create_response, indent=2))
 
-        open_orders = await _http_get(session, args.base, "/public/orders")
-        _LOGGER.info("Open orders: %s", json.dumps(open_orders, indent=2))
-
-        cancel_params = {"client_request_id": client_order_id}
-        cancel_response = await _http_delete(session, args.base, "/private/cancel-request", params=cancel_params)
-        cancel_body = {"client_order_id": client_order_id}
-        cancel_response = await _http_post(session, args.base, "/private/harbor/cancel_order", json_body=cancel_body)
-        _LOGGER.info("Cancel response: %s", json.dumps(cancel_response, indent=2))
-
-        final_orders = await _http_get(session, args.base, "/public/orders")
-        _LOGGER.info("Open orders after cancel: %s", json.dumps(final_orders, indent=2))
-
-    _LOGGER.info("Workflow complete. client_order_id=%s send_timestamp_ns=%s", client_order_id, now_ns())
-    return 0
+        insert_resp = await _try_paths_post(session, args.base, INSERT_PATHS, json_body=body)
+        print(json.dumps({"ok": True, "insert_response": insert_resp}, indent=2))
+        return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
+    try:
+        raise SystemExit(asyncio.run(main()))
+    except KeyboardInterrupt:
+        raise SystemExit(130)

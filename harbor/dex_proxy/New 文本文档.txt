@@ -1,0 +1,71 @@
+# harbor/dex_proxy/compat_routes.py
+from __future__ import annotations
+from typing import Callable
+
+def _reg(server, method: str, path: str, handler: Callable) -> None:
+    # WebServer.register( method, path, handler, ... )
+    # 仅传必需三参，避免不同版本的可选参数签名不一致
+    server.register(method, path, handler)
+
+def register_compat_routes(
+    server,
+    create_order: Callable,
+    insert_order: Callable,
+    cancel_request: Callable,
+    cancel_all: Callable,
+    list_open_orders: Callable,
+) -> None:
+    """
+    为 Harbor 的核心私有路由注册所有历史/别名：
+    - 同时支持连字符(-) 与 下划线(_)
+    - 同时支持 带 /harbor 前缀 与 不带 前缀
+    这样诸如：
+      /private/create-order
+      /private/create_order
+      /private/harbor/create-order
+      /private/harbor/create_order
+    等路径都会指向同一处理函数。
+    """
+
+    # --- create / insert ---
+    for p in [
+        "/private/create-order",
+        "/private/create_order",
+        "/private/harbor/create-order",
+        "/private/harbor/create_order",
+    ]:
+        _reg(server, "POST", p, create_order)
+
+    for p in [
+        "/private/insert-order",
+        "/private/insert_order",
+        "/private/harbor/insert-order",
+        "/private/harbor/insert_order",
+    ]:
+        _reg(server, "POST", p, insert_order)
+
+    # --- cancel ---
+    for p in [
+        "/private/cancel-request",
+        "/private/cancel_request",
+        "/private/harbor/cancel-request",
+        "/private/harbor/cancel_request",
+    ]:
+        _reg(server, "DELETE", p, cancel_request)
+
+    for p in [
+        "/private/cancel-all",
+        "/private/cancel_all",
+        "/private/harbor/cancel-all",
+        "/private/harbor/cancel_all",
+    ]:
+        _reg(server, "DELETE", p, cancel_all)
+
+    # --- list open orders ---
+    for p in [
+        "/private/list-open-orders",
+        "/private/list_open_orders",
+        "/private/harbor/list-open-orders",
+        "/private/harbor/list_open_orders",
+    ]:
+        _reg(server, "GET", p, list_open_orders)

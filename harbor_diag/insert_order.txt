@@ -1,0 +1,25 @@
+Note: Unnecessary use of -X or --request, POST is already inferred.
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying 127.0.0.1:1958...
+* Connected to 127.0.0.1 (127.0.0.1) port 1958
+* using HTTP/1.x
+> POST /private/insert-order HTTP/1.1
+> Host: 127.0.0.1:1958
+> User-Agent: curl/8.14.1
+> Accept: */*
+> Content-Type: application/json
+> Content-Length: 155
+> 
+} [155 bytes data]
+* upload completely sent off: 155 bytes
+< HTTP/1.1 400 Bad Request
+< Content-Type: application/json; charset=utf-8
+< Content-Length: 101
+< Date: Sat, 08 Nov 2025 03:42:54 GMT
+< Server: Python/3.12 aiohttp/3.13.2
+< 
+{ [101 bytes data]
+100   256  100   101  100   155  21526  33034 --:--:-- --:--:-- --:--:-- 64000
+* Connection #0 to host 127.0.0.1 left intact
+{"error": {"message": "Missing field 'base_ccy_symbol'"}, "send_timestamp_ns": "1762573374972603800"}

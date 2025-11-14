@@ -1,0 +1,11 @@
+# sitecustomize.py  —— 在这个 venv 里启动任何 Python 进程都会自动 import
+try:
+    # 复用我们写好的 monkey-patch：给 vasquez 的 BboPricer 补上 logger/log
+    from harbor.dex_proxy.vasquez_patches import ensure_vasquez_loggers
+    patched = ensure_vasquez_loggers()
+    if patched:
+        import logging
+        logging.getLogger("harbor.sitecustomize").info("Patched %s", patched)
+except Exception:
+    # 绝不能影响解释器启动；吞掉异常
+    pass

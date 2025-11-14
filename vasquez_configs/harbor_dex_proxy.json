@@ -1,0 +1,61 @@
+{
+  "strategy": {
+    "type": "naive_mm",
+    "gateway": "dex_proxy",
+    "dex_proxy": {
+      "server": {
+        "scheme": "http",
+        "hostname": "127.0.0.1",
+        "port": 1958
+      }
+    },
+
+    "order_refresh_s": 2,
+
+    "mm_params": {
+      "refresh_s": 2,
+      "spread_bps": 10,
+      "cbs": {
+        "half_spread": "0.0010",
+        "manual_skew": "0",
+        "min_spread": "0.0005",
+        "max_spread": "0.0100"
+      }
+    },
+
+    "quoters": {
+      "harbor-ETH/USDT=0": {
+        "instrument": "eth.eth-eth.usdt",
+        "symbol": "ETHUSDT",
+
+        "ref_exchange": "binance",
+        "quote_ref_price": 1,          
+        "ref_price": 3642.21,          
+        "quote_order_value": 5,        
+        "tick_size": 0.01,
+        "lot_size": 0.0001,
+
+        "min_balance_threshold": 0.0,
+        "max_balance_threshold": 999999.0,
+
+        "dry_run": true,
+
+        "cbs": {
+          "half_spread": "0.0010",
+          "manual_skew": "0",
+          "min_spread": "0.0005",
+          "max_spread": "0.0100"
+        }
+      }
+    }
+  },
+
+  "market_data": {
+    "provider": "binance",
+    "symbol": "ETHUSDT"
+  },
+
+  "logging": {
+    "level": "INFO"
+  }
+}

@@ -736,26 +736,20 @@ class Harbor(DexCommon):
                 balances.append({"symbol": symbol, "balance": bal})
         return 200, {"balances": {"exchange": balances}}
 
-    async def create_order(self, path, params, received_at_ms) -> Tuple[int, Dict[str, Any]]:
+    async def create_order(self, path, params, received_at_ms) -> Tuple[int, OrderResponse | OrderErrorResponse]:
         request = CreateOrderRequest(**params)
         try:
             market = await self._get_market(request.symbol)
         except HarborAPIError as exc:
             return self._harbor_error(exc)
         except KeyError:
-            return 400, OrderErrorResponse(
-                error_code="UNKNOWN_SYMBOL",
-                error_message=f"Symbol {request.symbol} is not listed on Harbor"
-            ).model_dump(mode="json")
+            return 400, OrderErrorResponse(error_code="UNKNOWN_SYMBOL", error_message=f"Symbol {request.symbol} is not listed on Harbor")
 
         try:
             price = ensure_multiple(Decimal(request.price), Decimal(market["priceTick"]), field_name="price")
             quantity = ensure_multiple(Decimal(request.quantity), Decimal(market["qtyTick"]), field_name="quantity")
         except ValueError as exc:
-            return 400, OrderErrorResponse(
-                error_code="INVALID_TICK",
-                error_message=str(exc)
-            ).model_dump(mode="json")
+            return 400, OrderErrorResponse(error_code="INVALID_TICK", error_message=str(exc))
 
         body = {
             "symbol": request.symbol,
@@ -776,7 +770,7 @@ class Harbor(DexCommon):
         self._order_index[resp.client_order_id] = _OrderIndex(resp.symbol, resp.order_id)
         return 200, resp.model_dump(mode="json")
 
-    async def cancel_order(self, path, params, received_at_ms) -> Tuple[int, Dict[str, Any]]:
+    async def cancel_order(self, path, params, received_at_ms) -> Tuple[int, OrderResponse | OrderErrorResponse]:
         p = CancelOrderParams(**params)
         idx = self._order_index.get(p.client_order_id)
         symbol = idx.symbol if idx else None
@@ -790,7 +784,7 @@ class Harbor(DexCommon):
         self._order_index[p.client_order_id] = _OrderIndex(resp.symbol, resp.order_id)
         return 200, resp.model_dump(mode="json")
 
-    async def list_open_orders(self, path, params, received_at_ms) -> Tuple[int, Dict[str, Any]]:
+    async def list_open_orders(self, path, params, received_at_ms) -> Tuple[int, QueryLiveOrdersResponse | OrderErrorResponse]:
         try:
             payload = await self._rest_client.get_orders(status="open")
         except HarborAPIError as exc:
@@ -938,10 +932,6 @@ class Harbor(DexCommon):
     ) -> Tuple[int, Dict[str, Any]]:
         send_ts = str(now_ns())
         message = exc.message or "Unknown Harbor error"
-        # ✨ 对典型 404 增加友好提示
-        if exc.status_code == 404 and (request_type == "ORDER" or request_type is None):
-            message = ("Not Found — likely uninitialized Harbor stagenet account (no deposit yet). "
-                    "Deposit via /xnode/inbound_addresses once it becomes available.")
         payload = {
             "error": {
                 "message": message,
@@ -954,16 +944,13 @@ class Harbor(DexCommon):
         }
         if exc.payload:
             payload["error"]["detail"] = exc.payload
-        if exc.status_code == 404:
-            _LOGGER.info(
-                "Harbor API 404 for type=%s client_request_id=%s request_id=%s: %s",
-                request_type, client_request_id, exc.request_id, message
-            )
-        else:
-            _LOGGER.warning(
-                "Harbor API error for request_type=%s client_request_id=%s request_id=%s: %s",
-                request_type, client_request_id, exc.request_id, message
-            )
+        _LOGGER.warning(
+            "Harbor API error for request_type=%s client_request_id=%s request_id=%s: %s",
+            request_type,
+            client_request_id,
+            exc.request_id,
+            message,
+        )
         return exc.status_code or 500, payload
 
     @staticmethod
@@ -1008,13 +995,11 @@ class Harbor(DexCommon):
             send_timestamp_ns=send_timestamp,
         )
 
-    def _harbor_error(self, exc: HarborAPIError) -> Tuple[int, Dict[str, Any]]:
+    def _harbor_error(self, exc: HarborAPIError) -> Tuple[int, OrderErrorResponse]:
         """
         Legacy-only error mapper for endpoints that are typed to OrderErrorResponse.
         (create_order / cancel_order / list_open_orders)
-        返回可序列化 JSON（而不是直接返回 Pydantic 对象）。
         """
         request_part = f" (request_id={exc.request_id})" if exc.request_id else ""
         message = f"Harbor error{request_part}: {exc.message}"
-        err = OrderErrorResponse(error_code="HARBOR_ERROR", error_message=message)
-        return exc.status_code, err.model_dump(mode="json")
+        return exc.status_code, OrderErrorResponse(error_code="HARBOR_ERROR", error_message=message)

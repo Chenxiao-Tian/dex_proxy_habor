@@ -1,51 +1,88 @@
+# harbor/dex_proxy/utils.py
 from __future__ import annotations
-import time
-from decimal import Decimal, ROUND_DOWN, InvalidOperation, getcontext
 
-# 保持与 Harbor 精度一致
-getcontext().prec = 28
+import time
+from decimal import Decimal, getcontext, InvalidOperation
+from typing import Optional
+
+__all__ = ["now_ns", "ensure_multiple"]
 
 
 def now_ns() -> int:
-    """Return current Unix timestamp in nanoseconds (int)."""
-    return int(time.time() * 1e9)
+    """
+    Return current time in integer nanoseconds.
+    """
+    try:
+        return time.time_ns()  # Py3.7+
+    except AttributeError:
+        return int(time.time() * 1_000_000_000)
+
+
+def _to_decimal(x) -> Decimal:
+    if isinstance(x, Decimal):
+        return x
+    # 防止 float 精度误差，统一走 str
+    return Decimal(str(x))
 
 
 def ensure_multiple(
     value: Decimal,
     tick: Decimal,
     *,
-    field_name: str = "value",
-    tol: Decimal | None = None
+    field_name: Optional[str] = None,
 ) -> Decimal:
     """
-    Ensure that the given value is a multiple of the tick size.
+    校验 value 是否为 tick 的整倍数；是则返回规范化后的值（尽量对齐 tick 的小数位），
+    否则抛出带字段名的 ValueError。兼容调用方传入 field_name=... 的写法。
 
-    Args:
-        value: Decimal — value to check (e.g., price, quantity)
-        tick: Decimal — tick size (e.g., priceTick or qtyTick)
-        field_name: used in error messages
-        tol: optional tolerance (default 1e-12)
-
-    Returns:
-        Decimal: rounded-down valid multiple if within tolerance
-
-    Raises:
-        ValueError: if not a multiple of tick
+    参数可为 Decimal / str / int / float（将被安全地转为 Decimal）。
     """
-    if tick <= 0:
+    # 统一成 Decimal
+    try:
+        value = _to_decimal(value)
+        tick = _to_decimal(tick) if tick is not None else None
+    except (InvalidOperation, ValueError):
+        # 兜底：无法解析成 Decimal 的情况直接抛错更明确
+        fname = f" for '{field_name}'" if field_name else ""
+        raise ValueError(f"invalid decimal input{fname}: value={value}, tick={tick}")
+
+    if tick is None:
         return value
 
+    # tick==0 或异常直接返回原值（由上游处理）
     try:
-        remainder = (value % tick).normalize()
-    except (InvalidOperation, ZeroDivisionError) as exc:
-        raise ValueError(f"Invalid {field_name} {value} for tick {tick}: {exc}") from exc
+        if tick == 0:
+            return value
+    except Exception:
+        return value
 
-    tolerance = tol if tol is not None else Decimal("1e-12")
+    # 提高精度，减少十进制误差
+    ctx = getcontext().copy()
+    if ctx.prec < 50:
+        ctx.prec = 50
+    getcontext().prec = ctx.prec  # 应用更高精度
 
-    if remainder > tolerance and abs(tick - remainder) > tolerance:
-        raise ValueError(f"{field_name}={value} is not a multiple of tick={tick}")
+    # 判定是否整倍数：value % tick == 0（允许极小噪声）
+    try:
+        remainder = value % tick
+    except (InvalidOperation, ValueError, ZeroDivisionError):
+        remainder = value - (value // tick) * tick  # 兜底
 
-    # Round down to nearest multiple
-    quantized = (value // tick) * tick
-    return quantized.quantize(tick, rounding=ROUND_DOWN)
+    # 允许极小的相对噪声
+    eps = (abs(tick) * Decimal("1e-30"))
+    if remainder == 0 or abs(remainder) < eps:
+        # 归一小数位：不多于 tick 的小数位
+        try:
+            # 通过 tick 的规范化字符串估计小数位
+            tick_str = f"{tick.normalize()}"
+            if "." in tick_str:
+                decimals = len(tick_str.split(".", 1)[1])
+                quant = Decimal(1).scaleb(-decimals)  # 10^-decimals
+                return value.quantize(quant)
+        except Exception:
+            pass
+        return value
+
+    # 不是整倍数 → 抛错
+    field = f" for '{field_name}'" if field_name else ""
+    raise ValueError(f"value{field}={value} is not a multiple of tick={tick}")
